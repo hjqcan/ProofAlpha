@@ -1,0 +1,20 @@
+Phase 7.4: Operator Runbook and Release Notes
+=============================================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Write the minimum operator documentation needed to run, stop, investigate, and
+evaluate Autotrade safely.
+
+Acceptance
+----------
+- Runbook covers setup, Paper run, readiness, Live arming, kill switch, strategy
+  control, export, incident review, and shutdown.
+- Release notes state what is supported, what is unsafe, and what is out of
+  scope.
+- Docs include exact commands and expected artifact locations.
+- Docs do not include real credentials or investment advice.

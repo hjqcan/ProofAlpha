@@ -1,0 +1,40 @@
+Phase 1.2: Local Auth and Command Modes
+=======================================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Protect the local control surface and make command availability explicit.
+
+Acceptance
+----------
+- Control-room routes are safe by default for local development.
+- Command execution can be disabled by configuration.
+- Snapshot response exposes data mode and command mode consistently.
+- Browser calls cannot perform commands when command mode is read-only.
+- No permissive CORS expansion is introduced.
+
+Implementation Notes
+--------------------
+- Keep local development ergonomic, but do not rely on obscurity for Live
+  safety.
+
+Completion Evidence
+-------------------
+- Control-room options now default to `ReadOnly`, disable control commands by
+  default, and require loopback access by default.
+- Snapshot command mode now reports the effective command mode, so disabled
+  configuration and read-only mode surface consistently to the Web App.
+- Control commands return a command response with `Disabled` or
+  `InvalidRequest` instead of executing or falling through to server errors.
+- Added loopback-only middleware for `/api/control-room` routes, with explicit
+  opt-out via `RequireLocalAccess=false`.
+- CORS no longer falls back to `AllowAnyOrigin`; empty configuration uses the
+  local Web App origins.
+- Regression: `dotnet test interfaces/Autotrade.Api.Tests/Autotrade.Api.Tests.csproj`
+  passed with 27 tests.
+- Regression: `dotnet test Autotrade.sln` passed with 329 tests.
+- Regression: `git diff --check` passed with line-ending warnings only.

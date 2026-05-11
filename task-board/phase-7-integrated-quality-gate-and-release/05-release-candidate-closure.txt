@@ -1,0 +1,31 @@
+Phase 7.5: Release Candidate Closure
+====================================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Close the product-hardening milestone with a single evidence-backed release
+record.
+
+Required Evidence
+-----------------
+- `dotnet restore`
+- `dotnet build`
+- `dotnet test`
+- `npm run build`
+- acceptance runner report
+- readiness artifacts
+- Paper run report
+- command audit evidence
+- risk and replay evidence
+- browser screenshots
+- operator runbook
+
+Acceptance
+----------
+- Release record links every required artifact.
+- Any residual limitation is explicit and not hidden as technical debt.
+- Product-hardening phase files are updated only after evidence exists.

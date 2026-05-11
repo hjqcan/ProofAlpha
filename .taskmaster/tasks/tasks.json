@@ -1,0 +1,885 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": "1",
+        "title": "Infrastructure Setup and Domain Model Definition",
+        "description": "Initialize the C# solution with DDD structure, configuration, and core domain model.",
+        "details": "Set up a solution with Domain, Application, Infrastructure, and CLI projects. Define aggregate roots and entities: Market, OrderBook, Order, Position, Account, TradingAccount, and RiskEvent. Implement base Entity, AggregateRoot, ValueObject, and DomainEvent types with invariants and validation. Configure DI, options binding, Serilog with correlation IDs, and EF Core PostgreSQL context with migrations. Provide appsettings.json plus environment variable overrides and local secrets support.",
+        "testStrategy": "Unit tests for domain invariants and value objects; migration smoke test with local Postgres; verify logging and config bootstrap.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Scaffold Solution, Projects, and Build Conventions",
+            "description": "Create the solution, project graph, and baseline build rules.",
+            "dependencies": [],
+            "details": "Create a solution with Domain, Application, Infrastructure, and CLI projects plus test projects. Establish references: Application -> Domain, Infrastructure -> Application/Domain, CLI -> Infrastructure/Application. Add Directory.Build.props/.targets and .editorconfig to enforce nullable, analyzers, warning levels, and deterministic builds.",
+            "status": "done",
+            "testStrategy": "Run dotnet build and dotnet test to confirm the project graph and analyzers are active.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement DDD Base Types and Guard Utilities",
+            "description": "Define foundational entity, value object, and domain event primitives.",
+            "dependencies": [1],
+            "details": "Implement base Entity (ID equality), AggregateRoot (domain event collection), ValueObject (structural equality), and IDomainEvent. Add guard/Result utilities for invariant enforcement and allow events to be queued and cleared.",
+            "status": "done",
+            "testStrategy": "Unit tests for ValueObject equality, Entity ID comparison, and DomainEvent collection/clearing logic.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Model Core Domain Entities and Invariants",
+            "description": "Define trading entities and enforce invariants.",
+            "dependencies": [2],
+            "details": "Implement Market, OrderBook, Order, Position, Account, TradingAccount, and RiskEvent. Define enums/value objects such as OrderSide, OrderType, OrderStatus, Price, Quantity, and MarketStatus. Enforce invariants like positive quantity/price and valid state transitions.",
+            "status": "done",
+            "testStrategy": "Unit tests for each entity to verify business rule validation and state transitions.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Configure DI, Options, and Structured Logging",
+            "description": "Set up application bootstrap with config layering and Serilog.",
+            "dependencies": [1],
+            "details": "Configure the Options pattern with appsettings.json, environment variable overrides, and local secrets. Integrate Serilog with structured JSON output and correlation ID enrichment. Register core services in DI with lifetimes appropriate for execution.",
+            "status": "done",
+            "testStrategy": "Verify config binding from appsettings and env vars, and that logs include correlation IDs.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "EF Core DbContext, Mappings, and Migrations",
+            "description": "Create PostgreSQL persistence with mappings and migrations.",
+            "dependencies": [3, 4],
+            "details": "Implement DbContext in Infrastructure with Fluent API mappings, indexes, and concurrency tokens. Configure connection string handling and add the initial migration. Ensure domain events are dispatched or collected during SaveChanges.",
+            "status": "done",
+            "testStrategy": "Migration smoke test against local Postgres and CRUD round-trip on key entities.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Testing Baseline and Fixtures",
+            "description": "Establish unit and integration test fixtures for domain and persistence.",
+            "dependencies": [1, 5],
+            "details": "Create test projects and shared fixtures (in-memory or containerized Postgres). Provide reusable helpers for domain entity construction and DbContext setup to support later tasks.",
+            "status": "done",
+            "testStrategy": "Run dotnet test to confirm fixtures initialize and tear down cleanly.",
+            "parentId": "undefined"
+          }
+        ]
+      },
+      {
+        "id": "2",
+        "title": "Polymarket API Client with Rate Limiting and Retries",
+        "description": "Implement the REST client with resilience, auth, and rate limiting.",
+        "details": "Develop PolymarketApiClient using HttpClientFactory with timeouts and cancellation tokens. Implement methods for market metadata, order place/cancel, order status, balances, and positions. Add request signing or auth and idempotency keys. Integrate Polly retries with jitter for transient errors only, plus a token-bucket rate limiter and circuit breaker. Emit structured logs and metrics.",
+        "testStrategy": "Contract tests against a mock server for auth, idempotency, rate limiting, retry behavior, and timeout handling.",
+        "priority": "high",
+        "dependencies": ["1"],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define API Contracts and Client Options",
+            "description": "Model request/response DTOs and client configuration.",
+            "dependencies": [],
+            "details": "Define DTOs for markets, orders, balances, positions, and error responses. Add strongly typed options for BaseUrl, API keys, timeouts, retry, and rate limit settings with validation. Configure JSON serialization (naming, enums).",
+            "status": "done",
+            "testStrategy": "Serialization tests to verify DTOs match expected JSON shapes.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement Authentication and Request Signing",
+            "description": "Add auth headers and signing logic for private endpoints.",
+            "dependencies": [1],
+            "details": "Implement signing/canonicalization, timestamp/nonce handling, and secure key retrieval. Ensure secrets are not logged and auth headers are redacted.",
+            "status": "done",
+            "testStrategy": "Unit tests for signature determinism and header construction.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Configure HttpClientFactory Pipeline and Error Mapping",
+            "description": "Create a typed client and map API errors to typed results.",
+            "dependencies": [2],
+            "details": "Build a typed HttpClient with base address, default headers, timeouts, and delegating handlers for auth, idempotency, and logging. Map non-success responses to typed ApiError/Result and classify transient errors.",
+            "status": "done",
+            "testStrategy": "Mock server tests to verify handler order and error mapping.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Resilience Policies with Retry-After Support",
+            "description": "Add Polly retry and circuit breaker policies with jitter.",
+            "dependencies": [3],
+            "details": "Retry only idempotent operations on 5xx/429/timeouts with exponential backoff and jitter. Respect Retry-After headers and implement circuit breaker with half-open probing.",
+            "status": "done",
+            "testStrategy": "Simulate 429/5xx responses to validate retry delays and breaker transitions.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Client-Side Rate Limiting and Concurrency Control",
+            "description": "Throttle outgoing requests using a token-bucket limiter.",
+            "dependencies": [4],
+            "details": "Implement token-bucket rate limiting with per-endpoint budgets and concurrency gating. Integrate with the HTTP pipeline and expose usage metrics.",
+            "status": "done",
+            "testStrategy": "Load test to ensure request rate stays within configured thresholds.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Implement Core API Methods and Idempotency Keys",
+            "description": "Add market, order, and account methods with validation.",
+            "dependencies": [5],
+            "details": "Implement GetMarkets, PlaceOrder, CancelOrder, GetOrderStatus, GetBalances, and GetPositions. Validate inputs, handle pagination, and include idempotency keys for mutating calls.",
+            "status": "done",
+            "testStrategy": "Contract tests against mock endpoints to verify request shapes and idempotency headers.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 7,
+            "title": "Observability and Contract Test Harness",
+            "description": "Add telemetry and a mock server test suite.",
+            "dependencies": [6],
+            "details": "Emit structured logs and metrics (latency, error rate, rate-limit hits) with correlation IDs. Build a mock server harness to verify auth, retries, rate limiting, and error handling.",
+            "status": "done",
+            "testStrategy": "End-to-end mock tests covering success, throttling, and outage scenarios.",
+            "parentId": "undefined"
+          }
+        ]
+      },
+      {
+        "id": "3",
+        "title": "WebSocket Market Data Provider and Subscription Manager",
+        "description": "Implement real-time market data with snapshot plus delta order book handling.",
+        "details": "Create a WebSocket client to subscribe to order book updates with snapshot plus delta handling and sequence validation. Maintain local OrderBook state with best bid/ask and depth. Implement SubscriptionManager for topics, heartbeats, backoff with jitter, and resubscribe on reconnect. Build a MarketCatalog service that refreshes metadata and filters markets by expiry, liquidity, and category. On reconnect, rebuild state from fresh snapshots.",
+        "testStrategy": "Integration tests with mocked WS streams including out-of-order messages; verify state rebuild and resubscription; manual soak test optional.",
+        "priority": "high",
+        "dependencies": ["2"],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "WebSocket Connection Lifecycle and Heartbeats",
+            "description": "Implement the WS client with reconnect, heartbeat, and cancellation handling.",
+            "dependencies": [],
+            "details": "Build a ClientWebSocket wrapper with connect/disconnect, cancellation tokens, ping/pong or heartbeat messages, and exponential backoff with jitter. Detect stale connections via read timeouts and heartbeat misses.",
+            "status": "done",
+            "testStrategy": "Unit tests for backoff schedule and integration tests with a mock WS server to verify heartbeat timeouts.",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-04T09:11:42.720Z"
+          },
+          {
+            "id": 2,
+            "title": "Protocol Parsing and Message Validation",
+            "description": "Define message contracts and validate incoming payloads.",
+            "dependencies": [1],
+            "details": "Define DTOs for snapshot, delta, subscription ack, and error messages. Implement JSON parsing, required-field validation, and schema version handling with clear error reporting.",
+            "status": "done",
+            "testStrategy": "Serialization tests against sample payloads and invalid message handling.",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-04T09:11:42.722Z"
+          },
+          {
+            "id": 3,
+            "title": "Subscription Registry and Resubscribe Logic",
+            "description": "Track active topics and recover subscriptions after reconnect.",
+            "dependencies": [2],
+            "details": "Implement SubscriptionManager to track active market topics, handle subscribe/unsubscribe requests, and resubscribe automatically after reconnect. Add thread-safe queueing for outbound subscription messages.",
+            "status": "done",
+            "testStrategy": "Simulate disconnect/reconnect to verify resubscribe messages are replayed in order.",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-04T09:11:42.722Z"
+          },
+          {
+            "id": 4,
+            "title": "Snapshot + Delta Sequencing and Resync",
+            "description": "Apply deltas to snapshots with sequence validation and resync on gaps.",
+            "dependencies": [2, 3],
+            "details": "Fetch initial REST snapshots, buffer incoming deltas until snapshot arrives, and apply deltas with sequence checks. Detect gaps or out-of-order updates and trigger a controlled resync with throttling to avoid loops.",
+            "status": "done",
+            "testStrategy": "Mock streams with missing/out-of-order sequences to confirm resync and state recovery.",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-04T09:11:42.723Z"
+          },
+          {
+            "id": 5,
+            "title": "Local OrderBook Store and Depth Queries",
+            "description": "Maintain an in-memory order book with top-of-book and depth queries.",
+            "dependencies": [],
+            "details": "Implement price level storage with sorted maps, apply incremental updates, expose best bid/ask, depth at levels, and snapshot access. Ensure thread-safe reads for strategy consumers.",
+            "status": "done",
+            "testStrategy": "Unit tests for add/update/remove levels and top-of-book accuracy.",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-04T09:11:42.724Z"
+          },
+          {
+            "id": 6,
+            "title": "MarketCatalog Refresh and Filtering",
+            "description": "Refresh market metadata and filter eligible markets.",
+            "dependencies": [],
+            "details": "Implement periodic metadata refresh with TTL, filter by expiry, liquidity, category, and status, and emit diffs for new/closed markets.",
+            "status": "done",
+            "testStrategy": "Unit tests for filter rules and integration tests for refresh cadence.",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-04T09:11:42.724Z"
+          },
+          {
+            "id": 7,
+            "title": "Market Data Observability Hooks",
+            "description": "Expose metrics and logs for market data health.",
+            "dependencies": [1, 4],
+            "details": "Emit metrics for message lag, reconnect counts, resync events, and order book update rates. Add structured logs for reconnect reasons and snapshot refreshes.",
+            "status": "done",
+            "testStrategy": "Simulate disconnects and verify metric/log emission.",
+            "parentId": "undefined",
+            "updatedAt": "2026-01-04T09:11:42.725Z"
+          }
+        ],
+        "updatedAt": "2026-01-04T09:11:42.725Z"
+      },
+      {
+        "id": "4",
+        "title": "Execution Engine with Paper Trading Support",
+        "description": "Develop the execution layer that toggles between Live and Paper trading modes.",
+        "details": "Implement IExecutionService with LiveExecutionService and PaperExecutionService. Support order types FAK/FOK/GTC/GTD and partial fills. Track client order IDs for idempotency and map to exchange IDs. Implement order state machine (Pending -> Open -> PartiallyFilled -> Filled/Canceled). Paper mode sim rules configurable for price, slippage, and partial fill probability.",
+        "testStrategy": "Unit tests for state machine transitions and paper fill rules; integration tests for live idempotency and cancel flows.",
+        "priority": "high",
+        "dependencies": ["2", "3"],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Execution Contracts and Validation",
+            "description": "Define execution interfaces, requests, and validation rules.",
+            "dependencies": [],
+            "details": "Define IExecutionService and DTOs such as OrderRequest/OrderResult, with validation for price/quantity, time-in-force, and market IDs. Use the domain Order state machine for transitions.",
+            "status": "done",
+            "testStrategy": "Unit tests for request validation and state transition mapping.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Idempotency Store and Order Tracking",
+            "description": "Prevent duplicate submissions and track client-to-exchange IDs.",
+            "dependencies": [1],
+            "details": "Introduce IIdempotencyStore to map ClientOrderId to ExchangeOrderId and track request hashes. Provide an in-memory implementation with TTL and duplicate detection.",
+            "status": "done",
+            "testStrategy": "Unit tests for duplicate prevention and lookup behavior.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "LiveExecutionService Implementation",
+            "description": "Integrate with PolymarketApiClient for live trading.",
+            "dependencies": [1, 2],
+            "details": "Implement PlaceOrder, CancelOrder, and GetOrderStatus using PolymarketApiClient. Map API errors to execution results, respect idempotency keys, and handle timeouts or transient failures.",
+            "status": "done",
+            "testStrategy": "Mock API tests for success/failure paths and idempotency behavior.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "PaperExecutionService Simulation",
+            "description": "Simulate fills from order book data with configurable rules.",
+            "dependencies": [1, 2],
+            "details": "Implement simulated matching with configurable slippage, partial fills, and latency. Use order book snapshots for price reference and allow deterministic mode for tests.",
+            "status": "done",
+            "testStrategy": "Unit tests for slippage, partial fill, and deterministic runs.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Order Updates and Reconciliation",
+            "description": "Keep execution state in sync with exchange reality.",
+            "dependencies": [3],
+            "details": "Implement polling or user order stream handling to update order status and fills. On startup, reconcile open orders and balances to avoid stale state.",
+            "status": "done",
+            "testStrategy": "Integration test verifying reconciliation updates local state after simulated restart.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Time-in-Force Handling",
+            "description": "Support FAK/FOK/GTC/GTD semantics in both modes.",
+            "dependencies": [3, 4],
+            "details": "Implement time-in-force behavior including GTD expiry scheduling, FOK/FAK immediate logic, and consistent cancel semantics across Live and Paper modes.",
+            "status": "done",
+            "testStrategy": "Unit tests for each time-in-force path and GTD expiration handling.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 7,
+            "title": "Execution Mode Routing and Telemetry Hooks",
+            "description": "Select execution mode from config and emit core telemetry.",
+            "dependencies": [3, 4, 6],
+            "details": "Wire DI or factory to choose Live/Paper via configuration. Emit structured logs and metrics for order latency, rejection reasons, and fill rates with correlation IDs.",
+            "status": "done",
+            "testStrategy": "Integration test for config-based mode resolution and log/metric emission.",
+            "parentId": "undefined"
+          }
+        ]
+      },
+      {
+        "id": "5",
+        "title": "Risk Management Module and Kill Switch",
+        "description": "Implement global and strategy-level risk constraints and emergency stop.",
+        "details": "Create RiskManager with checks for MaxCapitalPerMarket 0.05, MaxCapitalPerStrategy 0.30, MaxTotalCapitalUtilization 0.50, MaxOpenOrders 20, MaxConcurrentMarketsPerStrategy 3, DailyLossLimitPct 0.02 optional, MaxConsecutiveOrderErrors 10 optional, MaxUnhedgedCapitalPerMarket 0.02, and MaxFirstLegExposureSeconds 120. Enforce checks before order placement and on order updates. Implement Kill Switch to cancel open orders and block new ones. Emit RiskEvent records and structured logs.",
+        "testStrategy": "Unit tests for each threshold and Kill Switch behavior; scenario tests for unhedged exposure timeout and global stop.",
+        "priority": "high",
+        "dependencies": ["1", "4"],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Risk Configuration Schema and Validation",
+            "description": "Define risk thresholds, defaults, and validation rules.",
+            "dependencies": [],
+            "details": "Define RiskConfiguration with defaults and ranges for all thresholds (global and per-strategy). Support config binding and validation with clear error messages. Define RiskEvent schema with reason codes and severity.",
+            "status": "done",
+            "testStrategy": "Unit tests for config validation and default value application.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Exposure and Capital Accounting",
+            "description": "Track capital usage, open orders, and unhedged exposure.",
+            "dependencies": [1],
+            "details": "Implement accounting for available capital, per-market utilization, per-strategy utilization, open order counts, and unhedged exposure. Provide snapshot methods for RiskManager to consume.",
+            "status": "done",
+            "testStrategy": "Unit tests for accounting calculations with open orders and partial fills.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Risk Policy Evaluation Pipeline",
+            "description": "Evaluate pre-trade and post-trade risk policies with reason codes.",
+            "dependencies": [1, 2],
+            "details": "Implement RiskManager.ValidateOrder with ordered policies for capital limits, open order limits, per-strategy limits, and unhedged exposure caps. Return typed results with reason codes and suggested actions.",
+            "status": "done",
+            "testStrategy": "Unit tests per policy to verify correct rejection reasons.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Kill Switch and Circuit Breaker States",
+            "description": "Implement manual and automatic stop states.",
+            "dependencies": [3],
+            "details": "Implement global and strategy-level kill switches with explicit states (Enabled, SoftStop, HardStop). Ensure new orders are blocked and existing orders are canceled or held based on mode.",
+            "status": "done",
+            "testStrategy": "Scenario tests for manual stop and automatic stop triggers.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Unhedged Exposure Watchdog",
+            "description": "Enforce MaxFirstLegExposureSeconds and unhedged limits.",
+            "dependencies": [3],
+            "details": "Track first-leg exposure per market and enforce timeouts. On timeout, trigger configured exit actions and emit RiskEvents with context.",
+            "status": "done",
+            "testStrategy": "Simulated partial-fill scenario to verify timeout enforcement and exit behavior.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Risk Events, Error Counters, and Metrics",
+            "description": "Emit RiskEvents, track errors, and expose metrics.",
+            "dependencies": [3, 4, 5],
+            "details": "Record RiskEvents for all rejections and state changes. Track MaxConsecutiveOrderErrors and DailyLossLimitPct, and emit metrics for risk triggers and utilization.",
+            "status": "done",
+            "testStrategy": "Unit tests for error counters and daily loss calculation; verify event payloads.",
+            "parentId": "undefined"
+          }
+        ]
+      },
+      {
+        "id": "6",
+        "title": "Strategy Engine and Lifecycle Management",
+        "description": "Build the StrategyManager to coordinate multiple concurrent trading strategies.",
+        "details": "Define ITradingStrategy with SelectMarkets, EvaluateEntry, EvaluateExit, OnOrderUpdate or OnOrderFilled, Start, Pause, and Stop. Implement StrategyManager with scheduling, concurrency, and isolation via supervision and cancellation tokens. Support parameter injection and config reload on restart; ensure strategy failures do not crash the engine. Record decision reasons for audit.",
+        "testStrategy": "Mock strategy tests for lifecycle and error isolation; concurrency test with multiple strategies consuming shared data.",
+        "priority": "medium",
+        "dependencies": ["3", "5"],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define Strategy Interfaces and Context",
+            "description": "Create core strategy interfaces, context, and metadata.",
+            "dependencies": [],
+            "details": "Define ITradingStrategy with SelectMarkets, EvaluateEntry, EvaluateExit, OnOrderUpdate/OnOrderFilled, Start, Pause, and Stop. Define StrategyContext with MarketData access, ExecutionService, RiskManager, clock, and logger. Include metadata (name, version, capabilities).",
+            "status": "done",
+            "testStrategy": "Mock implementation to verify context wiring and lifecycle calls.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Strategy Registration and Factory",
+            "description": "Register strategies and construct them via DI.",
+            "dependencies": [1],
+            "details": "Implement a registry that maps strategy IDs to factories. Validate uniqueness, wire configuration sections to strategy types, and construct instances with DI.",
+            "status": "done",
+            "testStrategy": "Unit tests for registration, duplicate detection, and factory resolution.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Strategy Runner, Scheduling, and Data Routing",
+            "description": "Deliver market data and order updates to strategies with backpressure.",
+            "dependencies": [2],
+            "details": "Implement per-strategy queues for market data and order updates using Channels. Provide scheduling cadence and backpressure handling to avoid slow consumers blocking the engine.",
+            "status": "done",
+            "testStrategy": "Load tests with slow strategies to verify backpressure and ordering.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Lifecycle State Machine and Supervision",
+            "description": "Isolate failures and manage strategy lifecycle transitions.",
+            "dependencies": [3],
+            "details": "Implement strategy states (Running, Paused, Stopped, Faulted) with guarded transitions. Add supervision policies for restart, cooldown, and manual intervention.",
+            "status": "done",
+            "testStrategy": "Inject exceptions to verify fault isolation and correct state transitions.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Parameter Binding and Config Versioning",
+            "description": "Bind config to strategy parameters with version tracking.",
+            "dependencies": [2],
+            "details": "Bind per-strategy config sections to typed options and maintain a version stamp. Support safe reload by pausing/resuming or by swapping in a new instance.",
+            "status": "done",
+            "testStrategy": "Integration test updating config to verify version increments and safe reload behavior.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Decision Logging and State Reporting",
+            "description": "Capture decision reasons and expose status for CLI and audit.",
+            "dependencies": [3, 5],
+            "details": "Implement structured decision logs with inputs, thresholds, and outcomes. Expose strategy runtime stats (state, last decision, active markets) for CLI and persistence.",
+            "status": "done",
+            "testStrategy": "Verify decision logs and status snapshots for multiple strategies.",
+            "parentId": "undefined"
+          }
+        ]
+      },
+      {
+        "id": "7",
+        "title": "Dual-Leg Arbitrage Strategy Implementation",
+        "description": "Implement same-market dual-leg arbitrage with hedging safeguards.",
+        "details": "Implement DualLegStrategy for same-market Yes/No arbitrage. Compute PairCostThreshold where cost(Yes) + cost(No) < 1, apply liquidity and time-to-expiry filters, place first leg then hedge second leg. Enforce MaxUnhedgedCapitalPerMarket and MaxFirstLegExposureSeconds; on timeout, execute configured exit (cancel or market-sell) and log reason. Integrate with RiskManager and ExecutionService.",
+        "testStrategy": "Paper trading simulation for normal fills, partial fills, and hedge timeout; verify risk triggers and decision logs.",
+        "priority": "medium",
+        "dependencies": ["6"],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define Strategy Parameters and Validation",
+            "description": "Specify Dual-Leg configuration and validate defaults.",
+            "dependencies": [],
+            "details": "Define parameters such as PairCostThreshold, MinLiquidity, MinTimeToExpiry, MaxSlippagePct, MaxUnhedgedCapitalPerMarket, and MaxFirstLegExposureSeconds. Provide defaults and validation for ranges and units.",
+            "status": "done",
+            "testStrategy": "Unit tests for parameter validation and default application.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Market Selection and Filtering",
+            "description": "Implement SelectMarkets with liquidity, expiry, and price checks.",
+            "dependencies": [1],
+            "details": "Filter by liquidity, time-to-expiry, market status, and pair cost (Yes+No) below threshold. Exclude markets with insufficient depth or stale data.",
+            "status": "done",
+            "testStrategy": "Unit tests using mocked order books to verify filtering and threshold logic.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Entry Evaluation and Order Sizing",
+            "description": "Compute order sizes and entry decisions under risk limits.",
+            "dependencies": [2],
+            "details": "Calculate size based on available capital, depth, and slippage constraints. Integrate RiskManager checks for MaxUnhedgedCapitalPerMarket and MaxCapitalPerMarket before emitting orders.",
+            "status": "done",
+            "testStrategy": "Unit tests for sizing and risk gating across different liquidity scenarios.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Leg Execution State Machine",
+            "description": "Track first/second leg state and handle partial fills.",
+            "dependencies": [3],
+            "details": "Implement a strategy state machine to track first leg pending/filled, second leg hedge status, and partial fills. Handle cancel/replace logic and ensure idempotent state updates.",
+            "status": "done",
+            "testStrategy": "Integration tests with mocked ExecutionService for partial fills and state transitions.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Timeout Safeguards and Exit Logic",
+            "description": "Enforce exposure timeouts and exit actions.",
+            "dependencies": [4],
+            "details": "Monitor MaxFirstLegExposureSeconds and trigger configured exit actions (cancel/market-sell). Emit RiskEvents and decision logs with context.",
+            "status": "done",
+            "testStrategy": "Simulated latency tests to confirm timeout handling and exit dispatch.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Strategy Registration, Telemetry, and Soak Tests",
+            "description": "Integrate with StrategyManager and validate end-to-end behavior.",
+            "dependencies": [5],
+            "details": "Register DualLegStrategy with parameter injection. Add structured decision logs, metrics for hit rate/hedge time, and conduct paper trading soak tests.",
+            "status": "done",
+            "testStrategy": "Paper trading simulation to verify end-to-end flow, risk triggers, and decision log accuracy.",
+            "parentId": "undefined"
+          }
+        ]
+      },
+      {
+        "id": "8",
+        "title": "Persistence Layer and Audit Logging",
+        "description": "Implement PostgreSQL storage for trades, orders, and decision logs.",
+        "details": "Configure EF Core mappings for Order, Trade, Position, RiskEvent, StrategyState, and ConfigVersion. Add migrations, indexes for common queries, and retention hooks. Implement audit logging that writes structured strategy decisions and order events to the database for export.",
+        "testStrategy": "Database integration tests for migrations, insert/update consistency, and audit log retrieval.",
+        "priority": "medium",
+        "dependencies": ["1", "7"],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "EF Core Entity Mappings and Precision Rules",
+            "description": "Define Fluent API configurations and numeric precision.",
+            "dependencies": [],
+            "details": "Map domain entities to PostgreSQL tables. Define decimal precision for prices/quantities, configure enums, and use jsonb for StrategyState/ConfigVersion. Ensure PK/FK relationships and owned types are explicit.",
+            "status": "done",
+            "testStrategy": "Model validation tests to verify mappings and precision settings.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Migrations and Indexing Strategy",
+            "description": "Create migrations and add query-critical indexes.",
+            "dependencies": [1],
+            "details": "Create initial migrations. Add indexes for MarketId, OrderStatus, Timestamp, StrategyId, and correlation IDs. Add composite indexes for trade history and audit queries.",
+            "status": "done",
+            "testStrategy": "Migration smoke test against a local PostgreSQL container to verify schema integrity.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Repository, Unit of Work, and Concurrency",
+            "description": "Implement data access patterns with optimistic concurrency.",
+            "dependencies": [2],
+            "details": "Create repositories for Order, Trade, Position, and RiskEvent. Implement Unit of Work with explicit transaction scopes and optimistic concurrency tokens to prevent lost updates.",
+            "status": "done",
+            "testStrategy": "Integration tests for CRUD and concurrency conflict handling.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Audit Logging and Event Persistence",
+            "description": "Persist strategy decisions and execution events with correlation IDs.",
+            "dependencies": [3],
+            "details": "Implement an AuditLogger that writes structured decision data and order lifecycle events. Include correlation IDs, strategy IDs, and execution mode. Ensure failures are surfaced without blocking trading.",
+            "status": "done",
+            "testStrategy": "Verify that strategy decisions are correctly serialized and retrievable from the database.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Read Models and Export Queries",
+            "description": "Provide efficient queries for CLI export and reporting.",
+            "dependencies": [4],
+            "details": "Implement query helpers or projections for orders, trades, PnL, and audit logs. Ensure paging and time-range filters are supported for export.",
+            "status": "done",
+            "testStrategy": "Integration tests for export queries and paging correctness.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Retention and Maintenance Jobs",
+            "description": "Implement cleanup and maintenance routines.",
+            "dependencies": [5],
+            "details": "Add retention policies for old audit logs and strategy states. Provide a background worker or scheduled job for cleanup and optional archive export.",
+            "status": "done",
+            "testStrategy": "Integration test to verify that records older than the retention threshold are correctly purged.",
+            "parentId": "undefined"
+          }
+        ]
+      },
+      {
+        "id": "9",
+        "title": "CLI Interface and Configuration Management",
+        "description": "Develop the command-line interface for system control and configuration.",
+        "details": "Develop CLI using Spectre.Console or CommandDotNet. Commands: start, stop, status, positions, orders, pnl, config get/set, and export. Validate inputs, confirm destructive actions, and record config changes with versioning. Support appsettings.json plus environment variable overrides.",
+        "testStrategy": "End-to-end CLI tests with snapshot outputs and config change audits.",
+        "priority": "low",
+        "dependencies": ["6", "8"],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "CLI Bootstrap, DI, and Global Options",
+            "description": "Initialize CLI scaffolding, dependency injection, and global flags.",
+            "dependencies": [],
+            "details": "Create the CLI project and wire CommandApp with DI. Add global options (e.g., --config, --output, --json, --no-color, --non-interactive). Provide consistent error handling and a root help command.",
+            "status": "done",
+            "testStrategy": "Verify CLI boots, shows help, and parses global options correctly.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Output Schema and Exit Codes",
+            "description": "Define stable CLI output formats and error codes.",
+            "dependencies": [1],
+            "details": "Define a standard output schema for JSON and human-readable formats. Standardize exit codes and stderr usage for errors to keep automation predictable.",
+            "status": "done",
+            "testStrategy": "Snapshot tests for JSON output and error code mapping.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "System Control and Status Commands",
+            "description": "Implement start/stop/status/positions/orders/pnl commands.",
+            "dependencies": [2],
+            "details": "Wire commands to StrategyManager and state queries. Include connection status, subscription counts, risk mode, and basic PnL/positions summaries with stable column ordering.",
+            "status": "done",
+            "testStrategy": "Integration tests with mocked services to verify command outputs and state transitions.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Configuration Commands and Safe Writes",
+            "description": "Implement config get/set with validation and versioning.",
+            "dependencies": [2],
+            "details": "Implement config get/set with schema validation, atomic file writes, and version stamping. Respect environment overrides and redact secrets in output.",
+            "status": "done",
+            "testStrategy": "Tests for validation failures, atomic writes, and secret redaction.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Export Commands and Filtering",
+            "description": "Implement export of orders, trades, and audit logs.",
+            "dependencies": [2, 3, 4],
+            "details": "Add export commands with format selection (CSV/JSON), time-range filters, paging, and stdout support. Validate file paths and warn on overwrite.",
+            "status": "done",
+            "testStrategy": "Integration tests for export filters, paging, and output formats.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "CLI Safety, Automation, and Audit Hooks",
+            "description": "Harden CLI behavior for scripts and auditability.",
+            "dependencies": [5],
+            "details": "Add non-interactive mode, confirmation bypass flags, and consistent exit codes. Emit audit logs for config changes and destructive actions.",
+            "status": "done",
+            "testStrategy": "End-to-end CLI tests for non-interactive mode, confirmations, and audit log entries.",
+            "parentId": "undefined"
+          }
+        ]
+      },
+      {
+        "id": "10",
+        "title": "Observability and Health Monitoring",
+        "description": "Add health checks, metrics, and structured diagnostics.",
+        "details": "Add health checks for WS connectivity, API latency, and database availability. Implement metrics for subscription lag, order throughput, fill rate, and strategy decision latency. Correlate logs with trace IDs and provide optional Prometheus exporter.",
+        "testStrategy": "Integration tests for health reporting during simulated failures; verify metrics emission.",
+        "priority": "low",
+        "dependencies": ["9"],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Health Checks: Liveness and Readiness",
+            "description": "Implement health endpoints with dependency-aware checks.",
+            "dependencies": [],
+            "details": "Configure Microsoft.Extensions.Diagnostics.HealthChecks with liveness and readiness checks. Include WS connectivity, API reachability, DB availability, and background loop status with timeouts.",
+            "status": "done",
+            "testStrategy": "Integration tests for healthy/unhealthy responses under simulated failures.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Metrics Instrumentation and Cardinality Controls",
+            "description": "Define metrics and enforce low-cardinality labels.",
+            "dependencies": [1],
+            "details": "Instrument meters for latency, order throughput, fill rates, subscription lag, and risk triggers. Define safe tag sets to avoid high-cardinality labels (e.g., coarse market categories instead of IDs).",
+            "status": "done",
+            "testStrategy": "Unit tests to verify counters and histograms increment with expected tags.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Tracing and Log Correlation",
+            "description": "Add Activity tracing and correlate logs across async boundaries.",
+            "dependencies": [1],
+            "details": "Add ActivitySource instrumentation for API calls, WS processing, and strategy decisions. Ensure Serilog includes TraceId/SpanId and propagate correlation IDs through async operations.",
+            "status": "done",
+            "testStrategy": "Integration tests to verify trace IDs are present and consistent across components.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Metrics Exporters (Prometheus/OTLP)",
+            "description": "Expose metrics via Prometheus and optional OTLP.",
+            "dependencies": [2],
+            "details": "Implement Prometheus exporter and optional OTLP exporter with configuration flags. Expose /metrics endpoint and document scrape settings.",
+            "status": "done",
+            "testStrategy": "Integration test to scrape /metrics and validate expected metric names.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Diagnostics, Thresholds, and Alert Signals",
+            "description": "Aggregate signals and emit actionable alerts.",
+            "dependencies": [2, 3, 4],
+            "details": "Aggregate health and metrics into periodic diagnostic logs. Define thresholds for high latency, high lag, and error rates; emit warning-level logs and alert signals with context.",
+            "status": "done",
+            "testStrategy": "Simulate threshold breaches and verify alert logs and counters.",
+            "parentId": "undefined"
+          }
+        ]
+      },
+      {
+        "id": "11",
+        "title": "Spot Price Feed and Market Window Specification",
+        "description": "Add a reference spot price feed and enrich market metadata with explicit window/settlement specs needed for lag-based strategies.",
+        "details": "Introduce a MarketData-side spot price feed abstraction (ticks/bars) and at least one provider implementation. Add a MarketWindowSpec and market metadata enrichment to precisely define short-window markets (start/end alignment, underlying symbol, threshold/settlement reference, and token mappings). Expose a unified read interface to the StrategyContext without leaking provider-specific concerns.",
+        "testStrategy": "Unit tests for window spec parsing and time alignment; mock feed integration tests for reconnect/backoff and last-price store correctness.",
+        "priority": "medium",
+        "dependencies": ["3"],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define Spot Price Contracts and Storage",
+            "description": "Create spot price tick/bar contracts and a thread-safe in-memory store.",
+            "dependencies": [],
+            "details": "Define DTOs such as SpotPriceTick/SpotBar, and contracts such as ISpotPriceFeed and ISpotPriceStore. Ensure timestamps are UTC and monotonic handling is well-defined. Provide a simple in-memory store with last-value and recent-history access for strategies.",
+            "status": "done",
+            "testStrategy": "Unit tests for store updates, out-of-order tick handling, and UTC timestamp normalization.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement a Spot Provider with Reconnect and Backoff",
+            "description": "Add a first spot feed provider implementation (WS or REST polling) with resilience.",
+            "dependencies": [1],
+            "details": "Implement at least one provider (configurable) with reconnect/backoff, cancellation support, and bounded buffering. Do not hardcode exchange details into the Strategy layer. Emit metrics for lag and reconnect counts.",
+            "status": "done",
+            "testStrategy": "Integration tests using a mocked feed stream to verify reconnect/backoff behavior and store updates.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Define MarketWindowSpec and Metadata Enrichment",
+            "description": "Model and populate window specs needed for 15m markets (start/end, oracle reference, token mappings).",
+            "dependencies": [],
+            "details": "Define MarketWindowSpec (window start/end, underlying symbol, settlement oracle reference, and any thresholds) and a mapping layer from Polymarket metadata. Ensure we can derive token IDs for each outcome side and align the window boundary behavior deterministically.",
+            "status": "done",
+            "testStrategy": "Unit tests with sample metadata payloads to verify correct parsing and boundary alignment.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Expose Unified MarketData Snapshot API for Strategies",
+            "description": "Make spot + orderbook accessible to strategies via a stable read interface.",
+            "dependencies": [2, 3],
+            "details": "Provide a Strategy-facing abstraction that can return the latest SpotPrice + OrderBook top-of-book/depth and relevant MarketWindowSpec for a market. Ensure thread-safe reads and clear staleness semantics (e.g., max age thresholds).",
+            "status": "done",
+            "testStrategy": "Integration test that a strategy consumer can read spot/orderbook/spec concurrently without races or stale-data surprises.",
+            "parentId": "undefined"
+          }
+        ]
+      },
+      {
+        "id": "12",
+        "title": "Spot-Confirmed Repricing Lag Arbitrage Strategy (15m markets)",
+        "description": "Implement the lag-based strategy that waits for spot confirmation and buys mispriced outcomes before Polymarket reprices.",
+        "details": "Implement RepricingLagArbitrageStrategy that consumes MarketWindowSpec, spot price stream, and Polymarket order book. Use a guarded state machine (Wait -> Confirm -> Signal -> Submit -> Monitor -> Exit). Route all orders through ExecutionService, enforce RiskManager gating, and emit structured decision logs capturing inputs/thresholds and the detected edge (p_fair - p_pm).",
+        "testStrategy": "Paper trading simulation with recorded spot+orderbook replays; unit tests for signal determinism and state transitions; integration tests for order submit/cancel paths under lag expiry.",
+        "priority": "medium",
+        "dependencies": ["4", "6", "11"],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Confirm Market Definition and Oracle Alignment",
+            "description": "Finalize the exact 15m market type, settlement oracle/index, and window boundary rules used by the strategy.",
+            "dependencies": [],
+            "details": "Validate the market type (Up/Down vs Range/Threshold), confirm settlement oracle/index and sampling rules, and document the alignment rules we will use for the spot feed. Update the strategy doc with at least one real example market and its parsed MarketWindowSpec.",
+            "status": "done",
+            "testStrategy": "Documentation review + one or more example markets parsed successfully into MarketWindowSpec.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Define Strategy Parameters and Validation",
+            "description": "Create typed options for confirmation timing and mispricing thresholds.",
+            "dependencies": [1],
+            "details": "Define parameters such as ConfirmWaitDuration, MinMoveBps (or threshold rules), MinEdge, MaxSlippagePct, MaxDataStaleness, and MaxOrderAge. Add validation and defaults, ensuring units are explicit.",
+            "status": "done",
+            "testStrategy": "Unit tests for parameter validation and default value application.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Implement Window State Machine and Signal Computation",
+            "description": "Build the internal strategy state machine and compute signal/edge from spot + orderbook.",
+            "dependencies": [2],
+            "details": "Implement a deterministic state machine: wait for window open, wait for confirmation condition, compute p_fair, compare to Polymarket top-of-book, and gate on edge + staleness. Ensure transitions are idempotent and can recover after restarts (if persistence exists).",
+            "status": "done",
+            "testStrategy": "Unit tests for state transitions, edge calculation determinism, and staleness gating.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Execution Integration and Order Management",
+            "description": "Place/cancel/monitor orders via ExecutionService with timeouts and idempotency.",
+            "dependencies": [3],
+            "details": "Implement order placement using ExecutionService, including cancel-on-lag-expiry, optional cancel/replace, and handling partial fills. Ensure idempotency keys and retry behavior are correct. Integrate RiskManager checks prior to submit and on updates.",
+            "status": "done",
+            "testStrategy": "Integration tests with mocked ExecutionService for submit/cancel paths, partial fills, and lag expiry cancellation.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Replay/Backtest Harness for Lag Validation",
+            "description": "Create a replay harness for recorded spot + orderbook streams to validate the edge statistically.",
+            "dependencies": [3],
+            "details": "Build a deterministic replay runner (paper mode) that replays recorded streams and produces metrics: detected lag events, realized win-rate, expected value, and sensitivity to slippage/delay. Define a minimal dataset format and retention rules.",
+            "status": "done",
+            "testStrategy": "Run replay against at least one recorded dataset and produce a summary report artifact (stored under docs/ or .taskmaster/docs/).",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Decision Logging, Metrics, and Safety Hooks",
+            "description": "Add structured decision logs and safety triggers for oracle mismatch and abnormal conditions.",
+            "dependencies": [4, 5],
+            "details": "Emit decision logs including window spec, spot move, orderbook snapshot, edge, and action taken. Add safety checks for oracle mismatch/staleness and trigger kill switch when violated. Ensure logs are low-cardinality and suitable for audit.",
+            "status": "done",
+            "testStrategy": "Integration test verifying logs/metrics emission and kill switch trigger on simulated staleness/oracle mismatch.",
+            "parentId": "undefined"
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "version": "1.0.0",
+      "lastModified": "2026-05-04T14:46:00.000Z",
+      "taskCount": 12,
+      "completedCount": 12,
+      "tags": ["master"]
+    }
+  }
+}

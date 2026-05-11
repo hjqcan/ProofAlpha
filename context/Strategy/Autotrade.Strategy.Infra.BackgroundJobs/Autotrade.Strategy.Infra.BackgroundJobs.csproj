@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Autotrade.Strategy.Application\Autotrade.Strategy.Application.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Autotrade.Infra.BackgroundJobs.Core\Autotrade.Infra.BackgroundJobs.Core.csproj" />
+  </ItemGroup>
+
+</Project>

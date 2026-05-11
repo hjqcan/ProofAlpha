@@ -1,0 +1,25 @@
+Phase 4.5: Report UI and Gate
+=============================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Close Phase 4 with a usable run report surface and evidence gate.
+
+Required Evidence
+-----------------
+- Paper run report JSON
+- promotion checklist JSON
+- CSV exports
+- report UI screenshot
+- attribution tests
+- `dotnet test`
+- `npm run build`
+
+Acceptance
+----------
+- Evidence is stored under `artifacts/reports/phase-4/`.
+- Report UI clearly labels Paper evidence and residual Live risks.

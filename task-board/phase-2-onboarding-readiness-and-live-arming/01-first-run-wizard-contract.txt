@@ -1,0 +1,42 @@
+Phase 2.1: First-Run Wizard Contract
+====================================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Define the operator journey from fresh checkout to a safe Paper run.
+
+Acceptance
+----------
+- Wizard contract lists required checks, optional checks, and blocked checks.
+- Checks cover database, migrations, API reachability, market data, account
+  sync, compliance, execution mode, and risk limits.
+- Response is machine-readable for UI and CLI rendering.
+- Missing configuration produces next-action guidance, not a generic failure.
+
+Implementation Notes
+--------------------
+- Start with a contract and tests before UI work.
+
+Completion Notes
+----------------
+- Added the first-run readiness contract under
+  `Shared/Autotrade.Application/Readiness/FirstRunReadinessContract.cs` so CLI,
+  API, and Web App can share the same machine-readable shape.
+- Contract freezes stable check IDs, categories, requirement levels, Paper/Live
+  capability mapping, remediation hints, and source names.
+- Checks cover runtime configuration, database connection, migrations, control
+  room API reachability, public market data, WebSocket health, background jobs,
+  account sync, compliance, execution mode, risk limits, and exchange
+  authentication presence without exposing secret values.
+- Added `Shared/Autotrade.Application.Tests` and solution registration.
+
+Regression Evidence
+-------------------
+- 2026-05-03: `dotnet test
+  Shared\Autotrade.Application.Tests\Autotrade.Application.Tests.csproj`
+  passed 6 tests.
+- 2026-05-03: `dotnet test Autotrade.sln` passed 342 tests.

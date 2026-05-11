@@ -1,0 +1,18 @@
+Phase 7.1: End-to-End Acceptance Runner
+=======================================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Automate the acceptance checklist enough to produce repeatable local evidence.
+
+Acceptance
+----------
+- Runner executes required build, test, config validate, readiness, status, and
+  export commands.
+- Runner separates required gates from optional Postgres smoke tests.
+- Runner writes a machine-readable report and human-readable summary.
+- Failures include command, exit code, and artifact path.

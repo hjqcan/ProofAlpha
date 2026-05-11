@@ -1,0 +1,126 @@
+Phase 6: Polymarket Builder Attribution
+=======================================
+
+Status
+------
+[TODO]
+
+
+Intent
+------
+Show that ProofAlpha is not only selling signals; it can become a monetizable
+Polymarket entry point by attributing order flow to the agent.
+
+
+Current Repo Fact
+-----------------
+`Shared/Autotrade.Polymarket` already contains:
+
+- `OrderRequest.Builder`
+- signed order field `builder`
+- `PolymarketClobOptions.BuilderCode`
+- validation that builder metadata is a bytes32 hex string
+
+This phase validates and surfaces that capability.
+
+
+Accepted Scope
+--------------
+- Builder-code readiness check.
+- Signed order builder propagation tests.
+- Redacted order-envelope evidence.
+- Arc signal id to client order id correlation.
+- Optional builder-trades query if stable.
+
+
+Out of Scope
+------------
+- Real-money order only for attribution.
+- Claiming real builder revenue unless proven.
+- Rewriting the signer.
+
+
+Tasks
+-----
+[TODO] AH-P6-T001 Add builder readiness probe.
+
+Report:
+
+- builder code configured
+- format valid
+- redacted builder code hash
+- mode: disabled/demo/live
+
+[TODO] AH-P6-T002 Add signer tests.
+
+Tests:
+
+- configured builder code reaches `SignedClobOrder.Builder`
+- per-order builder overrides config
+- invalid builder code fails before HTTP call
+- empty builder falls back to zero bytes32 when configured that way
+
+[TODO] AH-P6-T003 Add builder evidence exporter.
+
+Export redacted JSON:
+
+- clientOrderId
+- strategyId
+- marketId
+- arcSignalId
+- builderCodeHash
+- signedOrderHash
+- orderType
+- price
+- size
+- createdAtUtc
+
+Do not export private key or raw reusable signature material.
+
+[TODO] AH-P6-T004 Add execution correlation.
+
+Persist or expose:
+
+- arcSignalId
+- clientOrderId
+- orderId
+- builderCodeHash
+- runSessionId
+- command audit id
+
+[TODO] AH-P6-T005 Add optional builder trades reader.
+
+If endpoint is available:
+
+- query attributed trades
+- map to client orders
+- include in settlement journal
+
+If unavailable:
+
+- record as external verification not used
+- rely on signed order evidence for demo
+
+[TODO] AH-P6-T006 Add tests and docs.
+
+- tests for redaction
+- docs explaining what builder attribution proves
+- docs explaining what it does not prove
+
+
+Acceptance Criteria
+-------------------
+1. Builder field propagation is tested.
+2. Demo evidence includes redacted signed-order builder field/hash.
+3. Client order id is linked to Arc signal id.
+4. No reusable signing material is exposed.
+5. Submission can truthfully say ProofAlpha creates attributable Polymarket
+   order flow.
+
+
+Evidence
+--------
+- `artifacts/arc-hackathon/demo-run/builder-attribution.json`
+- `artifacts/arc-hackathon/demo-run/order-envelope-redacted.json`
+- targeted Polymarket builder tests
+

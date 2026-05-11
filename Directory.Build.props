@@ -1,0 +1,28 @@
+<Project>
+  <PropertyGroup>
+    <!-- 统一构建与代码质量约定（对齐 third-party/grukirbs 的“分层 + 可维护性优先”风格） -->
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- 启用 .NET 分析器与代码风格检查 -->
+    <AnalysisLevel>latest</AnalysisLevel>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+    <!-- 可重复构建 -->
+    <Deterministic>true</Deterministic>
+
+    <!-- 默认将告警视为错误，避免隐性质量回退（可按需在单个项目中覆盖） -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+
+    <!-- 不强制 XML 文档注释（避免早期阶段噪音过大） -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <!-- CI 环境启用严格的可重复构建标志 -->
+  <PropertyGroup Condition="'$(CI)' == 'true' Or '$(GITHUB_ACTIONS)' == 'true'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+</Project>
+

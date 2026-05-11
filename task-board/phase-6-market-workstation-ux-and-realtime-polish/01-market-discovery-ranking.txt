@@ -1,0 +1,18 @@
+Phase 6.1: Market Discovery Ranking
+===================================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Help operators understand why markets are ranked, interesting, or unsuitable.
+
+Acceptance
+----------
+- Market response includes or derives reason fields for ranking and exclusion.
+- Filters cover category, status, liquidity, volume, expiry, accepting orders,
+  and signal score.
+- UI shows unsuitable reasons without hiding the market state.
+- Ranking behavior is deterministic and tested.

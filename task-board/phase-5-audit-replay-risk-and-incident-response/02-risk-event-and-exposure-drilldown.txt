@@ -1,0 +1,19 @@
+Phase 5.2: Risk Event and Exposure Drill-Down
+=============================================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Make risk triggers and unhedged exposure understandable from the control room.
+
+Acceptance
+----------
+- Risk event detail shows limit, current value, threshold, state, trigger
+  reason, selected action, and affected orders.
+- Exposure detail shows market, outcome, strategy, notional, duration, hedge
+  state, and mitigation result.
+- Kill-switch activation links to triggering event when applicable.
+- UI and exports use the same source data.

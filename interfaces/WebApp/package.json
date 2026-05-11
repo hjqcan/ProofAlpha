@@ -1,0 +1,28 @@
+{
+  "name": "autotrade-webapp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5173",
+    "i18n:check": "node scripts/check-i18n-messages.mjs",
+    "smoke:phase6": "node scripts/phase6-visual-smoke.mjs",
+    "build": "npm run i18n:check && tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 4173"
+  },
+  "dependencies": {
+    "lucide-react": "^0.560.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-intl": "^10.1.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.0.0",
+    "typescript": "^5.8.3",
+    "vite": "^7.0.5"
+  }
+}

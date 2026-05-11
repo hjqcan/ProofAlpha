@@ -1,0 +1,96 @@
+Phase 3: Strategy Explainability and Control
+============================================
+
+Status
+------
+[DONE]
+
+
+Intent
+------
+Move strategies from black-box background workers to inspectable, controllable
+product units. Operators must see what each strategy is trying to do, why it is
+blocked, and why it made or rejected a decision.
+
+
+Core Boundary
+-------------
+Explainability must be grounded in real strategy state and decision records. Do
+not invent UI-only explanations that cannot be audited from persisted data.
+
+
+Accepted Scope
+--------------
+- strategy detail contract
+- last decision reason chain
+- blocked reason model
+- parameter version, diff, and rollback workflow
+- strategy control UI polish
+
+
+Out of Scope
+------------
+- new alpha strategies
+- ML forecasting
+- direct UI order placement
+- undocumented parameter mutation
+
+
+Acceptance Criteria
+-------------------
+1. Every strategy detail shows lifecycle state, desired state, health, recent
+   error, recent decision, blocked reason, and key parameters.
+2. Decision records link market data, signal, risk verdict, order intent, and
+   final action where available.
+3. Parameter changes are versioned, audited, validated, and reversible.
+4. Run/Pause/Stop controls explain why they are disabled.
+5. Strategy regression tests cover state transitions and command audit.
+
+
+Tasks
+-----
+[DONE] P3-T001 Expand strategy state and blocked-reason model.
+[DONE] P3-T002 Add decision reason-chain API contract.
+[DONE] P3-T003 Build strategy detail and operator control UI.
+[DONE] P3-T004 Add parameter version diff and rollback workflow.
+[DONE] P3-T005 Add strategy explainability regression gate.
+
+
+Planned Evidence
+----------------
+- strategy detail API samples under `artifacts/strategies/phase-3/`
+- decision reason-chain export
+- strategy detail desktop/mobile browser smoke screenshots
+- command audit for parameter update and rollback
+- targeted strategy tests
+- `dotnet test`
+- `npm run build`
+
+Completed Evidence
+------------------
+- P3-T003 strategy workspace desktop/mobile browser smoke:
+  `artifacts/readiness/phase-3/strategy-detail-desktop.png` and
+  `artifacts/readiness/phase-3/strategy-detail-mobile.png`.
+- P3-T004 parameter version diff and rollback browser smoke:
+  `artifacts/readiness/phase-3/strategy-parameters-desktop.png` and
+  `artifacts/readiness/phase-3/strategy-parameters-mobile.png`.
+- P3-T004 backend regression: `dotnet test Autotrade.sln --no-restore`.
+- P3-T004 frontend regression: `npm run build`.
+- P3-T004 hygiene: `git diff --check`.
+- P3-T005 consolidated evidence manifest:
+  `artifacts/strategies/phase-3/phase3-regression-evidence.json`.
+- P3-T005 targeted TRX evidence:
+  `artifacts/strategies/phase-3/phase3-strategy-tests.trx` and
+  `artifacts/strategies/phase-3/phase3-api-tests.trx`.
+- P3-T005 browser smoke evidence:
+  `artifacts/strategies/phase-3/phase3-browser-smoke-report.json`.
+
+
+Breakdown Folder
+----------------
+- `task-board/phase-3-strategy-explainability-and-control/00-README.txt`
+- `task-board/phase-3-strategy-explainability-and-control/01-strategy-state-model.txt`
+- `task-board/phase-3-strategy-explainability-and-control/02-decision-reason-chain-api.txt`
+- `task-board/phase-3-strategy-explainability-and-control/03-strategy-detail-ui.txt`
+- `task-board/phase-3-strategy-explainability-and-control/04-parameter-version-diff-rollback.txt`
+- `task-board/phase-3-strategy-explainability-and-control/05-strategy-regression-gate.txt`

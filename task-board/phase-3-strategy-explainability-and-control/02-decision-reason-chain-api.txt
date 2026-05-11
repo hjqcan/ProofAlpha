@@ -1,0 +1,46 @@
+Phase 3.2: Decision Reason-Chain API
+====================================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Expose the chain from market observation to strategy decision to risk verdict
+to order intent.
+
+Acceptance
+----------
+- API can return recent decisions by strategy, market, action, and time range.
+- Decision detail includes signal inputs, thresholds, risk verdict, action, and
+  order references when available.
+- Rejected/no-op decisions are first-class records.
+- Export paths preserve decision IDs and correlation IDs.
+
+Implementation Notes
+--------------------
+- Reuse existing decision logging where possible; extend the contract instead
+  of introducing a second decision log.
+- Added `StrategyDecisionRecord` so query/export paths preserve durable
+  decision IDs, config version, execution mode, and correlation IDs.
+- Extended `StrategyDecisionQuery` with action and correlation filters while
+  preserving existing call sites.
+- Added `GET /api/strategy-decisions` for recent decisions filtered by
+  strategy, market, action, correlation ID, and time range.
+- Added `GET /api/strategy-decisions/{decisionId}` for detail views that
+  derive signal inputs, thresholds, risk verdict, and order references from
+  existing `ContextJson`.
+- Updated CLI decision export to include `decision_id` in CSV and JSON output.
+- Rejected/no-op actions are returned as first-class records because the API
+  does not whitelist action names and supports action-specific filtering.
+
+
+Evidence
+--------
+- `dotnet test interfaces\Autotrade.Api.Tests\Autotrade.Api.Tests.csproj --no-restore`
+  passed.
+- `dotnet test context\Strategy\Autotrade.Strategy.Tests\Autotrade.Strategy.Tests.csproj --no-restore`
+  passed.
+- `dotnet build Autotrade.Cli\Autotrade.Cli.csproj --no-restore`
+  passed.

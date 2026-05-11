@@ -1,0 +1,18 @@
+Phase 6.3: Trade Workspace Layout Polish
+========================================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Make the main market and trade views usable for repeated operator work.
+
+Acceptance
+----------
+- Markets, Trade, Ops, and Activity views have stable responsive layouts.
+- Long market names, token IDs, order IDs, and strategy IDs do not overlap.
+- Tables remain scannable with dense but readable typography.
+- Empty states are operationally useful and do not look like failures.
+- Buttons use icons and concise labels consistently.

@@ -1,0 +1,19 @@
+Phase 4.2: Run Report API and Export
+====================================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Provide structured Paper run reports for UI display and offline review.
+
+Acceptance
+----------
+- API returns summary metrics, strategy breakdown, market breakdown, risk
+  events, notable incidents, and export references.
+- CLI can export run reports as JSON and CSV-compatible tables.
+- Reports include evidence links to decisions, orders, trades, positions, and
+  risk events.
+- Empty or partial runs produce explicit report status, not misleading zeros.

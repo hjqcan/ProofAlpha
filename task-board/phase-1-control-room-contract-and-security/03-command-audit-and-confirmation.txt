@@ -1,0 +1,43 @@
+Phase 1.3: Command Audit and Confirmation
+=========================================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Make every high-impact control-room command traceable to operator intent.
+
+Acceptance
+----------
+- Strategy lifecycle commands record who/what initiated the command, target
+  state, previous state, outcome, and timestamp.
+- Kill-switch activation and reset record reason, level, outcome, and affected
+  orders when available.
+- UI confirmation is required for kill-switch reset, hard stop, and Live-mode
+  enabling commands.
+- Failed commands are audit records too.
+
+Implementation Notes
+--------------------
+- Reuse existing command audit services where possible rather than introducing
+  a parallel audit store.
+
+Completion Evidence
+-------------------
+- Strategy state and kill-switch API commands now write structured entries
+  through the existing Strategy `ICommandAuditLogger`.
+- Audit payloads include command source, actor, command mode, target details,
+  previous strategy state where available, kill-switch level, affected open
+  orders where available, outcome, duration, and error details for rejected
+  commands.
+- Disabled commands, invalid requests, missing confirmations, accepted
+  commands, and execution failures are all audit-recorded.
+- Backend confirmation is required for Live strategy enablement, kill-switch
+  reset, and kill-switch hard stop. Missing confirmation returns
+  `ConfirmationRequired` and does not mutate trading state.
+- Regression: `dotnet test interfaces/Autotrade.Api.Tests/Autotrade.Api.Tests.csproj`
+  passed with 34 tests.
+- Regression: `dotnet test Autotrade.sln` passed with 336 tests.
+- Regression: `git diff --check` passed with line-ending warnings only.

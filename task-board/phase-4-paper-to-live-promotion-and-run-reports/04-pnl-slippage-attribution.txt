@@ -1,0 +1,19 @@
+Phase 4.4: PnL, Slippage, and Exposure Attribution
+==================================================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Explain where Paper run outcomes came from.
+
+Acceptance
+----------
+- Report separates realized PnL, unrealized PnL, fees if available, mark
+  source, slippage estimate, latency, and stale-data contribution.
+- Strategy and market attribution add up to the run totals or explain why they
+  cannot.
+- Unhedged exposure is measured by duration, notional, and mitigation outcome.
+- Attribution calculations are covered by tests.

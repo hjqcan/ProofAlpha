@@ -1,0 +1,67 @@
+Phase 2.5: Readiness and Arming Acceptance Smoke
+================================================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Close Phase 2 with proof that onboarding and Live arming gates behave as
+intended.
+
+Required Evidence
+-----------------
+- Paper-ready readiness JSON
+- Live-blocked readiness JSON with missing or unsafe prerequisites
+- Live arming accepted sample using non-secret fake or test configuration
+- Live arming rejected sample
+- `dotnet test`
+- `npm run build`
+
+Acceptance
+----------
+- Evidence is stored under `artifacts/readiness/phase-2/`.
+- No evidence artifact contains a real secret.
+
+
+Implementation Notes
+--------------------
+- Added a repeatable smoke runner:
+  `artifacts/readiness/phase-2/run_phase2_readiness_smoke.ps1`.
+- Added a fake local Polymarket HTTP service for smoke-only account sync and
+  balance/order/position reads:
+  `artifacts/readiness/phase-2/phase2_fake_polymarket.mjs`.
+- The smoke runner verifies Paper readiness, Live-blocked readiness, rejected
+  arming, accepted arming, armed status, and disarm cleanup with fake-only
+  credentials.
+
+
+Evidence
+--------
+- Paper-ready readiness JSON:
+  `artifacts/readiness/phase-2/paper-ready.json`
+- Live-blocked readiness JSON:
+  `artifacts/readiness/phase-2/live-blocked.json`
+- Live arming rejected sample:
+  `artifacts/readiness/phase-2/live-arm-rejected.json`
+- Live arming accepted sample:
+  `artifacts/readiness/phase-2/live-arm-accepted.json`
+- Armed status sample:
+  `artifacts/readiness/phase-2/live-arm-accepted-status.json`
+- Disarm cleanup sample:
+  `artifacts/readiness/phase-2/live-disarm-cleanup.json`
+- Smoke progress log:
+  `artifacts/readiness/phase-2/phase2-smoke-progress.log`
+- Verification:
+  `powershell -NoProfile -ExecutionPolicy Bypass -File artifacts\readiness\phase-2\run_phase2_readiness_smoke.ps1`
+  passed.
+- Regression:
+  `dotnet test Autotrade.sln --no-restore` passed.
+- Web build:
+  `npm run build` passed from `webApp`.
+- Whitespace:
+  `git diff --check` passed with Git LF/CRLF normalization warnings only.
+- Secret scan:
+  Evidence JSON contains only credential presence states such as `missing`;
+  no fake or real credential values were present in generated evidence JSON.

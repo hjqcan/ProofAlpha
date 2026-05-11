@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Autotrade.SelfImprove.Application.Contract\Autotrade.SelfImprove.Application.Contract.csproj" />
+    <ProjectReference Include="..\Autotrade.SelfImprove.Application\Autotrade.SelfImprove.Application.csproj" />
+    <ProjectReference Include="..\Autotrade.SelfImprove.Infra.Data\Autotrade.SelfImprove.Infra.Data.csproj" />
+    <ProjectReference Include="..\..\Strategy\Autotrade.Strategy.Application\Autotrade.Strategy.Application.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

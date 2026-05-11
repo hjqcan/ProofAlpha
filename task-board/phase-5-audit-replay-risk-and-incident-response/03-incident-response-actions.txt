@@ -1,0 +1,18 @@
+Phase 5.3: Incident Response Actions
+====================================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Define and implement safe operator actions for incidents.
+
+Acceptance
+----------
+- Actions include hard stop, reset, pause strategy, stop strategy, cancel open
+  orders where supported, and export incident package.
+- Each action has confirmation, disabled reason, audit record, and result.
+- Unsafe or unsupported actions remain blocked with explanation.
+- Incident runbook maps symptoms to actions without promising outcomes.

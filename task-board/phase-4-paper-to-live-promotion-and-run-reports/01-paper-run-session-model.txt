@@ -1,0 +1,19 @@
+Phase 4.1: Paper Run Session Model
+==================================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Group Paper decisions, orders, positions, risk events, and configuration into
+auditable run sessions.
+
+Acceptance
+----------
+- Session records include start, stop, execution mode, config version,
+  strategies, risk profile, and operator source.
+- Restart recovery does not split a session unless explicitly requested.
+- Session IDs are attached to new decisions and order audit where possible.
+- Tests cover session start, stop, restart, and export behavior.

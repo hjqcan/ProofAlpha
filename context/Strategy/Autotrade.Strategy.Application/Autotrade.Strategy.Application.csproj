@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Shared\Autotrade.Application\Autotrade.Application.csproj" />
+    <ProjectReference Include="..\Autotrade.Strategy.Domain\Autotrade.Strategy.Domain.csproj" />
+    <ProjectReference Include="..\Autotrade.Strategy.Domain.Shared\Autotrade.Strategy.Domain.Shared.csproj" />
+    <ProjectReference Include="..\Autotrade.Strategy.Application.Contract\Autotrade.Strategy.Application.Contract.csproj" />
+    <ProjectReference Include="..\..\MarketData\Autotrade.MarketData.Application.Contract\Autotrade.MarketData.Application.Contract.csproj" />
+    <ProjectReference Include="..\..\Trading\Autotrade.Trading.Application.Contract\Autotrade.Trading.Application.Contract.csproj" />
+    <ProjectReference Include="..\..\Trading\Autotrade.Trading.Domain.Shared\Autotrade.Trading.Domain.Shared.csproj" />
+    <ProjectReference Include="..\..\OpportunityDiscovery\Autotrade.OpportunityDiscovery.Application.Contract\Autotrade.OpportunityDiscovery.Application.Contract.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0-*" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.1" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

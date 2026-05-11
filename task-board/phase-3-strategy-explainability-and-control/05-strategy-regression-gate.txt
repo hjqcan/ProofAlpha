@@ -1,0 +1,45 @@
+Phase 3.5: Strategy Regression Gate
+===================================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Close Phase 3 with strategy explainability and control evidence.
+
+Required Evidence
+-----------------
+- strategy state model tests
+- decision reason-chain API tests
+- parameter update and rollback tests
+- Web App build
+- browser smoke for strategy detail and disabled-command reasons
+
+Acceptance
+----------
+- Evidence is stored under `artifacts/strategies/phase-3/`.
+- No strategy can be controlled through an unaudited path.
+
+Completed Evidence
+------------------
+- Strategy state model and parameter workflow tests:
+  `artifacts/strategies/phase-3/phase3-strategy-tests.trx`.
+- Decision reason-chain API and audited control boundary tests:
+  `artifacts/strategies/phase-3/phase3-api-tests.trx`.
+- Web App production build:
+  `artifacts/strategies/phase-3/phase3-web-build.log`.
+- Browser smoke for strategy detail, disabled-command reasons, parameter
+  changed-only diffs, rollback action, and desktop/mobile overflow checks:
+  `artifacts/strategies/phase-3/phase3-browser-smoke-report.json`.
+- Browser smoke screenshots:
+  `artifacts/strategies/phase-3/strategy-regression-detail-disabled-desktop.png`
+  and
+  `artifacts/strategies/phase-3/strategy-regression-detail-disabled-mobile.png`.
+- Evidence manifest:
+  `artifacts/strategies/phase-3/phase3-regression-evidence.json`.
+- Added regression gates that require strategy state terminal responses to
+  emit command audit entries, parameter rollback audit to include rollback
+  source version metadata, and API controllers to avoid direct raw strategy
+  control ports.

@@ -1,0 +1,183 @@
+Phase 2: Arc Contract Suite Foundation
+======================================
+
+Status
+------
+[TODO]
+
+
+Intent
+------
+Build the contract and deployment foundation for the paid-agent loop.
+
+
+Accepted Scope
+--------------
+- `interfaces/ArcContracts` workspace.
+- Contract tests.
+- Deployment scripts.
+- Deployment artifact format.
+- Backend config schema.
+- ArcSettlement bounded context skeleton.
+
+
+Contract Suite
+--------------
+Minimum contracts:
+
+- `SignalRegistry`
+- `StrategyAccess`
+- `PerformanceLedger`
+- `RevenueSettlement`
+
+Optional/stretch:
+
+- `ExecutionPermission`
+- `AgentReputation`
+
+
+Tasks
+-----
+[TODO] AH-P2-T001 Create `interfaces/ArcContracts`.
+
+Required npm scripts:
+
+- `build`
+- `test`
+- `deploy:arc-testnet`
+- `deploy:local`
+- `export-abi`
+
+Required folders:
+
+- `contracts/`
+- `scripts/`
+- `test/`
+- `deployments/`
+- `abi/`
+
+[TODO] AH-P2-T002 Implement contract interfaces first.
+
+Add interface or abstract design notes for:
+
+- signal publishing
+- subscription payment
+- access checks
+- outcome recording
+- revenue recording
+
+[TODO] AH-P2-T003 Implement `SignalRegistry`.
+
+Required:
+
+- duplicate `signalId` rejected
+- zero agent rejected
+- empty venue rejected
+- signal metadata stored or event emitted with enough fields
+- read method for public signal summary
+
+[TODO] AH-P2-T004 Implement `StrategyAccess`.
+
+Required:
+
+- accepts configured ERC20/USDC token address
+- plan id maps to price/duration/strategy key
+- `subscribe(strategyKey, planId)`
+- `hasAccess(user, strategyKey)`
+- `accessExpiresAt(user, strategyKey)`
+- emits `StrategySubscribed`
+
+[TODO] AH-P2-T005 Implement `PerformanceLedger`.
+
+Required:
+
+- records terminal outcome for signal id
+- prevents multiple terminal outcomes unless explicit correction event exists
+- emits `OutcomeRecorded`
+- includes status, realized pnl bps, slippage bps, and outcome hash
+
+[TODO] AH-P2-T006 Implement `RevenueSettlement`.
+
+MVP:
+
+- event-only settlement journal is acceptable
+- records settlement id, signal id, gross amount, shares, token, and timestamp
+- no actual fund distribution required for MVP
+
+[TODO] AH-P2-T007 Add local/mock token for contract tests.
+
+- Use a clearly named test ERC20 fixture.
+- Do not label it as production USDC.
+- If Arc testnet USDC is available, configure it only in deployment artifact.
+
+[TODO] AH-P2-T008 Add deployment artifacts.
+
+Artifact fields:
+
+- chain id
+- network name
+- contract name
+- address
+- deployer
+- tx hash
+- block number
+- constructor args
+- ABI hash
+- deployedAtUtc
+
+[TODO] AH-P2-T009 Create ArcSettlement .NET projects.
+
+Add projects:
+
+- Domain.Shared
+- Domain
+- Application.Contract
+- Application
+- Infra.Evm
+- Infra.Data
+- Infra.CrossCutting.IoC
+- Tests
+
+Register in `Autotrade.sln`.
+
+[TODO] AH-P2-T010 Add backend config.
+
+Config section:
+
+```json
+{
+  "ArcSettlement": {
+    "Enabled": false,
+    "ChainId": 0,
+    "RpcUrl": "",
+    "BlockExplorerBaseUrl": "",
+    "Contracts": {
+      "SignalRegistry": "",
+      "StrategyAccess": "",
+      "PerformanceLedger": "",
+      "RevenueSettlement": ""
+    },
+    "Wallet": {
+      "PrivateKeyEnvironmentVariable": "ARC_SETTLEMENT_PRIVATE_KEY"
+    }
+  }
+}
+```
+
+
+Acceptance Criteria
+-------------------
+1. Contract tests pass locally.
+2. .NET solution builds with ArcSettlement skeleton.
+3. Disabled Arc config does not require RPC/private key.
+4. Enabled write config validates required public fields and secret presence
+   without exposing secret value.
+5. Deployment artifacts contain no secrets.
+
+
+Evidence
+--------
+- `interfaces/ArcContracts/test/*`
+- `artifacts/arc-hackathon/contract-deployments/*.json`
+- `docs/hackathon/arc-contract-suite.md`
+

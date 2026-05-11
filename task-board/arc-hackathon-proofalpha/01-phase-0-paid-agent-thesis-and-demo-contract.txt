@@ -1,0 +1,149 @@
+Phase 0: Paid-Agent Thesis and Demo Contract
+============================================
+
+Status
+------
+[TODO]
+
+
+Intent
+------
+Freeze the business loop before implementation. The submission must read as a
+paid agent trading gateway, not as a generic Arc integration.
+
+
+Core Product Claim
+------------------
+ProofAlpha uses Arc to prove strategy signals and outcomes, then lets users pay
+USDC for access to the agent's arbitrage opportunities or auto-trading
+permissions.
+
+
+Accepted Scope
+--------------
+- Final product one-liner.
+- Subscription tiers.
+- Entitlement rules.
+- Demo flow.
+- Explicit definition of what "strategy is useful" means.
+- Explicit definition of what is testnet, simulated, or real.
+
+
+Out of Scope
+------------
+- Guaranteed profitability.
+- Real-money Live trading in demo.
+- Production billing.
+- Mainnet deployment.
+- Replacing existing Polymarket execution.
+
+
+Tasks
+-----
+[TODO] AH-P0-T001 Write the final one-liner and pitch paragraph.
+
+Required one-liner:
+
+`ProofAlpha proves alpha on Arc, sells access with USDC, and executes on
+Polymarket through a risk-gated agent.`
+
+Pitch paragraph must include:
+
+- AI agent discovers opportunities
+- Arc proves publication/outcome/reputation
+- USDC subscription unlocks access
+- Polymarket remains execution venue
+- builder attribution makes the agent a monetizable entry point
+
+[TODO] AH-P0-T002 Define subscription tiers.
+
+Minimum tiers:
+
+- `SignalViewer`
+  - can view published opportunities after delay or immediately
+  - no auto-trading permission
+- `AutoTrader`
+  - can request strategy start/copy-trade automation
+  - still blocked by Paper/Live/risk/compliance gates
+- `Operator`
+  - can publish signals and settle revenue in demo
+  - local/admin only for hackathon
+
+Each tier needs:
+
+- strategy ids covered
+- duration
+- USDC amount
+- allowed API/CLI/WebApp actions
+- disabled reason when missing
+
+[TODO] AH-P0-T003 Define the strategy utility proof standard.
+
+A strategy is "useful" in demo only if it has:
+
+- pre-execution signal hash
+- strategy/evidence/reasoning hash
+- risk envelope
+- Paper execution or replay outcome
+- post-execution outcome record
+- performance ledger entry
+
+The proof must not imply future profit.
+
+[TODO] AH-P0-T004 Freeze the demo flow.
+
+Demo happy path:
+
+1. Display unsubscribed wallet blocked from full signal details.
+2. Subscribe with USDC on Arc or a labeled testnet USDC fixture.
+3. Backend reads entitlement.
+4. User unlocks an arbitrage opportunity.
+5. Publish signal proof to Arc.
+6. Execute Paper order with Polymarket builder metadata evidence.
+7. Record performance outcome on Arc.
+8. Record revenue settlement/split event.
+9. Show agent reputation and subscriber access in WebApp.
+
+[TODO] AH-P0-T005 Write source notes and assumptions.
+
+Create:
+
+- `docs/hackathon/arc-hackathon-source-notes.md`
+- `docs/hackathon/arc-proofalpha-submission.md`
+- `docs/hackathon/arc-proofalpha-demo-script.md`
+
+Capture:
+
+- event URL
+- retrieval date
+- Arc/USDC settlement assumptions
+- Circle tool usage assumptions
+- any unresolved rule questions
+
+[TODO] AH-P0-T006 Define no-go language.
+
+Reject any UI/doc/pitch line that says or implies:
+
+- guaranteed profit
+- risk-free
+- fully autonomous Live trading
+- Arc settles the Polymarket venue trade
+- user funds are custodied safely by ProofAlpha unless custody is actually
+  implemented and reviewed
+
+
+Acceptance Criteria
+-------------------
+1. The paid-agent loop is described in one page.
+2. Subscription tiers are defined before contract work starts.
+3. Demo path includes a real entitlement gate, not only a UI label.
+4. "Strategy utility" proof standard is explicit and measurable.
+5. All simulated/testnet parts are labeled.
+
+
+Evidence
+--------
+- `docs/hackathon/arc-proofalpha-submission.md`
+- `docs/hackathon/arc-proofalpha-demo-script.md`
+- `docs/hackathon/arc-hackathon-source-notes.md`
+

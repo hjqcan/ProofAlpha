@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Autotrade.Trading.Application\Autotrade.Trading.Application.csproj" />
+    <ProjectReference Include="..\Autotrade.Trading.Domain\Autotrade.Trading.Domain.csproj" />
+    <ProjectReference Include="..\Autotrade.Trading.Infra.Data\Autotrade.Trading.Infra.Data.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Autotrade.Domain.Abstractions\Autotrade.Domain.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="DotNetCore.CAP" Version="8.3.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.1" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

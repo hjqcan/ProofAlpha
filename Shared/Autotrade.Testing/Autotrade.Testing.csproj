@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.21" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\context\Trading\Autotrade.Trading.Infra.Data\Autotrade.Trading.Infra.Data.csproj" />
+    <ProjectReference Include="..\..\context\MarketData\Autotrade.MarketData.Infra.Data\Autotrade.MarketData.Infra.Data.csproj" />
+    <ProjectReference Include="..\Autotrade.Infra.Data.Core\Autotrade.Infra.Data.Core.csproj" />
+  </ItemGroup>
+
+</Project>

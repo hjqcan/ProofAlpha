@@ -1,0 +1,44 @@
+Phase 3.1: Strategy State Model
+===============================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Expand strategy state so operators can understand health, blocking, and next
+action.
+
+Acceptance
+----------
+- Strategy detail includes desired state, actual state, enabled flag, heartbeat,
+  last decision time, last error, active markets, backlog, and blocked reason.
+- Blocked reason distinguishes kill switch, disabled config, risk limit,
+  readiness, stale data, missing market, and strategy fault.
+- State model is covered by application tests.
+- Existing lifecycle commands remain backwards compatible.
+
+
+Implementation Notes
+--------------------
+- Added `StrategyBlockedReasonKind` and `StrategyBlockedReason` to the Strategy
+  application contract, covering kill switch, disabled config, risk limit,
+  readiness, stale data, missing market, and strategy fault categories.
+- Extended `StrategyStatus` with nullable `BlockedReason` while retaining the
+  existing `IsKillSwitchBlocked` field for backwards compatibility.
+- Persisted blocked reason kind/code/message on `StrategyRunStates` with EF
+  migration `AddStrategyBlockedReason`.
+- Exposed blocked reason through `ControlRoomStrategyDto` and the web
+  `ControlRoomStrategy` type.
+- Strategy supervisor now publishes disabled-config, kill-switch, and fault
+  blocked reasons from real runtime state.
+
+
+Evidence
+--------
+- `dotnet test context\Strategy\Autotrade.Strategy.Tests\Autotrade.Strategy.Tests.csproj --no-restore`
+  passed.
+- `dotnet test interfaces\Autotrade.Api.Tests\Autotrade.Api.Tests.csproj --no-restore`
+  passed.
+- `npm run build` passed from `webApp`.

@@ -1,0 +1,137 @@
+Phase 7: Performance Ledger and Agent Reputation
+================================================
+
+Status
+------
+[TODO]
+
+
+Intent
+------
+Use blockchain records to prove strategy usefulness over time. The agent should
+build reputation from all signal outcomes, not from selective screenshots.
+
+
+Accepted Scope
+--------------
+- Outcome recording service.
+- PerformanceLedger contract integration.
+- Local reputation read model.
+- Metrics in API and WebApp.
+- Tests for expired/loss/rejected inclusion.
+
+
+Out of Scope
+------------
+- Full quantitative research platform.
+- Guaranteed prediction of future performance.
+- Editing or deleting bad outcomes.
+
+
+Outcome Statuses
+----------------
+- `ExecutedWin`
+- `ExecutedLoss`
+- `ExecutedFlat`
+- `RejectedRisk`
+- `RejectedCompliance`
+- `Expired`
+- `SkippedNoAccess`
+- `FailedExecution`
+- `CancelledOperator`
+
+
+Tasks
+-----
+[TODO] AH-P7-T001 Implement outcome intent record.
+
+Fields:
+
+- outcomeId
+- signalId
+- executionId
+- strategyId
+- marketId
+- status
+- realizedPnlBps
+- slippageBps
+- fillRate
+- reasonCode
+- outcomeHash
+- transactionHash
+- createdAtUtc
+- recordedAtUtc
+
+[TODO] AH-P7-T002 Implement outcome builder.
+
+Sources:
+
+- strategy decision logs
+- order events
+- trades
+- Paper run reports
+- risk events
+- replay export
+
+Rules:
+
+- terminal outcome required by `validUntilUtc`
+- risk rejection is still an outcome
+- expired signal is still an outcome
+
+[TODO] AH-P7-T003 Implement `IArcPerformanceRecorder`.
+
+Behavior:
+
+- no-op when disabled
+- create local intent
+- submit to `PerformanceLedger`
+- store tx hash
+- map duplicate/correction behavior explicitly
+
+[TODO] AH-P7-T004 Implement reputation calculator.
+
+Metrics:
+
+- total signals
+- terminal signals
+- pending signals
+- executed signals
+- expired/rejected count
+- win/loss/flat count
+- average realized pnl bps
+- average slippage bps
+- risk rejection rate
+- confidence coverage: outcomes / signals
+
+[TODO] AH-P7-T005 Add API endpoints.
+
+- `GET /api/arc/performance/agent`
+- `GET /api/arc/performance/strategies/{strategyId}`
+- `GET /api/arc/performance/signals/{signalId}/outcome`
+
+[TODO] AH-P7-T006 Add tests.
+
+- losing outcome included in reputation
+- expired signal included
+- risk rejection included
+- pending signals do not count as wins
+- duplicate outcome blocked or corrected by explicit correction path
+- API returns no secrets
+
+
+Acceptance Criteria
+-------------------
+1. One signal can be recorded with a terminal outcome on Arc.
+2. Agent reputation changes after outcome record.
+3. Loss/expired/rejected outcomes are represented.
+4. WebApp can show "proof of usefulness" without guaranteeing future profit.
+5. Demo includes both signal tx and outcome tx.
+
+
+Evidence
+--------
+- `artifacts/arc-hackathon/demo-run/performance-outcome.json`
+- `artifacts/arc-hackathon/demo-run/agent-reputation.json`
+- tx hash for `OutcomeRecorded`
+

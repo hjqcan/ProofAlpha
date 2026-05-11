@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.21" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.7" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\context\MarketData\Autotrade.MarketData.Infra.BackgroundJobs\Autotrade.MarketData.Infra.BackgroundJobs.csproj" />
+    <ProjectReference Include="..\..\context\MarketData\Autotrade.MarketData.Infra.CrossCutting.IoC\Autotrade.MarketData.Infra.CrossCutting.IoC.csproj" />
+    <ProjectReference Include="..\..\context\MarketData\Autotrade.MarketData.Infra.Data\Autotrade.MarketData.Infra.Data.csproj" />
+    <ProjectReference Include="..\..\context\OpportunityDiscovery\Autotrade.OpportunityDiscovery.Infra.BackgroundJobs\Autotrade.OpportunityDiscovery.Infra.BackgroundJobs.csproj" />
+    <ProjectReference Include="..\..\context\OpportunityDiscovery\Autotrade.OpportunityDiscovery.Infra.CrossCutting.IoC\Autotrade.OpportunityDiscovery.Infra.CrossCutting.IoC.csproj" />
+    <ProjectReference Include="..\..\context\OpportunityDiscovery\Autotrade.OpportunityDiscovery.Infra.Data\Autotrade.OpportunityDiscovery.Infra.Data.csproj" />
+    <ProjectReference Include="..\..\context\SelfImprove\Autotrade.SelfImprove.Infra.BackgroundJobs\Autotrade.SelfImprove.Infra.BackgroundJobs.csproj" />
+    <ProjectReference Include="..\..\context\SelfImprove\Autotrade.SelfImprove.Infra.CrossCutting.IoC\Autotrade.SelfImprove.Infra.CrossCutting.IoC.csproj" />
+    <ProjectReference Include="..\..\context\SelfImprove\Autotrade.SelfImprove.Infra.Data\Autotrade.SelfImprove.Infra.Data.csproj" />
+    <ProjectReference Include="..\..\context\Strategy\Autotrade.Strategy.Infra.BackgroundJobs\Autotrade.Strategy.Infra.BackgroundJobs.csproj" />
+    <ProjectReference Include="..\..\context\Strategy\Autotrade.Strategy.Infra.CrossCutting.IoC\Autotrade.Strategy.Infra.CrossCutting.IoC.csproj" />
+    <ProjectReference Include="..\..\context\Strategy\Autotrade.Strategy.Infra.Data\Autotrade.Strategy.Infra.Data.csproj" />
+    <ProjectReference Include="..\..\context\Trading\Autotrade.Trading.Infra.BackgroundJobs\Autotrade.Trading.Infra.BackgroundJobs.csproj" />
+    <ProjectReference Include="..\..\context\Trading\Autotrade.Trading.Infra.CrossCutting.IoC\Autotrade.Trading.Infra.CrossCutting.IoC.csproj" />
+    <ProjectReference Include="..\..\context\Trading\Autotrade.Trading.Infra.Data\Autotrade.Trading.Infra.Data.csproj" />
+    <ProjectReference Include="..\Autotrade.EventBus\Autotrade.EventBus.csproj" />
+    <ProjectReference Include="..\Autotrade.Infra.BackgroundJobs.Core\Autotrade.Infra.BackgroundJobs.Core.csproj" />
+  </ItemGroup>
+
+</Project>

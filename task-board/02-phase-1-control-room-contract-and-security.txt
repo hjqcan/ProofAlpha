@@ -1,0 +1,88 @@
+Phase 1: Control Room Contract and Security
+===========================================
+
+Status
+------
+[DONE]
+
+
+Intent
+------
+Make the control room safe to operate locally. Freeze API contracts, command
+semantics, local access controls, and command audit behavior before adding more
+operator workflows.
+
+
+Core Boundary
+-------------
+The Web App can inspect and control the system only through explicit API command
+contracts. It must not receive exchange credentials, bypass CLI safeguards, or
+mutate trading state without audited command intent.
+
+
+Accepted Scope
+--------------
+- control-room API contract tests
+- local-only access and command-mode policy
+- command confirmation and audit trail
+- UI disabled states for read-only, Paper, degraded, and Live modes
+- API/Web App build and smoke evidence
+
+
+Out of Scope
+------------
+- hosted dashboard
+- multi-user account system
+- cloud sync
+- direct manual order placement
+- real exchange credential display
+
+
+Acceptance Criteria
+-------------------
+1. Snapshot, markets, market detail, order book, strategy state, and kill switch
+   endpoints have contract tests.
+2. Control commands can be disabled by configuration and the UI reflects that
+   state without pretending an action succeeded.
+3. High-risk commands require explicit confirmation and are audit logged.
+4. The API documents command mode and data mode in every control snapshot.
+5. Browser smoke verifies the control room loads without console errors against
+   a local API or deterministic mock.
+
+
+Tasks
+-----
+[DONE] P1-T001 Add control-room API contract tests.
+[DONE] P1-T002 Add local access, auth, and command-mode guardrails.
+[DONE] P1-T003 Add command confirmation and audit behavior.
+[DONE] P1-T004 Align UI command safety states.
+[DONE] P1-T005 Add Web App build and browser smoke evidence.
+
+
+Planned Evidence
+----------------
+- API contract tests under `interfaces/Autotrade.Api.Tests` or equivalent
+- command audit evidence from strategy and kill-switch commands
+- Web App build: `npm run build`
+- backend gate: `dotnet build` and `dotnet test`
+- browser smoke screenshot or report under `artifacts/control-room/phase-1/`
+
+Completion Evidence
+-------------------
+- 2026-05-03: `dotnet build` passed with 0 warnings and 0 errors.
+- 2026-05-03: `dotnet test` passed 336 tests.
+- 2026-05-03: `npm run build` from `webApp` passed.
+- 2026-05-03: local browser smoke passed for Markets, Trade, Ops, Activity,
+  and Ops mobile views.
+- 2026-05-03: command disabled-state sample returned HTTP 202 with
+  `status: Disabled` and `commandMode: ReadOnly`.
+
+
+Breakdown Folder
+----------------
+- `task-board/phase-1-control-room-contract-and-security/00-README.txt`
+- `task-board/phase-1-control-room-contract-and-security/01-api-contract-tests.txt`
+- `task-board/phase-1-control-room-contract-and-security/02-local-auth-and-command-modes.txt`
+- `task-board/phase-1-control-room-contract-and-security/03-command-audit-and-confirmation.txt`
+- `task-board/phase-1-control-room-contract-and-security/04-ui-command-safety-states.txt`
+- `task-board/phase-1-control-room-contract-and-security/05-build-and-browser-smoke.txt`

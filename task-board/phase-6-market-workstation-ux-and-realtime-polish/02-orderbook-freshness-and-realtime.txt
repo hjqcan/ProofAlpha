@@ -1,0 +1,17 @@
+Phase 6.2: Order-Book Freshness and Realtime States
+===================================================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Prevent operators from mistaking stale market data for live actionable state.
+
+Acceptance
+----------
+- Order-book data includes last updated time, source, and freshness status.
+- UI displays fresh, delayed, stale, empty, and error states distinctly.
+- Strategy and risk views surface stale-data blockers where relevant.
+- Tests cover freshness thresholds and stale-state rendering.

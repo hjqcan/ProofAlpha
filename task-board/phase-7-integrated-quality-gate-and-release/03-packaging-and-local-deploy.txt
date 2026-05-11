@@ -1,0 +1,20 @@
+Phase 7.3: Packaging and Local Deploy
+=====================================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Make local product evaluation reproducible without hand-editing undocumented
+steps.
+
+Acceptance
+----------
+- API and Web App startup instructions are current and tested.
+- Local configuration template remains safe for Paper mode.
+- Generated frontend assets can be served or deployed according to documented
+  local path.
+- The process works when another common dev port is already occupied.
+- No package includes secrets or local private config.

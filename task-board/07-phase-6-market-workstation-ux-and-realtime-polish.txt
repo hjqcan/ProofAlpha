@@ -1,0 +1,74 @@
+Phase 6: Market Workstation UX and Realtime Polish
+==================================================
+
+Status
+------
+[DONE]
+
+
+Intent
+------
+Polish the Web App into a focused trading workstation: clear market discovery,
+fresh order-book state, readable copy, responsive layouts, and trustworthy
+visual states.
+
+
+Core Boundary
+-------------
+This phase improves operator usability without adding unsupported manual trading
+or bypassing strategy/risk controls.
+
+
+Accepted Scope
+--------------
+- market discovery ranking and filters
+- order-book freshness and stale-data states
+- detail and activity layout polish
+- i18n copy and encoding repair
+- visual regression smoke
+
+
+Out of Scope
+------------
+- marketing landing page
+- decorative dashboard-only charts
+- direct unmanaged order ticket
+- hosted analytics
+
+
+Acceptance Criteria
+-------------------
+1. zh-CN and en-US copy render correctly with no mojibake.
+2. Market cards expose why a market is interesting or unsuitable.
+3. Order book freshness is visible and stale data cannot be mistaken for live
+   data.
+4. Layouts work on desktop and mobile without text overlap.
+5. Browser smoke captures screenshots for key views.
+
+
+Tasks
+-----
+[DONE] P6-T001 Improve market discovery ranking and unsuitable reasons.
+[DONE] P6-T002 Add order-book freshness and realtime states.
+[DONE] P6-T003 Polish trade workspace layout and activity surfaces.
+[DONE] P6-T004 Fix i18n copy, encoding, and operator wording.
+[DONE] P6-T005 Add browser visual regression smoke.
+
+
+Planned Evidence
+----------------
+- Web App build: `npm run build`
+- screenshots under `artifacts/webapp/phase-6/`
+- copy/encoding test or lint evidence
+- API sample data for stale and fresh order-book states
+- `dotnet test`
+
+
+Breakdown Folder
+----------------
+- `task-board/phase-6-market-workstation-ux-and-realtime-polish/00-README.txt`
+- `task-board/phase-6-market-workstation-ux-and-realtime-polish/01-market-discovery-ranking.txt`
+- `task-board/phase-6-market-workstation-ux-and-realtime-polish/02-orderbook-freshness-and-realtime.txt`
+- `task-board/phase-6-market-workstation-ux-and-realtime-polish/03-trade-workspace-layout-polish.txt`
+- `task-board/phase-6-market-workstation-ux-and-realtime-polish/04-i18n-copy-and-encoding.txt`
+- `task-board/phase-6-market-workstation-ux-and-realtime-polish/05-browser-visual-regression.txt`

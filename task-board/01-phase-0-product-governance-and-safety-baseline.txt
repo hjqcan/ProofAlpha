@@ -1,0 +1,78 @@
+Phase 0: Product Governance and Safety Baseline
+===============================================
+
+Status
+------
+[DONE] Accepted by baseline product docs, task-board source-of-truth files, and
+`docs/product/autotrade-phase-0-quality-gate.md`.
+
+
+Intent
+------
+Freeze the product direction and safety baseline before expanding the control
+room. This phase turns the current rough product shape into a governed build
+plan with measurable gates.
+
+
+Core Boundary
+-------------
+This phase does not add trading behavior. It defines product guardrails,
+acceptance evidence, and repository-wide safety contracts that later phases must
+honor.
+
+
+Accepted Scope
+--------------
+- current product inventory
+- explicit Paper, Live, and command-mode policy
+- product safety invariants
+- test and evidence baseline
+- roadmap source-of-truth links
+
+
+Out of Scope
+------------
+- new strategies
+- UI redesign
+- real-money execution testing
+- credential management changes beyond policy and tests
+
+
+Acceptance Criteria
+-------------------
+1. Current backend, API, CLI, and Web App surfaces are inventoried.
+2. Product safety invariants are documented and testable.
+3. Existing build and test commands are captured as the minimum quality gate.
+4. Phase task board becomes the source of truth for product hardening order.
+5. No implementation phase can claim completion without evidence paths.
+
+
+Tasks
+-----
+[DONE] P0-T001 Inventory current product surfaces and risks.
+[DONE] P0-T002 Freeze safety policy contracts.
+[DONE] P0-T003 Establish build, test, and acceptance evidence baseline.
+[DONE] P0-T004 Publish roadmap source of truth and update rules.
+
+
+Planned Evidence
+----------------
+- product inventory: `docs/product/autotrade-current-surface-inventory.md`
+- safety policy: `docs/product/autotrade-safety-policy.md`
+- baseline gate notes: `docs/product/autotrade-baseline-quality-gate.md`
+- roadmap: `docs/product/autotrade-product-hardening-roadmap.md`
+- phase gate: `docs/product/autotrade-phase-0-quality-gate.md`
+- commands:
+  - `dotnet restore`
+  - `dotnet build`
+  - `dotnet test`
+  - `npm run build` from `webApp`
+
+
+Breakdown Folder
+----------------
+- `task-board/phase-0-product-governance-and-safety-baseline/00-README.txt`
+- `task-board/phase-0-product-governance-and-safety-baseline/01-current-product-inventory.txt`
+- `task-board/phase-0-product-governance-and-safety-baseline/02-safety-policy-contracts.txt`
+- `task-board/phase-0-product-governance-and-safety-baseline/03-test-gate-baseline.txt`
+- `task-board/phase-0-product-governance-and-safety-baseline/04-roadmap-source-of-truth.txt`

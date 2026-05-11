@@ -1,0 +1,20 @@
+Phase 5.1: Audit Timeline Contract
+==================================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Create a unified timeline for decisions, orders, trades, risk events, command
+events, readiness changes, and reconciliation.
+
+Acceptance
+----------
+- Timeline can filter by market, strategy, order, run session, risk event, and
+  time range.
+- Each item includes timestamp, type, actor/source, correlation ID, and detail
+  reference.
+- Timeline ordering is deterministic.
+- Tests cover empty, partial, and dense timelines.

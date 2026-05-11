@@ -1,0 +1,56 @@
+Phase 1.5: Build and Browser Smoke
+==================================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Close Phase 1 with executable evidence across backend and frontend surfaces.
+
+Required Evidence
+-----------------
+- `dotnet build`
+- `dotnet test`
+- `npm run build` from `webApp`
+- local browser smoke for Markets, Trade, Ops, and Activity views
+- API command disabled-state sample
+
+Acceptance
+----------
+- The control room loads without console errors.
+- No key control overlaps or unreadable disabled state appears in screenshots.
+- Evidence is written under `artifacts/control-room/phase-1/`.
+
+Completion Notes
+----------------
+- Added a repeatable Phase 1 smoke runner under
+  `artifacts/control-room/phase-1/run_phase1_smoke.ps1`.
+- Added a Node Playwright smoke script under
+  `artifacts/control-room/phase-1/phase1_browser_smoke.mjs` that uses local
+  Edge/Chrome when bundled Playwright browsers are unavailable.
+- Added a Web App favicon so browser smoke does not emit a default
+  `/favicon.ico` 404 console error.
+- Smoke configuration starts the API with modules disabled, public market data
+  disabled, read-only command mode, and control commands disabled.
+
+Regression Evidence
+-------------------
+- 2026-05-03: `dotnet build` passed with 0 warnings and 0 errors.
+- 2026-05-03: `dotnet test` passed 336 tests.
+- 2026-05-03: `npm run build` from `webApp` passed.
+- 2026-05-03: `git diff --check` passed; Git emitted CRLF normalization
+  warnings only.
+- 2026-05-03: `powershell -NoProfile -ExecutionPolicy Bypass -File
+  artifacts\control-room\phase-1\run_phase1_smoke.ps1` passed.
+
+Artifacts
+---------
+- `artifacts/control-room/phase-1/phase1-browser-smoke-report.json`
+- `artifacts/control-room/phase-1/api-command-disabled-sample.json`
+- `artifacts/control-room/phase-1/phase1-smoke-markets.png`
+- `artifacts/control-room/phase-1/phase1-smoke-trade.png`
+- `artifacts/control-room/phase-1/phase1-smoke-ops.png`
+- `artifacts/control-room/phase-1/phase1-smoke-activity.png`
+- `artifacts/control-room/phase-1/phase1-smoke-ops-mobile.png`

@@ -1,0 +1,31 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.cs]
+indent_style = space
+indent_size = 4
+
+# 使用 var（与 third-party/grukirbs 约定一致：明显类型用 var）
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = true:suggestion
+
+# using 排序（系统 -> 其他）
+dotnet_sort_system_directives_first = true
+
+# 文件范围命名空间（减小缩进层级）
+csharp_style_namespace_declarations = file_scoped:suggestion
+
+# 表达式体（适度）
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+csharp_style_expression_bodied_properties = when_on_single_line:suggestion
+
+[*.{csproj,sln}]
+indent_style = space
+indent_size = 2
+

@@ -1,0 +1,24 @@
+Phase 0.1: Current Product Inventory
+====================================
+
+Status
+------
+[DONE] Accepted by `docs/product/autotrade-current-surface-inventory.md`.
+
+Goal
+----
+Document the current operator-visible product surfaces and the risks attached
+to each surface.
+
+Acceptance
+----------
+- Inventory covers CLI, API, Web App, strategies, market data, execution, risk,
+  persistence, exports, health checks, and configuration.
+- Each surface lists current capabilities, known gaps, and owner context.
+- The inventory distinguishes engineering capability from accepted product
+  behavior.
+- No private credential or account-specific data appears in the inventory.
+
+Planned Output
+--------------
+- `docs/product/autotrade-current-surface-inventory.md`

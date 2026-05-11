@@ -1,0 +1,76 @@
+Phase 4: Paper-to-Live Promotion and Run Reports
+================================================
+
+Status
+------
+[DONE]
+
+
+Intent
+------
+Make Paper mode a measurable proving ground instead of a loose simulation. A
+run should produce evidence that explains whether the system is ready for
+carefully armed Live operation.
+
+
+Core Boundary
+-------------
+Promotion evidence can recommend readiness but must not bypass Live arming,
+compliance, account sync, or risk gates.
+
+
+Accepted Scope
+--------------
+- Paper run session model
+- run report API and exports
+- promotion checklist
+- PnL, slippage, latency, fill, and exposure attribution
+- report UI
+
+
+Out of Scope
+------------
+- guarantee of profitability
+- automatic Live enablement
+- unmanaged real-money experiments
+- historical backtest engine
+
+
+Acceptance Criteria
+-------------------
+1. Paper runs are grouped into sessions with start, stop, configuration, and
+   strategy set.
+2. Run reports summarize decisions, orders, fills, PnL, latency, stale data,
+   risk events, and unhedged exposure.
+3. Promotion checklist has pass/fail reasons and explicit residual risks.
+4. Reports export to JSON and CSV without losing audit IDs.
+5. UI makes it clear whether evidence came from Paper or Live.
+
+
+Tasks
+-----
+[DONE] P4-T001 Add Paper run session model and tests.
+[DONE] P4-T002 Add run report API and export commands.
+[DONE] P4-T003 Add Paper-to-Live promotion checklist.
+[DONE] P4-T004 Add PnL, slippage, latency, and exposure attribution.
+[DONE] P4-T005 Add run report UI and evidence gate.
+
+
+Planned Evidence
+----------------
+- Paper run report: `artifacts/reports/phase-4/paper-run-report.json`
+- promotion checklist: `artifacts/reports/phase-4/promotion-checklist.json`
+- CSV exports for decisions, orders, trades, positions, risk events, and PnL
+- targeted report tests
+- `dotnet test`
+- `npm run build`
+
+
+Breakdown Folder
+----------------
+- `task-board/phase-4-paper-to-live-promotion-and-run-reports/00-README.txt`
+- `task-board/phase-4-paper-to-live-promotion-and-run-reports/01-paper-run-session-model.txt`
+- `task-board/phase-4-paper-to-live-promotion-and-run-reports/02-run-report-api-and-export.txt`
+- `task-board/phase-4-paper-to-live-promotion-and-run-reports/03-promotion-checklist.txt`
+- `task-board/phase-4-paper-to-live-promotion-and-run-reports/04-pnl-slippage-attribution.txt`
+- `task-board/phase-4-paper-to-live-promotion-and-run-reports/05-report-ui-and-gate.txt`

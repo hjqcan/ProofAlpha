@@ -1,0 +1,22 @@
+Phase 0.2: Safety Policy Contracts
+==================================
+
+Status
+------
+[DONE] Accepted by `docs/product/autotrade-safety-policy.md`.
+
+Goal
+----
+Freeze product safety invariants before expanding operator workflows.
+
+Acceptance
+----------
+- Paper mode default behavior is documented.
+- Live readiness and arming invariants are documented.
+- Command-mode, read-only mode, and degraded mode semantics are documented.
+- Kill switch, compliance, and credential handling invariants are explicit.
+- Later phases can reference these contracts without reinterpretation.
+
+Planned Output
+--------------
+- `docs/product/autotrade-safety-policy.md`

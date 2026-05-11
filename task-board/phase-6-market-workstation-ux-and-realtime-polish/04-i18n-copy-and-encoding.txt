@@ -1,0 +1,19 @@
+Phase 6.4: i18n Copy and Encoding
+=================================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Repair copy so both zh-CN and en-US operator interfaces are readable and
+consistent.
+
+Acceptance
+----------
+- Existing zh-CN mojibake is replaced with correct text.
+- Source files are saved with consistent encoding.
+- Operator copy avoids promises of profitability or investment advice.
+- Translation keys are complete for all rendered UI paths.
+- A build or test fails if required message IDs are missing.

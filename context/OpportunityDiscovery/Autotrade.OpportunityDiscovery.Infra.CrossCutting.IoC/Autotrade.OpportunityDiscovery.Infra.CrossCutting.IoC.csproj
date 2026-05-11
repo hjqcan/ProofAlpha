@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Autotrade.OpportunityDiscovery.Application\Autotrade.OpportunityDiscovery.Application.csproj" />
+    <ProjectReference Include="..\Autotrade.OpportunityDiscovery.Infra.Data\Autotrade.OpportunityDiscovery.Infra.Data.csproj" />
+    <ProjectReference Include="..\Autotrade.OpportunityDiscovery.Infra.Sources\Autotrade.OpportunityDiscovery.Infra.Sources.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Autotrade.Llm\Autotrade.Llm.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.1" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

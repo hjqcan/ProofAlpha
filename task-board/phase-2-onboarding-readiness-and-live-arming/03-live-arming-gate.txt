@@ -1,0 +1,57 @@
+Phase 2.3: Live Arming Gate
+===========================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Require explicit operator evidence before the system can place Live orders.
+
+Acceptance
+----------
+- Live arming requires passing readiness checks, compliance allowance, account
+  sync, risk limits, and command-mode eligibility.
+- Arming records operator confirmation, timestamp, risk summary, and config
+  version.
+- Arming expires or is invalidated when critical configuration changes.
+- Disarming is available and audited.
+- Live order paths verify arming state before placement.
+
+Implementation Notes
+--------------------
+- Do not weaken existing `Compliance:GeoKycAllowed` protections.
+
+Completion Notes
+----------------
+- Added `ILiveArmingService` contracts, file-backed arming evidence, expiry,
+  typed arm/disarm confirmation, config fingerprint invalidation, and risk
+  summary capture.
+- Registered Live arming in Trading DI and exposed status through CLI readiness,
+  API readiness, `live status`, `live arm`, `live disarm`, and control-room
+  `/api/control-room/live/*` endpoints.
+- Live execution now checks arming state after persisted-order lookup and before
+  new idempotency entries or exchange submission. Unarmed Live orders persist as
+  rejected with `LIVE_NOT_ARMED` and never call CLOB APIs.
+- Control-room arm requires `LiveServices` command mode. Disarm remains
+  available and audited even when command mode is read-only because it lowers
+  live risk.
+
+Regression Evidence
+-------------------
+- `dotnet test context\Trading\Autotrade.Trading.Tests\Autotrade.Trading.Tests.csproj --no-restore`
+  passed: 214 tests.
+- `dotnet test interfaces\Autotrade.Api.Tests\Autotrade.Api.Tests.csproj --no-restore`
+  passed: 47 tests.
+- `dotnet build Autotrade.Cli\Autotrade.Cli.csproj --no-restore` passed with
+  0 warnings and 0 errors.
+- `dotnet Autotrade.Cli\bin\Debug\net10.0\Autotrade.Cli.dll live status --json`
+  produced `artifacts/readiness/phase-2/live-status.json` and exited 1 because
+  no local Live arming evidence exists.
+- `dotnet Autotrade.Cli\bin\Debug\net10.0\Autotrade.Cli.dll readiness --json`
+  produced `artifacts/readiness/phase-2/readiness.json`; `execution.live_armed`
+  is blocked by the Live arming service without exceptions.
+- `dotnet test Autotrade.sln --no-restore` passed all solution tests.
+- `git diff --check` passed; only existing line-ending normalization warnings
+  were reported.

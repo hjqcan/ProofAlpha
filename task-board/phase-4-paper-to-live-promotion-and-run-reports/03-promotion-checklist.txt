@@ -1,0 +1,19 @@
+Phase 4.3: Promotion Checklist
+==============================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Turn Paper run evidence into an explicit pass/fail checklist for Live
+consideration.
+
+Acceptance
+----------
+- Checklist evaluates run duration, decision coverage, stale data, risk events,
+  unhedged exposure, order errors, reconciliation health, and PnL attribution.
+- Failed criteria include specific reasons and affected evidence IDs.
+- Passing checklist does not arm Live by itself.
+- Checklist can be rendered by CLI, API, and UI.

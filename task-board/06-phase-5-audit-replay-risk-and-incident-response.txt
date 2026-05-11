@@ -1,0 +1,78 @@
+Phase 5: Audit Replay, Risk, and Incident Response
+==================================================
+
+Status
+------
+[DONE]
+
+
+Intent
+------
+Give operators a reliable way to answer what happened, why it happened, and
+what the system did in response. Risk events and audit replay become first-class
+product workflows.
+
+
+Core Boundary
+-------------
+Incident response must not hide, rewrite, or delete audit evidence. Replay is a
+read-only reconstruction path unless a separate audited operator command is
+issued.
+
+
+Accepted Scope
+--------------
+- audit timeline contract
+- risk event drill-down
+- unhedged exposure timeline
+- incident response actions and runbook
+- replay export
+
+
+Out of Scope
+------------
+- automated legal or tax reporting
+- mutable audit history
+- forced Live liquidation without existing risk policy
+- replacing database backups
+
+
+Acceptance Criteria
+-------------------
+1. A user can replay a market, strategy, order, or risk event from persisted
+   evidence.
+2. Risk events show trigger, metrics, limits, action, and affected orders.
+3. Unhedged exposure records are visible with duration, market, strategy, and
+   mitigation result.
+4. Incident response actions are explicit, audited, and reversible where
+   reversal is safe.
+5. Exported replay packages are sufficient for offline review.
+
+
+Tasks
+-----
+[DONE] P5-T001 Add audit timeline contract and tests.
+[DONE] P5-T002 Add risk event and exposure drill-down.
+[DONE] P5-T003 Add incident response actions and runbook.
+[DONE] P5-T004 Add replay export package.
+[DONE] P5-T005 Add audit and replay regression gate.
+
+
+Planned Evidence
+----------------
+- replay package: `artifacts/audit/phase-5/replay-package.json`
+- risk event export: `artifacts/audit/phase-5/risk-events.csv`
+- incident runbook: `docs/operations/autotrade-incident-runbook.md`
+- targeted audit tests
+- `dotnet test`
+- `npm run build`
+
+
+Breakdown Folder
+----------------
+- `task-board/phase-5-audit-replay-risk-and-incident-response/00-README.txt`
+- `task-board/phase-5-audit-replay-risk-and-incident-response/01-audit-timeline-contract.txt`
+- `task-board/phase-5-audit-replay-risk-and-incident-response/02-risk-event-and-exposure-drilldown.txt`
+- `task-board/phase-5-audit-replay-risk-and-incident-response/03-incident-response-actions.txt`
+- `task-board/phase-5-audit-replay-risk-and-incident-response/04-replay-export.txt`
+- `task-board/phase-5-audit-replay-risk-and-incident-response/05-audit-regression-gate.txt`

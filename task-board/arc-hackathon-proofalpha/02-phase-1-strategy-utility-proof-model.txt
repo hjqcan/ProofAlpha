@@ -1,0 +1,174 @@
+Phase 1: Strategy Utility Proof Model
+=====================================
+
+Status
+------
+[TODO]
+
+
+Intent
+------
+Define and implement the evidence model that lets ProofAlpha prove a strategy
+was useful without making false investment claims. This phase prevents a weak
+"we put a hash onchain" demo.
+
+
+Core Boundary
+-------------
+ProofAlpha proves:
+
+- what the agent knew
+- what the agent recommended
+- what risk envelope applied
+- whether it executed
+- what happened afterward
+
+Arc anchors hashes and outcome records. Arc does not decide that a strategy is
+profitable.
+
+
+Accepted Scope
+--------------
+- Canonical signal document.
+- Canonical outcome document.
+- Utility metrics.
+- Anti-cherry-pick rules.
+- Local evidence export.
+- Tests for deterministic hashing and redaction.
+
+
+Out of Scope
+------------
+- Full statistical backtesting platform.
+- Profit guarantee.
+- Publishing full reasoning text to public chain.
+
+
+Proof Documents
+---------------
+`StrategySignalProofDocument`:
+
+- documentVersion
+- agentId
+- sourceKind
+- sourceId
+- strategyId
+- marketId
+- venue
+- createdAtUtc
+- configVersion
+- evidenceIds
+- opportunityHash
+- reasoningHash
+- riskEnvelopeHash
+- expectedEdgeBps
+- maxNotionalUsdc
+- validUntilUtc
+- generatedStrategyPackageHash, optional
+
+`StrategyOutcomeProofDocument`:
+
+- documentVersion
+- signalId
+- executionId
+- runSessionId
+- clientOrderIds
+- orderEventIds
+- tradeIds
+- paperOrLive
+- status: `Executed`, `Rejected`, `Expired`, `Skipped`, `Failed`
+- realizedPnlBps
+- slippageBps
+- fillRate
+- riskRejectReason
+- completedAtUtc
+
+
+Tasks
+-----
+[TODO] AH-P1-T001 Define proof DTOs.
+
+- Add DTOs in `ArcSettlement.Application.Contract`.
+- Keep them independent from EF entities.
+- Include JSON serializer options for stable output.
+
+[TODO] AH-P1-T002 Define utility metrics.
+
+Minimum:
+
+- published signals count
+- executed signals count
+- expired signals count
+- rejected signals count
+- win rate over executed Paper outcomes
+- average realized PnL bps
+- average slippage bps
+- average time from signal to execution
+- max drawdown-like Paper metric if available
+
+[TODO] AH-P1-T003 Define anti-cherry-pick rules.
+
+- Every published signal needs a terminal outcome:
+  - executed
+  - expired
+  - rejected
+  - skipped
+  - failed
+- Outcome deadline must be derived from `validUntilUtc`.
+- Reputation includes losing and expired signals.
+- Manual deletion of poor signals is not allowed; use tombstone/revoked status.
+
+[TODO] AH-P1-T004 Implement hash service.
+
+- Hash canonical signal document.
+- Hash canonical outcome document.
+- Hash risk envelope and evidence summaries.
+- Tests prove same input gives same hash.
+- Tests prove modified edge/market/legs/outcome changes hash.
+
+[TODO] AH-P1-T005 Implement redaction guard.
+
+- Scan proof documents before persistence/publication for:
+  - private key
+  - api key
+  - api secret
+  - passphrase
+  - mnemonic
+  - raw CLOB signature if not explicitly allowed as redacted evidence
+- Fail publication if sensitive fields are detected.
+
+[TODO] AH-P1-T006 Create local proof export.
+
+Export folder:
+
+```text
+artifacts/arc-hackathon/demo-run/proofs/
+  signal-proof.json
+  outcome-proof.json
+  utility-metrics.json
+  hash-manifest.json
+```
+
+[TODO] AH-P1-T007 Add tests.
+
+- deterministic signal hash
+- deterministic outcome hash
+- redaction blocks likely secrets
+- expired signal contributes to reputation denominator
+- failed/rejected outcome can be recorded and exported
+
+
+Acceptance Criteria
+-------------------
+1. Strategy utility proof can be generated without Arc online.
+2. Proof documents are stable and hashable.
+3. Proof documents cannot contain obvious secrets.
+4. Reputation model includes non-winning outcomes.
+5. Demo artifact can explain "why this strategy looked useful."
+
+
+Evidence
+--------
+- `artifacts/arc-hackathon/demo-run/proofs/*`
+- targeted ArcSettlement proof model tests
+

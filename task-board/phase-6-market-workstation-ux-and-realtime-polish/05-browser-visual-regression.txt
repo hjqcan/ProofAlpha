@@ -1,0 +1,24 @@
+Phase 6.5: Browser Visual Regression
+====================================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Close Phase 6 with visual evidence for key operator views.
+
+Required Evidence
+-----------------
+- desktop screenshots for Markets, Trade, Ops, Activity, strategy detail, and
+  run report where available
+- mobile screenshots for Markets and Trade
+- stale order-book state screenshot
+- `npm run build`
+- `dotnet test`
+
+Acceptance
+----------
+- Evidence is stored under `artifacts/webapp/phase-6/`.
+- Screenshots show no text overlap, blank primary panels, or unreadable copy.

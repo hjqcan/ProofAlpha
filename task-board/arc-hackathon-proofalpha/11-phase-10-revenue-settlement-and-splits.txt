@@ -1,0 +1,139 @@
+Phase 10: Revenue Settlement and Splits
+=======================================
+
+Status
+------
+[TODO]
+
+
+Intent
+------
+Show how the agent becomes a revenue-generating market entry point: subscription
+fees, builder-attributed flow, and strategy/provider splits are recorded on Arc.
+
+
+Accepted Scope
+--------------
+- Revenue settlement model.
+- Event-only RevenueSettlement contract integration.
+- Local revenue journal.
+- Demo settlement command.
+- WebApp/API read model.
+
+
+Out of Scope
+------------
+- Production accounting.
+- Tax reporting.
+- Mainnet distribution.
+- Actual revenue distribution unless implemented and tested.
+
+
+Revenue Sources
+---------------
+- `SubscriptionFee`
+- `BuilderAttributedFlow`
+- `StrategyMarketplaceFee`
+- `ManualDemoSettlement`
+
+Recipients:
+
+- agent owner
+- strategy author
+- platform
+- referrer, optional
+- treasury, optional
+
+
+Tasks
+-----
+[TODO] AH-P10-T001 Define revenue settlement document.
+
+Fields:
+
+- settlementId
+- sourceKind
+- signalId
+- executionId
+- walletAddress
+- strategyId
+- grossUsdc
+- tokenAddress
+- shares
+- reason
+- simulated
+- sourceTransactionHash
+- settlementHash
+- createdAtUtc
+
+[TODO] AH-P10-T002 Implement local settlement journal.
+
+Statuses:
+
+- Pending
+- Submitted
+- Confirmed
+- Failed
+- SkippedDisabled
+
+[TODO] AH-P10-T003 Implement settlement recorder.
+
+Interface:
+
+```csharp
+public interface IArcRevenueSettlementRecorder
+{
+    Task<ArcRevenueSettlementResult> RecordAsync(
+        ArcRevenueSettlementRequest request,
+        CancellationToken cancellationToken = default);
+}
+```
+
+[TODO] AH-P10-T004 Add settlement calculation.
+
+MVP:
+
+- deterministic split config
+- gross amount from subscription or demo fixture
+- no hidden rounding drift
+- all splits sum to gross
+
+[TODO] AH-P10-T005 Add CLI command.
+
+Commands:
+
+```powershell
+autotrade arc revenue record --signal-id <id> --gross-usdc 10 --simulated --reason "demo subscription"
+autotrade arc revenue list --limit 20
+```
+
+[TODO] AH-P10-T006 Add API endpoints.
+
+- `GET /api/arc/revenue`
+- `GET /api/arc/revenue/{settlementId}`
+- `POST /api/arc/revenue/record`
+
+[TODO] AH-P10-T007 Add tests.
+
+- split sums to gross
+- simulated flag required for non-real source
+- disabled mode skipped
+- duplicate settlement id idempotent
+- response redacts secrets
+
+
+Acceptance Criteria
+-------------------
+1. Demo can record a revenue settlement event on Arc or local EVM.
+2. Settlement is linked to signal/subscription/execution evidence.
+3. WebApp shows settlement as testnet/simulated when appropriate.
+4. Split math is deterministic and tested.
+5. Submission can say "agent monetization path" truthfully.
+
+
+Evidence
+--------
+- `artifacts/arc-hackathon/demo-run/revenue-settlement.json`
+- tx hash for `RevenueRecorded`
+- split calculation test output
+

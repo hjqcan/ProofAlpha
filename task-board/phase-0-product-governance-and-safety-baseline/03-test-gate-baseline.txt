@@ -1,0 +1,23 @@
+Phase 0.3: Test Gate Baseline
+=============================
+
+Status
+------
+[DONE] Accepted by `docs/product/autotrade-baseline-quality-gate.md`.
+
+Goal
+----
+Record the minimum quality gate that every later phase must preserve.
+
+Acceptance
+----------
+- Baseline commands are captured with expected success criteria.
+- Optional Postgres smoke behavior is documented separately from required gates.
+- Web App build is included when frontend files are touched.
+- Gate output locations are standardized under `artifacts/`.
+- Any currently failing baseline is recorded as a blocker, not normalized as
+  technical debt.
+
+Planned Output
+--------------
+- `docs/product/autotrade-baseline-quality-gate.md`

@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Autotrade.SelfImprove.Domain.Shared\Autotrade.SelfImprove.Domain.Shared.csproj" />
+    <ProjectReference Include="..\..\Strategy\Autotrade.Strategy.Application.Contract\Autotrade.Strategy.Application.Contract.csproj" />
+    <ProjectReference Include="..\..\Trading\Autotrade.Trading.Application.Contract\Autotrade.Trading.Application.Contract.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,18 @@
+Phase 7.2: API, Web App, and CLI Cross-Surface Gate
+===================================================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Prove that core operator workflows are consistent across CLI, API, and Web App.
+
+Acceptance
+----------
+- Readiness results match across CLI/API/UI.
+- Strategy state changes are reflected across CLI/API/UI.
+- Kill-switch activation and reset are reflected across CLI/API/UI.
+- Reports and audit exports reference the same evidence IDs.
+- Gate records all artifact paths.

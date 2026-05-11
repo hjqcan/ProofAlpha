@@ -1,0 +1,172 @@
+Phase 11: Demo Gate and Submission
+==================================
+
+Status
+------
+[TODO]
+
+
+Intent
+------
+Package a repeatable hackathon demo that proves the full paid-agent loop.
+
+
+Accepted Scope
+--------------
+- Demo runner script.
+- Submission markdown.
+- Demo talk track.
+- Screenshots.
+- Command evidence.
+- Secret scan.
+- Final quality gate.
+
+
+Demo Runner
+-----------
+Create:
+
+```powershell
+.\scripts\run-arc-hackathon-demo.ps1
+```
+
+The script should:
+
+1. Build contracts.
+2. Run contract tests.
+3. Build .NET.
+4. Run targeted ArcSettlement and builder attribution tests.
+5. Build WebApp.
+6. Seed or locate one demo opportunity.
+7. Publish signal proof.
+8. Sync subscription entitlement.
+9. Show access denied and access allowed JSON.
+10. Execute or simulate Paper order with builder evidence.
+11. Record performance outcome.
+12. Record revenue settlement.
+13. Export `demo-summary.md`.
+
+
+Submission Doc Outline
+----------------------
+`docs/hackathon/arc-proofalpha-submission.md`:
+
+1. One-liner.
+2. Problem: AI trading agents need trust and monetization.
+3. Product: paid Arc-backed ProofAlpha agent gateway.
+4. Why Arc: proof, USDC subscription, settlement, reputation.
+5. Why Polymarket: execution venue and builder attribution.
+6. Architecture.
+7. Demo flow.
+8. Subscription/entitlement model.
+9. Strategy utility proof model.
+10. Performance/reputation ledger.
+11. Revenue settlement model.
+12. Safety: Paper-first, Live arming, no secrets.
+13. Testnet/simulated disclosures.
+14. Evidence links and tx hashes.
+15. Next steps.
+
+
+Tasks
+-----
+[TODO] AH-P11-T001 Create demo runner.
+
+- fail fast on missing tools
+- never print secrets
+- write logs under `artifacts/arc-hackathon/demo-run/logs`
+- write all final artifacts under `artifacts/arc-hackathon/demo-run`
+
+[TODO] AH-P11-T002 Create final architecture diagram.
+
+Must include:
+
+- OpportunityDiscovery
+- SelfImprove
+- Strategy
+- Trading
+- Polymarket CLOB
+- Builder attribution
+- ArcSettlement
+- SignalRegistry
+- StrategyAccess
+- PerformanceLedger
+- RevenueSettlement
+- Control Room
+
+[TODO] AH-P11-T003 Record five-minute video script.
+
+Flow:
+
+1. agent finds strategy
+2. user blocked before subscription
+3. user subscribes with USDC/testnet token
+4. signal proof published to Arc
+5. Paper execution with builder attribution
+6. performance ledger records outcome
+7. revenue settlement records monetization
+8. safety posture
+
+[TODO] AH-P11-T004 Run final quality gate.
+
+Commands:
+
+```powershell
+dotnet restore
+dotnet build
+dotnet test
+npm --prefix .\interfaces\WebApp run build
+npm --prefix .\interfaces\ArcContracts test
+```
+
+[TODO] AH-P11-T005 Capture screenshots.
+
+Minimum:
+
+- blocked unsubscribed view
+- subscribed unlocked view
+- signal proof with tx hash
+- performance/reputation view
+- revenue settlement view
+- auto-trading permission blocked/allowed state
+
+[TODO] AH-P11-T006 Run secret scan.
+
+Scan:
+
+- docs
+- config
+- artifacts
+- deployment outputs
+- screenshots if any OCR/manual review is possible
+
+No real keys, private keys, mnemonics, passphrases, or API secrets.
+
+[TODO] AH-P11-T007 Final claim review.
+
+Review every public claim:
+
+- Is it implemented?
+- Is it proven by artifact?
+- Is it testnet/simulated if not production?
+- Does it avoid investment advice?
+- Does it avoid claiming Arc venue settlement for Polymarket trades?
+
+
+Acceptance Criteria
+-------------------
+1. One fresh run can produce demo artifacts.
+2. Demo proves paid access, signal proof, execution attribution, performance
+   outcome, and revenue settlement.
+3. All local gates pass or true external blockers are recorded.
+4. No secret scan findings remain.
+5. Demo can be presented in under five minutes.
+
+
+Evidence
+--------
+- `artifacts/arc-hackathon/demo-run/demo-summary.md`
+- `docs/hackathon/arc-proofalpha-submission.md`
+- `docs/hackathon/arc-proofalpha-demo-script.md`
+- `artifacts/arc-hackathon/screenshots/*`
+

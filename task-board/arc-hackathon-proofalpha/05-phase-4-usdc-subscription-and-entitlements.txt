@@ -1,0 +1,177 @@
+Phase 4: USDC Subscription and Entitlements
+===========================================
+
+Status
+------
+[TODO]
+
+
+Intent
+------
+Make USDC payment on Arc unlock a real ProofAlpha capability. This is the
+commercial core of the hackathon project.
+
+
+Accepted Scope
+--------------
+- StrategyAccess contract integration.
+- Subscription plan model.
+- Entitlement mirror in backend.
+- Manual refresh/sync command.
+- API read model.
+- Tests for entitlement gating.
+
+
+Out of Scope
+------------
+- Production billing.
+- Custody.
+- Mainnet token handling.
+- Real tax/accounting.
+
+
+Subscription Plans
+------------------
+Plan fields:
+
+- planId
+- strategyKey
+- planName
+- tier
+- priceUsdc
+- durationSeconds
+- permissions
+- maxMarkets
+- autoTradingAllowed
+- liveTradingAllowed
+- createdAtUtc
+
+Permissions:
+
+- `ViewSignals`
+- `ViewReasoning`
+- `ExportSignal`
+- `RequestPaperAutoTrade`
+- `RequestLiveAutoTrade`
+- `PublishSignal`
+- `RecordSettlement`
+
+
+Tasks
+-----
+[TODO] AH-P4-T001 Implement `StrategyAccess` deployment config.
+
+- Store contract address in `ArcSettlement:Contracts:StrategyAccess`.
+- Store USDC/test token address in deployment artifact.
+- Never hardcode private key.
+
+[TODO] AH-P4-T002 Add backend subscription plan config.
+
+Example:
+
+```json
+{
+  "ArcSettlement": {
+    "SubscriptionPlans": [
+      {
+        "PlanId": 1,
+        "StrategyKey": "two_leg_arbitrage",
+        "Tier": "SignalViewer",
+        "PriceUsdc": "10.00",
+        "DurationDays": 7,
+        "Permissions": ["ViewSignals", "ViewReasoning"]
+      }
+    ]
+  }
+}
+```
+
+[TODO] AH-P4-T003 Implement entitlement domain model.
+
+Entities:
+
+- `ArcSubscriptionPlan`
+- `ArcSubscriptionMirror`
+- `ArcEntitlement`
+- `ArcAccessSyncCursor`
+
+Mirror fields:
+
+- walletAddress
+- strategyKey
+- tier
+- permissionsJson
+- expiresAtUtc
+- sourceTransactionHash
+- syncedAtUtc
+
+[TODO] AH-P4-T004 Implement access reader.
+
+Interface:
+
+```csharp
+public interface IArcStrategyAccessReader
+{
+    Task<ArcStrategyAccessStatus> GetAccessAsync(
+        string walletAddress,
+        string strategyKey,
+        CancellationToken cancellationToken = default);
+}
+```
+
+[TODO] AH-P4-T005 Implement subscription sync.
+
+MVP options:
+
+- read contract state by wallet and strategy key
+- or ingest known `StrategySubscribed` tx hash for demo
+
+Sync must:
+
+- validate wallet address format
+- normalize addresses
+- update mirror record
+- record source block/tx
+- handle expired subscription
+
+[TODO] AH-P4-T006 Add CLI commands.
+
+Commands:
+
+```powershell
+autotrade arc access plans
+autotrade arc access status --wallet <address> --strategy two_leg_arbitrage
+autotrade arc access sync --wallet <address> --strategy two_leg_arbitrage
+```
+
+[TODO] AH-P4-T007 Add API endpoints.
+
+- `GET /api/arc/access/plans`
+- `GET /api/arc/access/{walletAddress}/{strategyKey}`
+- `POST /api/arc/access/sync`
+
+[TODO] AH-P4-T008 Add tests.
+
+- expired access denied
+- active access allowed
+- missing wallet denied with reason
+- disabled Arc access returns clear disabled state
+- permission list maps to API gates
+- no secret fields in response
+
+
+Acceptance Criteria
+-------------------
+1. A wallet can have active or expired access mirrored in backend.
+2. API can answer whether the wallet may view a strategy signal.
+3. Subscription tx hash can be linked in WebApp or artifact.
+4. Testnet/mock USDC distinction is explicit.
+5. Entitlement logic is not only visual; at least one backend path uses it.
+
+
+Evidence
+--------
+- `artifacts/arc-hackathon/demo-run/subscription.json`
+- `artifacts/arc-hackathon/demo-run/entitlement-status.json`
+- tx hash for `StrategySubscribed`
+

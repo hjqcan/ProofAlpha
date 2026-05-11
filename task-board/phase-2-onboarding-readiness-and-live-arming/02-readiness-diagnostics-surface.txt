@@ -1,0 +1,47 @@
+Phase 2.2: Readiness Diagnostics Surface
+========================================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Expose readiness diagnostics consistently through CLI, API, and Web App.
+
+Acceptance
+----------
+- CLI readiness JSON and API readiness response have matching check names.
+- Web App shows ready, degraded, unhealthy, and blocked checks.
+- Checks include source, last checked time, and remediation hint.
+- Background service heartbeat and WebSocket health are visible.
+- Compliance warnings are distinguishable from hard blockers.
+
+Completion Notes
+----------------
+- Added shared readiness report collection to API and CLI using the Phase 2
+  contract check ids.
+- Added local-only protection for `/api/readiness` alongside control-room
+  routes so diagnostic state is not exposed remotely by default.
+- Hardened database migration probes so dependency failures return Unhealthy
+  diagnostics instead of throwing out of the readiness surface.
+- Added Ops readiness UI with overall status, capability blockers, status
+  counts, full check list, source, last checked time, and remediation hints.
+- Preserved Live-only distinctions for compliance, credentials, WebSocket, and
+  arming checks so Paper and Live readiness are not conflated.
+
+Regression Evidence
+-------------------
+- `dotnet test interfaces\Autotrade.Api.Tests\Autotrade.Api.Tests.csproj --no-restore`
+  passed 38 tests.
+- `dotnet test Shared\Autotrade.Application.Tests\Autotrade.Application.Tests.csproj --no-restore`
+  passed 8 tests.
+- `dotnet build Autotrade.Cli\Autotrade.Cli.csproj --no-restore` passed with 0
+  warnings and 0 errors.
+- `dotnet test Autotrade.sln --no-restore` passed 348 tests.
+- `npm run build` passed in `webApp`.
+- Browser smoke passed with no console errors, page errors, request failures,
+  or layout issues: `artifacts/control-room/phase-1/phase1-browser-smoke-report.json`.
+- CLI readiness artifact generated at
+  `artifacts/readiness/phase-2/readiness.json`; the command returned `EXIT=1`
+  because this local environment still has blocking readiness checks.

@@ -1,0 +1,241 @@
+Arc Hackathon: ProofAlpha Paid Agent Trading Gateway
+====================================================
+
+Status
+------
+[TODO] Revised hackathon board. This board is independent from the existing
+product-hardening board and must preserve every Paper-first, Live-arming, risk,
+audit, bounded-context, and secret-handling invariant documented in
+`docs/product/*`.
+
+
+Core Thesis
+-----------
+ProofAlpha turns a Polymarket strategy agent into a monetizable trading
+gateway:
+
+1. The agent finds market opportunities and produces strategy signals.
+2. ProofAlpha runs strategy/risk/execution evidence in Paper or explicitly
+   armed Live mode.
+3. Arc records tamper-evident proof that a strategy signal existed, what
+   evidence backed it, and how it performed after execution.
+4. Users pay USDC on Arc to subscribe to agent-generated arbitrage
+   opportunities or to unlock auto-trading permissions.
+5. Polymarket builder attribution and Arc settlement records make the agent a
+   revenue-generating market entry point.
+
+Short pitch:
+
+`ProofAlpha proves alpha on Arc, sells access with USDC, and executes on
+Polymarket through a risk-gated agent.`
+
+
+Product Positioning
+-------------------
+The project is not a generic trading bot and not a claim that every strategy is
+profitable. It is a verifiable strategy marketplace and execution gateway:
+
+- blockchain proves publication time, evidence hash, execution outcome, and
+  subscriber/revenue events
+- ProofAlpha proves strategy behavior through local deterministic evidence,
+  Paper runs, risk checks, and replay exports
+- users pay for access to the agent's signals or auto-trading capability
+- the agent can earn through subscriptions, builder-attributed flow, and
+  settlement records
+
+
+How Arc Fits
+------------
+Arc is the product and trust layer:
+
+- `SignalRegistry`: proves a signal and reasoning/evidence hash existed before
+  or at execution time
+- `PerformanceLedger`: records outcomes so the agent builds reputation instead
+  of cherry-picking wins
+- `StrategyAccess`: accepts USDC subscription payments and exposes entitlement
+  state
+- `ExecutionPermission`: records whether a wallet is allowed to request
+  auto-trading for a strategy
+- `RevenueSettlement`: records builder revenue or simulated revenue splits
+- `AgentReputation`: summarizes public signal/outcome history for the agent
+
+Polymarket remains the trading venue. ProofAlpha remains the strategy, risk,
+execution, audit, and operator-control system.
+
+
+Repository Fit
+--------------
+- `context/Strategy` already owns decisions, observations, run sessions,
+  reports, strategy lifecycle, and parameter versions.
+- `context/Trading` already owns Paper/Live execution, risk, compliance,
+  Polymarket orders, audit, idempotency, and reconciliation.
+- `context/OpportunityDiscovery` already owns LLM-assisted opportunity research
+  with evidence, review, and publish workflow.
+- `context/SelfImprove` already owns strategy episode analysis and generated
+  strategy packages.
+- `Shared/Autotrade.Polymarket` already supports signed orders with a
+  `builder` field and `Polymarket:Clob:BuilderCode` configuration.
+- `interfaces/Autotrade.Api` and `interfaces/WebApp` already provide the
+  Control Room surface that can become the subscriber/operator portal.
+
+
+Target User Journeys
+--------------------
+Journey A: paid signal access
+
+1. User connects wallet or provides Arc wallet address.
+2. User pays USDC subscription on Arc.
+3. ProofAlpha verifies `StrategyAccess.hasAccess`.
+4. User can view agent-generated arbitrage opportunities.
+5. Each opportunity links to Arc proof, evidence hash, strategy plan, and
+   historical performance.
+
+Journey B: paid auto-trading permission
+
+1. User subscribes to a strategy plan with USDC.
+2. User explicitly grants auto-trading permission for a strategy/risk tier.
+3. ProofAlpha checks entitlement before allowing strategy start or copy-trade
+   automation for that wallet/account.
+4. Existing ProofAlpha risk, compliance, and Live arming gates still apply.
+5. Execution records are written back to Arc.
+
+Journey C: agent revenue entry point
+
+1. ProofAlpha places or simulates a Polymarket order with builder metadata.
+2. The order is correlated to an Arc signal id.
+3. The agent settlement journal records volume, PnL, and builder/revenue split.
+4. The Control Room shows that this agent generated attributable flow.
+
+
+Non-Negotiable Constraints
+--------------------------
+1. Paper remains the default demo and product path.
+2. Paid access cannot bypass Trading risk, compliance, kill switch, live
+   arming, or command audit.
+3. Subscription access unlocks information or permission checks; it does not
+   guarantee profit.
+4. No private key, API key, mnemonic, CLOB secret, wallet secret, or RPC secret
+   can be committed, logged, returned by API, or rendered in WebApp.
+5. Browser wallet flows may sign user-side transactions, but the browser must
+   never receive Polymarket credential material.
+6. Chain writes must be idempotent by domain id.
+7. Strategy utility proof must include losses, rejected trades, stale signals,
+   and expired opportunities, not only wins.
+8. Arc failures must produce explicit degraded states, not silent success.
+9. No LLM-generated strategy can execute without existing review and promotion
+   gates.
+10. No public copy may claim investment advice, guaranteed return, or risk
+   elimination.
+
+
+Architecture Boundary
+---------------------
+Create a bounded context for Arc and monetization behavior:
+
+```text
+context/ArcSettlement/
+  Autotrade.ArcSettlement.Domain.Shared/
+  Autotrade.ArcSettlement.Domain/
+  Autotrade.ArcSettlement.Application.Contract/
+  Autotrade.ArcSettlement.Application/
+  Autotrade.ArcSettlement.Infra.Evm/
+  Autotrade.ArcSettlement.Infra.Data/
+  Autotrade.ArcSettlement.Infra.CrossCutting.IoC/
+  Autotrade.ArcSettlement.Tests/
+
+interfaces/ArcContracts/
+  contracts/
+  scripts/
+  test/
+  deployments/
+```
+
+Ownership rules:
+
+- `ArcSettlement` owns signal proofs, performance ledger records, subscription
+  mirrors, execution permission records, revenue settlement records, and Arc tx
+  state.
+- `OpportunityDiscovery`, `Strategy`, `SelfImprove`, and `Trading` expose
+  source data through existing contracts or new application contracts.
+- API/CLI/WebApp consume `ArcSettlement.Application.Contract`; they must not
+  call contract scripts or EVM clients directly.
+- `Shared/Autotrade.Hosting` remains the composition root for modules.
+
+
+Phase Order
+-----------
+1. `task-board/arc-hackathon-proofalpha/01-phase-0-paid-agent-thesis-and-demo-contract.txt`
+2. `task-board/arc-hackathon-proofalpha/02-phase-1-strategy-utility-proof-model.txt`
+3. `task-board/arc-hackathon-proofalpha/03-phase-2-arc-contract-suite-foundation.txt`
+4. `task-board/arc-hackathon-proofalpha/04-phase-3-signal-proof-registry.txt`
+5. `task-board/arc-hackathon-proofalpha/05-phase-4-usdc-subscription-and-entitlements.txt`
+6. `task-board/arc-hackathon-proofalpha/06-phase-5-api-entitlement-gates-and-auto-trading-permissions.txt`
+7. `task-board/arc-hackathon-proofalpha/07-phase-6-polymarket-builder-attribution.txt`
+8. `task-board/arc-hackathon-proofalpha/08-phase-7-performance-ledger-and-agent-reputation.txt`
+9. `task-board/arc-hackathon-proofalpha/09-phase-8-agent-strategy-provenance.txt`
+10. `task-board/arc-hackathon-proofalpha/10-phase-9-control-room-subscriber-portal.txt`
+11. `task-board/arc-hackathon-proofalpha/11-phase-10-revenue-settlement-and-splits.txt`
+12. `task-board/arc-hackathon-proofalpha/12-phase-11-demo-gate-and-submission.txt`
+
+
+MVP Cut
+-------
+MVP must prove the paid-agent loop:
+
+- Strategy signal or opportunity can be hashed and published to Arc.
+- User subscription/access can be paid or simulated with testnet USDC and read
+  by backend.
+- API refuses gated signal access when not subscribed.
+- WebApp shows subscribed user can view opportunity/proof.
+- Polymarket signed order path carries builder metadata in evidence.
+
+
+Strong Submission Cut
+---------------------
+- PerformanceLedger records signal outcome after Paper execution.
+- Auto-trading permission gate blocks unauthorized strategy start/copy-trade
+  command.
+- RevenueSettlement records a simulated builder/subscription split.
+- WebApp shows agent reputation from all signals, including losses/expired
+  signals.
+- One script produces repeatable end-to-end evidence.
+
+
+Stretch Cut
+-----------
+- Real testnet USDC contract interaction on Arc.
+- Wallet-connected subscription flow in WebApp.
+- Builder-trades query if external endpoint is stable.
+- SelfImprove generated strategy package anchored to Arc.
+- Revenue split distribution, not just event journaling.
+
+
+Planned Evidence
+----------------
+- `docs/hackathon/arc-proofalpha-submission.md`
+- `docs/hackathon/arc-proofalpha-demo-script.md`
+- `docs/hackathon/arc-hackathon-source-notes.md`
+- `artifacts/arc-hackathon/contract-deployments/*.json`
+- `artifacts/arc-hackathon/demo-run/*.json`
+- `artifacts/arc-hackathon/demo-run/demo-summary.md`
+- `artifacts/arc-hackathon/screenshots/*`
+- redacted signed-order evidence showing builder field
+- tx hashes for signal, subscription, performance, and settlement events
+
+
+Minimum Quality Gate
+--------------------
+Run before claiming completion:
+
+```powershell
+dotnet restore
+dotnet build
+dotnet test
+npm --prefix .\interfaces\WebApp run build
+npm --prefix .\interfaces\ArcContracts test
+```
+
+If Arc network or testnet services are unavailable, record the exact failed
+command, UTC timestamp, endpoint, error, and fallback evidence. Do not hide
+external availability failures behind local mocks.
+

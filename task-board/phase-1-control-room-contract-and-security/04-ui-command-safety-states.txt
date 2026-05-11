@@ -1,0 +1,42 @@
+Phase 1.4: UI Command Safety States
+===================================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Align Web App command controls with backend command mode, risk state, and
+strategy state.
+
+Acceptance
+----------
+- Disabled Run/Pause/Stop and kill-switch controls show actionable reasons.
+- Read-only, Paper, Live, degraded, and offline states are visually distinct.
+- UI does not optimistically claim success before API confirmation.
+- Error strips include command result details without leaking secrets.
+- Existing layout remains responsive.
+
+Implementation Notes
+--------------------
+- Prefer concise operator copy over explanatory marketing copy.
+
+Completion Notes
+----------------
+- Web App command API calls now submit explicit command intent fields and wait
+  for backend `ControlRoomCommandResponse` before showing operator feedback.
+- Command controls derive disabled state from snapshot command mode, module
+  readiness, health degradation, kill-switch state, strategy state, and pending
+  command state.
+- Read-only, Paper, Live, degraded, and offline states have distinct visual
+  chips; disabled controls expose concise reasons in titles and inline copy.
+- High-risk UI actions request typed `CONFIRM` confirmation where the backend
+  policy requires it.
+- Command result strips sanitize secret-like tokens before display.
+
+Regression Evidence
+-------------------
+- 2026-05-03: `npm run build` from `webApp` passed.
+- 2026-05-03: `git diff --check` passed; Git emitted CRLF normalization
+  warnings only.

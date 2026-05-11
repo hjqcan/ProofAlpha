@@ -1,0 +1,7 @@
+<Project>
+  <PropertyGroup>
+    <!-- 统一禁用一些“无意义噪音”告警，可按需扩展 -->
+    <NoWarn>$(NoWarn)</NoWarn>
+  </PropertyGroup>
+</Project>
+

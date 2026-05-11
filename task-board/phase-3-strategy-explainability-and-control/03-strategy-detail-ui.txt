@@ -1,0 +1,37 @@
+Phase 3.3: Strategy Detail UI
+=============================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Make each strategy inspectable from the control room.
+
+Acceptance
+----------
+- Strategy cards link to detail state without losing current workspace context.
+- Detail view shows hypothesis, current state, blocked reason, parameters,
+  recent decisions, and affected markets.
+- Disabled actions explain why they are unavailable.
+- The UI remains dense and operational, not decorative.
+- Desktop and mobile layouts have no text overlap.
+
+Completed Evidence
+------------------
+- Added `?strategy=...#ops` strategy detail state without replacing the active
+  workspace hash.
+- Added control-room strategy detail UI for hypothesis, current and desired
+  state, blocked reason, parameters, recent decisions, and affected markets.
+- Added visible disabled-action reasons for Run, Pause, and Stop.
+- Added `/api/strategy-decisions` frontend query support for recent strategy
+  decisions.
+- `npm run build`
+- Browser mock smoke:
+  - desktop 1440px: `artifacts/readiness/phase-3/strategy-detail-desktop.png`
+  - mobile 390px: `artifacts/readiness/phase-3/strategy-detail-mobile.png`
+  - verified no document horizontal overflow and no strategy-detail text
+    overflow offenders.
+  - verified clicking a strategy card updates URL to
+    `?strategy=liquidity_pulse#ops` and opens that strategy detail.

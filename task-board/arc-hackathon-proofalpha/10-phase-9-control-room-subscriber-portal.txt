@@ -1,0 +1,147 @@
+Phase 9: Control Room Subscriber Portal
+=======================================
+
+Status
+------
+[TODO]
+
+
+Intent
+------
+Make the paid-agent loop visible in the WebApp: subscribe, unlock, inspect
+proof, request automation, and review performance.
+
+
+Accepted Scope
+--------------
+- Arc status panel.
+- Wallet/subscriber input or wallet connect fixture.
+- Subscription status display.
+- Gated opportunity detail.
+- Signal proof detail.
+- Performance/reputation panel.
+- Revenue/settlement panel.
+- Screenshots for demo.
+
+
+Out of Scope
+------------
+- Production auth.
+- Custodial wallet.
+- Complex portfolio UI.
+
+
+Tasks
+-----
+[TODO] AH-P9-T001 Add WebApp Arc API client and types.
+
+Types:
+
+- ArcStatus
+- SubscriptionPlan
+- EntitlementStatus
+- ArcSignalSummary
+- ArcSignalDetail
+- PerformanceSummary
+- RevenueSettlementSummary
+
+[TODO] AH-P9-T002 Add subscriber identity UI.
+
+MVP:
+
+- wallet address input
+- strategy tier selector
+- refresh access button
+- clear disabled and expired states
+
+Stretch:
+
+- wallet connect
+- signed challenge
+
+[TODO] AH-P9-T003 Add subscription panel.
+
+Show:
+
+- plan name
+- price USDC
+- duration
+- permissions
+- status
+- subscription tx hash
+- expires at
+- missing/expired reason
+
+[TODO] AH-P9-T004 Add gated opportunity UI.
+
+Unsubscribed:
+
+- show summary
+- hide full reasoning/execution plan
+- show required plan
+
+Subscribed:
+
+- show full signal detail
+- show evidence/provenance
+- show Arc tx links
+
+[TODO] AH-P9-T005 Add auto-trading permission UI.
+
+Show:
+
+- whether `RequestPaperAutoTrade` is available
+- whether Live auto-trading is disabled
+- command result
+- blocked reason
+- audit id if available
+
+[TODO] AH-P9-T006 Add performance/reputation UI.
+
+Show:
+
+- total signals
+- terminal outcomes
+- wins/losses/expired/rejected
+- average realized pnl bps
+- confidence coverage
+- last outcome tx hash
+
+[TODO] AH-P9-T007 Add settlement UI.
+
+Show:
+
+- subscription revenue
+- builder-attributed flow
+- simulated revenue split
+- settlement tx hash
+- testnet/simulated label
+
+[TODO] AH-P9-T008 Add screenshots and visual QA.
+
+Required screenshots:
+
+- unsubscribed blocked view
+- subscribed unlocked view
+- signal proof view
+- performance ledger view
+- revenue settlement view
+- mobile/narrow viewport
+
+
+Acceptance Criteria
+-------------------
+1. WebApp build passes.
+2. Unsubscribed and subscribed states are visually distinct.
+3. Gated data is enforced by API, not only hidden in UI.
+4. Tx hashes are visible/copyable.
+5. UI labels testnet/simulated settlement honestly.
+
+
+Evidence
+--------
+- `artifacts/arc-hackathon/screenshots/subscriber-blocked.png`
+- `artifacts/arc-hackathon/screenshots/subscriber-unlocked.png`
+- `artifacts/arc-hackathon/screenshots/performance-ledger.png`
+- `npm --prefix .\interfaces\WebApp run build`
+

@@ -1,0 +1,3 @@
+[submodule "lib/pythonscript"]
+	path = lib/pythonscript
+	url = http://47.112.167.15:7080/robotsoft/backend/pythonscript

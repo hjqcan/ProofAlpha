@@ -1,0 +1,81 @@
+Phase 2: Onboarding, Readiness, and Live Arming
+===============================================
+
+Status
+------
+[DONE]
+
+
+Intent
+------
+Turn first run and Live enablement into an explicit operator workflow. The user
+should know what is configured, what is unsafe, and what remains blocked before
+the system can place real orders.
+
+
+Core Boundary
+-------------
+Readiness and Live arming are gates, not recommendations. Live order placement
+must remain blocked unless configuration, compliance, credentials, account sync,
+and risk posture are all acceptable.
+
+
+Accepted Scope
+--------------
+- first-run readiness wizard
+- credential and configuration diagnostics without secret leakage
+- Live arming checklist
+- Paper default path
+- readiness UI and CLI/API parity
+
+
+Out of Scope
+------------
+- exchange account creation
+- KYC workflow automation
+- storing secrets in the browser
+- weakening existing compliance blocks
+
+
+Acceptance Criteria
+-------------------
+1. First-run diagnostics show database, API reachability, WebSocket, background
+   jobs, account sync, compliance, risk limits, and execution mode.
+2. Live arming requires explicit operator action and records evidence.
+3. Missing or unsafe Live prerequisites block command execution with actionable
+   reasons.
+4. Paper mode remains usable when Live prerequisites are missing.
+5. CLI, API, and Web App present consistent readiness outcomes.
+
+
+Tasks
+-----
+[DONE] P2-T001 Define first-run wizard contract and tests.
+[DONE] P2-T002 Surface readiness diagnostics across CLI, API, and UI.
+[DONE] P2-T003 Implement Live arming gate and evidence record.
+[DONE] P2-T004 Harden config and credential safety checks.
+[DONE] P2-T005 Add readiness and arming acceptance smoke.
+
+
+Planned Evidence
+----------------
+- readiness JSON: `artifacts/readiness/phase-2/readiness.json`
+- Live arming blocked evidence: `artifacts/readiness/phase-2/live-blocked.json`
+- Paper ready evidence: `artifacts/readiness/phase-2/paper-ready.json`
+- Live arming rejected evidence: `artifacts/readiness/phase-2/live-arm-rejected.json`
+- Live arming accepted evidence: `artifacts/readiness/phase-2/live-arm-accepted.json`
+- Live arming status evidence: `artifacts/readiness/phase-2/live-arm-accepted-status.json`
+- Live disarm cleanup evidence: `artifacts/readiness/phase-2/live-disarm-cleanup.json`
+- Smoke runner: `artifacts/readiness/phase-2/run_phase2_readiness_smoke.ps1`
+- `dotnet test Autotrade.sln --no-restore`
+- `npm run build`
+
+
+Breakdown Folder
+----------------
+- `task-board/phase-2-onboarding-readiness-and-live-arming/00-README.txt`
+- `task-board/phase-2-onboarding-readiness-and-live-arming/01-first-run-wizard-contract.txt`
+- `task-board/phase-2-onboarding-readiness-and-live-arming/02-readiness-diagnostics-surface.txt`
+- `task-board/phase-2-onboarding-readiness-and-live-arming/03-live-arming-gate.txt`
+- `task-board/phase-2-onboarding-readiness-and-live-arming/04-config-credentials-safety.txt`
+- `task-board/phase-2-onboarding-readiness-and-live-arming/05-acceptance-smoke.txt`

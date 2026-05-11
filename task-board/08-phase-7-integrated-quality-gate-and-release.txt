@@ -1,0 +1,78 @@
+Phase 7: Integrated Quality Gate and Release
+============================================
+
+Status
+------
+[DONE]
+
+
+Intent
+------
+Close the product-hardening milestone with integrated evidence. The release
+claim must be traceable to build, test, UI, API, CLI, readiness, audit, and
+operator-runbook artifacts.
+
+
+Core Boundary
+-------------
+This phase does not accept docs-only closure. It accepts only evidence-backed
+release readiness.
+
+
+Accepted Scope
+--------------
+- end-to-end acceptance runner
+- CLI/API/Web App cross-surface gate
+- local deployment and packaging path
+- operator runbook
+- release candidate closure record
+
+
+Out of Scope
+------------
+- public SaaS release
+- production custody or account management
+- real-money automated CI
+- profitability claims
+
+
+Acceptance Criteria
+-------------------
+1. `dotnet restore`, `dotnet build`, `dotnet test`, and Web App build pass.
+2. Acceptance checklist paths produce current artifacts.
+3. Paper run, readiness, command audit, risk, replay, and report evidence are
+   linked from a single quality gate.
+4. Local deployment instructions can start API and Web App reliably.
+5. Release notes clearly state Live limitations and operator responsibilities.
+
+
+Tasks
+-----
+[DONE] P7-T001 Add end-to-end acceptance runner.
+[DONE] P7-T002 Add CLI, API, and Web App cross-surface quality gate.
+[DONE] P7-T003 Add packaging and local deploy path.
+[DONE] P7-T004 Write operator runbook and release notes.
+[DONE] P7-T005 Close release candidate with immutable evidence.
+
+
+Planned Evidence
+----------------
+- quality gate: `artifacts/quality-gates/phase-7/autotrade-product-gate.json`
+- acceptance report: `artifacts/acceptance/phase-7/acceptance-report.md`
+- local deploy smoke: `artifacts/deploy/phase-7/local-smoke.md`
+- release notes: `docs/releases/autotrade-product-hardening-release.md`
+- full commands:
+  - `dotnet restore`
+  - `dotnet build`
+  - `dotnet test`
+  - `npm run build` from `webApp`
+
+
+Breakdown Folder
+----------------
+- `task-board/phase-7-integrated-quality-gate-and-release/00-README.txt`
+- `task-board/phase-7-integrated-quality-gate-and-release/01-end-to-end-acceptance-runner.txt`
+- `task-board/phase-7-integrated-quality-gate-and-release/02-api-webapp-cli-cross-surface-gate.txt`
+- `task-board/phase-7-integrated-quality-gate-and-release/03-packaging-and-local-deploy.txt`
+- `task-board/phase-7-integrated-quality-gate-and-release/04-docs-operator-runbook.txt`
+- `task-board/phase-7-integrated-quality-gate-and-release/05-release-candidate-closure.txt`

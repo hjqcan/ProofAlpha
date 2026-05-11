@@ -1,0 +1,27 @@
+Phase 0.4: Roadmap Source of Truth
+==================================
+
+Status
+------
+[DONE] Accepted by `docs/product/autotrade-product-hardening-roadmap.md`,
+`task-board/00-README.txt`, and
+`docs/product/autotrade-phase-0-quality-gate.md`.
+
+Goal
+----
+Make this task board the engineering source of truth for the product-hardening
+milestone.
+
+Acceptance
+----------
+- README execution order matches all phase files.
+- Each phase has a parent file and breakdown folder.
+- Update rules explain when a task can move from TODO to DONE.
+- Product decisions that change scope must update the task board and relevant
+  docs in the same change.
+- No phase can be closed without evidence paths.
+
+Planned Output
+--------------
+- `docs/product/autotrade-product-hardening-roadmap.md`
+- updated `task-board/00-README.txt`

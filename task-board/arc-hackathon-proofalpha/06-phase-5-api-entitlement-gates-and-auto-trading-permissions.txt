@@ -1,0 +1,168 @@
+Phase 5: API Entitlement Gates and Auto-Trading Permissions
+===========================================================
+
+Status
+------
+[TODO]
+
+
+Intent
+------
+Make subscription state enforce real product behavior: unsubscribed users cannot
+access full opportunities or request auto-trading permission.
+
+
+Core Boundary
+-------------
+Entitlement checks are product access checks. They do not replace risk,
+compliance, kill switch, strategy lifecycle, or Live arming gates.
+
+
+Accepted Scope
+--------------
+- Access-gated signal detail endpoint.
+- Access-gated opportunity detail endpoint.
+- Auto-trading permission request model.
+- Paper-only auto-trading demo gate.
+- Audit of blocked and accepted access decisions.
+
+
+Out of Scope
+------------
+- Real custody or user fund management.
+- Live trading enablement without existing Live arming.
+- Direct wallet signing in backend.
+
+
+Permission Model
+----------------
+`ViewSignals`:
+
+- can list public signal summaries
+- can view full opportunity details if active
+
+`ViewReasoning`:
+
+- can view evidence/reasoning hashes and summaries
+- never sees raw private prompts or secrets
+
+`RequestPaperAutoTrade`:
+
+- can request Paper strategy start for allowed strategy key
+- still requires strategy enabled and risk not blocked
+
+`RequestLiveAutoTrade`:
+
+- can request Live strategy start only if all existing Live gates pass
+- probably disabled for hackathon unless explicitly demonstrated safely
+
+
+Tasks
+-----
+[TODO] AH-P5-T001 Define subscriber identity model.
+
+MVP:
+
+- wallet address passed via header or query for demo
+- API validates format
+- no auth claim that this proves wallet ownership unless signature challenge is
+  implemented
+
+Stretch:
+
+- signed wallet challenge
+- short-lived subscriber session
+
+[TODO] AH-P5-T002 Add access decision service.
+
+Interface:
+
+```csharp
+public interface IArcAccessDecisionService
+{
+    Task<ArcAccessDecision> EvaluateAsync(
+        ArcAccessDecisionRequest request,
+        CancellationToken cancellationToken = default);
+}
+```
+
+Decision must include:
+
+- allowed
+- reasonCode
+- reason
+- requiredPermission
+- tier
+- expiresAtUtc
+- evidenceTransactionHash
+
+[TODO] AH-P5-T003 Gate signal detail.
+
+- Summary endpoint can show public signal metadata.
+- Full detail requires `ViewSignals`.
+- Reasoning/evidence summary requires `ViewReasoning`.
+- Blocked responses return clear upgrade/subscription reason.
+
+[TODO] AH-P5-T004 Gate OpportunityDiscovery detail.
+
+- Published opportunity summary can be public.
+- Full compiled policy and execution plan require access.
+- Candidate/NeedsReview opportunity remains internal regardless of access.
+
+[TODO] AH-P5-T005 Add auto-trading permission command.
+
+Command shape:
+
+```powershell
+autotrade arc autotrade request --wallet <address> --strategy two_leg_arbitrage --mode Paper
+```
+
+Behavior:
+
+- checks `RequestPaperAutoTrade`
+- checks strategy exists
+- checks command mode allows mutation
+- starts/resumes strategy through existing Strategy command path
+- audits accepted and blocked attempts
+
+[TODO] AH-P5-T006 Add Live safety block.
+
+For hackathon:
+
+- `RequestLiveAutoTrade` can be modeled but default disabled.
+- If enabled, it must still require:
+  - Execution:Mode=Live
+  - compliance allowed
+  - credentials present
+  - readiness healthy
+  - risk not blocked
+  - kill switch inactive
+  - Live arming current
+  - explicit confirmation text
+
+[TODO] AH-P5-T007 Add tests.
+
+- unsubscribed wallet blocked from full signal
+- subscribed wallet allowed
+- missing permission blocked
+- expired access blocked
+- Paper auto-trade request blocked when no entitlement
+- Paper auto-trade request uses existing strategy command path
+- Live auto-trade remains blocked without arming
+
+
+Acceptance Criteria
+-------------------
+1. At least one API endpoint is truly gated by Arc subscription state.
+2. At least one command path checks auto-trading permission.
+3. Blocked attempts are auditable.
+4. Entitlement never bypasses risk/compliance/arming.
+5. Demo can show before/after subscription behavior.
+
+
+Evidence
+--------
+- `artifacts/arc-hackathon/demo-run/access-denied.json`
+- `artifacts/arc-hackathon/demo-run/access-allowed.json`
+- `artifacts/arc-hackathon/demo-run/autotrade-permission.json`
+

@@ -1,0 +1,137 @@
+Phase 3: Signal Proof Registry
+==============================
+
+Status
+------
+[TODO]
+
+
+Intent
+------
+Publish agent strategy signals to Arc so users can verify when a signal was
+created and what evidence/reasoning hash backed it.
+
+
+Accepted Scope
+--------------
+- Signal publication application service.
+- Local publication intent/result records.
+- Arc EVM publisher.
+- CLI publish/list commands.
+- API read model.
+- Tests for idempotency, disabled mode, and duplicate signal handling.
+
+
+Out of Scope
+------------
+- Automatic publication from every strategy cycle.
+- Chain writes from `StrategyRunner`.
+- Publishing full reasoning content onchain.
+
+
+Tasks
+-----
+[TODO] AH-P3-T001 Implement local signal publication entity.
+
+Fields:
+
+- signalId
+- sourceKind
+- sourceId
+- agentId
+- strategyId
+- marketId
+- reasoningHash
+- riskEnvelopeHash
+- expectedEdgeBps
+- maxNotionalUsdc
+- validUntilUtc
+- status
+- transactionHash
+- errorCode
+- createdAtUtc
+- publishedAtUtc
+
+[TODO] AH-P3-T002 Implement publication statuses.
+
+Statuses:
+
+- `Pending`
+- `SkippedDisabled`
+- `Submitted`
+- `Confirmed`
+- `Failed`
+- `Duplicate`
+- `RejectedUnsafe`
+
+[TODO] AH-P3-T003 Implement `IArcSignalPublisher`.
+
+Rules:
+
+- create local intent first
+- no chain write when Arc disabled
+- reject unsafe/unreviewed/expired source
+- map duplicate contract revert to `Duplicate`
+- store transaction hash
+- return explorer URL when configured
+
+[TODO] AH-P3-T004 Connect OpportunityDiscovery source.
+
+- Only `Approved` or `Published` opportunities can become public trade-ready
+  signals.
+- Include evidence ids and compiled policy hash.
+- Include valid-until check.
+
+[TODO] AH-P3-T005 Connect StrategyDecision source.
+
+- Allow publishing a selected strategy decision only if it has:
+  - market id
+  - strategy id
+  - decision context
+  - risk envelope
+  - non-empty reasoning/context hash
+
+[TODO] AH-P3-T006 Add CLI commands.
+
+Commands:
+
+```powershell
+dotnet run --project .\interfaces\Autotrade.Cli\Autotrade.Cli.csproj -- arc signal publish --source opportunity --id <guid>
+dotnet run --project .\interfaces\Autotrade.Cli\Autotrade.Cli.csproj -- arc signal publish --source decision --id <guid>
+dotnet run --project .\interfaces\Autotrade.Cli\Autotrade.Cli.csproj -- arc signal list --limit 20
+dotnet run --project .\interfaces\Autotrade.Cli\Autotrade.Cli.csproj -- arc signal show --id <signal-id>
+```
+
+[TODO] AH-P3-T007 Add API endpoints.
+
+- `GET /api/arc/signals`
+- `GET /api/arc/signals/{signalId}`
+- `POST /api/arc/signals/publish`
+
+Post command requires actor/reason.
+
+[TODO] AH-P3-T008 Add tests.
+
+- disabled mode returns skipped result
+- duplicate source is idempotent
+- expired source rejected
+- unreviewed opportunity rejected
+- transaction hash persisted
+- API returns no secrets
+
+
+Acceptance Criteria
+-------------------
+1. A signal proof can be published to Arc testnet or local EVM.
+2. Re-running publication does not create duplicate local records.
+3. API and CLI expose publication state.
+4. Signal proof links to canonical proof document hash.
+5. Failure modes are visible and auditable.
+
+
+Evidence
+--------
+- `artifacts/arc-hackathon/demo-run/signal-proof.json`
+- `artifacts/arc-hackathon/demo-run/signal-publication.json`
+- tx hash for `SignalPublished`
+

@@ -1,0 +1,35 @@
+Phase 1.1: API Contract Tests
+=============================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Freeze the control-room API contract before expanding operator workflows.
+
+Acceptance
+----------
+- Snapshot response contract covers process, risk, strategies, markets, orders,
+  positions, decisions, timeline, and curves.
+- Market discovery, market detail, and order-book contracts cover paging,
+  token selection, source, and freshness fields.
+- Strategy state and kill-switch command contracts cover accepted, rejected,
+  disabled, and invalid-request paths.
+- Tests assert JSON enum/string behavior expected by the Web App.
+
+Implementation Notes
+--------------------
+- Prefer integration-style API tests with deterministic in-memory or fake
+  control-room services where possible.
+
+Completion Evidence
+-------------------
+- Added `interfaces/Autotrade.Api.Tests` to the solution.
+- Added `ControlRoomControllerContractTests` covering snapshot, market
+  discovery, market detail, order book, strategy state command, kill-switch
+  command, command decision statuses, and Web JSON enum/string behavior.
+- Regression: `dotnet test interfaces/Autotrade.Api.Tests/Autotrade.Api.Tests.csproj`
+  passed with 15 tests.
+- Regression: `dotnet test Autotrade.sln` passed with 317 tests.

@@ -1,0 +1,43 @@
+Phase 3.4: Parameter Version Diff and Rollback
+==============================================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Make strategy parameter changes safe, auditable, and reversible.
+
+Acceptance
+----------
+- Parameter update flow validates values before persistence.
+- Every update records previous value, next value, config version, operator
+  source, and timestamp.
+- Diff view shows changed parameters only.
+- Rollback restores a prior accepted config version and records an audit entry.
+- Live mode parameter changes respect arming invalidation policy.
+
+Completed Evidence
+------------------
+- Added persisted `StrategyParameterVersions` with snapshot JSON, changed-only
+  diff JSON, config version, source, actor, reason, timestamp, and rollback
+  lineage.
+- Added strategy parameter API endpoints for snapshot, update, and rollback:
+  `GET /api/strategy-parameters/{strategyId}`,
+  `POST /api/strategy-parameters/{strategyId}/versions`, and
+  `POST /api/strategy-parameters/{strategyId}/versions/{versionId}/rollback`.
+- Runtime parameter updates validate against the strategy option validators
+  before persistence, apply through `IOptionsMonitorCache<T>`, and revert the
+  runtime cache if persistence fails.
+- Rollback restores a prior accepted snapshot as a new accepted version and
+  records command audit with rollback source metadata.
+- LiveServices parameter updates require explicit live arming invalidation
+  before mutation when the live arming gate is active.
+- UI exposes canonical parameter snapshots, changed-only version diffs, update
+  mutation, and rollback action in the strategy workspace.
+- Browser smoke evidence:
+  `artifacts/readiness/phase-3/strategy-parameters-desktop.png` and
+  `artifacts/readiness/phase-3/strategy-parameters-mobile.png`.
+- Regression: `dotnet test Autotrade.sln --no-restore`, `npm run build`, and
+  `git diff --check`.

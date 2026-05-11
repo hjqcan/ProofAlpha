@@ -1,0 +1,114 @@
+Phase 8: Agent Strategy Provenance
+==================================
+
+Status
+------
+[TODO]
+
+
+Intent
+------
+Anchor the agent's research and generated strategy provenance so subscribers
+can see where a signal came from.
+
+
+Accepted Scope
+--------------
+- OpportunityDiscovery provenance export.
+- SelfImprove generated package anchor.
+- Proof document links to source evidence.
+- API read model.
+- Tests for unsafe source rejection.
+
+
+Out of Scope
+------------
+- LLM direct chain calls.
+- Generated Python access to keys.
+- Auto-promoting generated strategy to Live.
+
+
+Tasks
+-----
+[TODO] AH-P8-T001 Define provenance document schema.
+
+Fields:
+
+- source module
+- source id
+- agent id
+- market id
+- strategy id
+- evidence ids
+- evidence summary hash
+- LLM output hash
+- compiled policy hash
+- generated package hash, optional
+- risk envelope hash
+- validation status
+- createdAtUtc
+
+[TODO] AH-P8-T002 Add OpportunityDiscovery provenance export.
+
+Only export trade-ready provenance for:
+
+- `Approved`
+- `Published`
+
+Reject:
+
+- `Candidate`
+- `NeedsReview`
+- `Rejected`
+- `Expired`
+
+[TODO] AH-P8-T003 Add SelfImprove generated package anchor.
+
+Anchor only when:
+
+- package hash exists
+- manifest exists
+- risk envelope exists
+- validation summary passes minimum gate
+
+[TODO] AH-P8-T004 Link provenance to signal.
+
+Signal proof should include:
+
+- provenanceHash
+- sourceKind
+- sourceId
+- evidenceUri or artifact path
+
+[TODO] AH-P8-T005 Add subscriber-safe explanation.
+
+API/WebApp can show:
+
+- source module
+- evidence titles/summaries
+- hashes
+- why full content may be private/local
+- validation status
+
+[TODO] AH-P8-T006 Add tests.
+
+- unreviewed opportunity rejected
+- expired opportunity rejected
+- generated package below gate rejected
+- provenance hash deterministic
+- secret redaction works
+
+
+Acceptance Criteria
+-------------------
+1. One demo opportunity has provenance artifact and hash.
+2. The published signal links to provenance hash.
+3. Unsafe sources cannot become paid signals.
+4. Subscriber can understand why the agent generated the signal.
+
+
+Evidence
+--------
+- `artifacts/arc-hackathon/demo-run/provenance/*`
+- API contract tests for provenance detail
+

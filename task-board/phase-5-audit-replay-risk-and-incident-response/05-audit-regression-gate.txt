@@ -1,0 +1,26 @@
+Phase 5.5: Audit Regression Gate
+================================
+
+Status
+------
+[DONE]
+
+Goal
+----
+Close Phase 5 with proof that replay, risk drill-down, and incident actions are
+evidence-backed.
+
+Required Evidence
+-----------------
+- audit timeline tests
+- risk event drill-down tests
+- incident action audit tests
+- replay export fixture
+- Web App screenshot for audit/risk views
+- `dotnet test`
+- `npm run build`
+
+Acceptance
+----------
+- Evidence is stored under `artifacts/audit/phase-5/`.
+- Replay export remains read-only and redacted.

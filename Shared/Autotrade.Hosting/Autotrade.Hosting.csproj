@@ -17,6 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\context\ArcSettlement\Autotrade.ArcSettlement.Infra.CrossCutting.IoC\Autotrade.ArcSettlement.Infra.CrossCutting.IoC.csproj" />
     <ProjectReference Include="..\..\context\MarketData\Autotrade.MarketData.Infra.BackgroundJobs\Autotrade.MarketData.Infra.BackgroundJobs.csproj" />
     <ProjectReference Include="..\..\context\MarketData\Autotrade.MarketData.Infra.CrossCutting.IoC\Autotrade.MarketData.Infra.CrossCutting.IoC.csproj" />
     <ProjectReference Include="..\..\context\MarketData\Autotrade.MarketData.Infra.Data\Autotrade.MarketData.Infra.Data.csproj" />

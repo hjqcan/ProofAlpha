@@ -1,0 +1,265 @@
+[
+  {
+    "inputs": [],
+    "name": "EmptySignalId",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidOutcomeStatus",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "signalId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "MissingTerminalOutcome",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "signalId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "TerminalOutcomeAlreadyRecorded",
+    "type": "error"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "signalId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "enum PerformanceLedger.OutcomeStatus",
+        "name": "status",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "int256",
+        "name": "realizedPnlBps",
+        "type": "int256"
+      },
+      {
+        "indexed": false,
+        "internalType": "int256",
+        "name": "slippageBps",
+        "type": "int256"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "outcomeHash",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "correctionHash",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "recorder",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "correctedAt",
+        "type": "uint64"
+      }
+    ],
+    "name": "OutcomeCorrected",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "signalId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "enum PerformanceLedger.OutcomeStatus",
+        "name": "status",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "int256",
+        "name": "realizedPnlBps",
+        "type": "int256"
+      },
+      {
+        "indexed": false,
+        "internalType": "int256",
+        "name": "slippageBps",
+        "type": "int256"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "outcomeHash",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "recorder",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "recordedAt",
+        "type": "uint64"
+      }
+    ],
+    "name": "OutcomeRecorded",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "signalId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "enum PerformanceLedger.OutcomeStatus",
+        "name": "status",
+        "type": "uint8"
+      },
+      {
+        "internalType": "int256",
+        "name": "realizedPnlBps",
+        "type": "int256"
+      },
+      {
+        "internalType": "int256",
+        "name": "slippageBps",
+        "type": "int256"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "outcomeHash",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "correctionHash",
+        "type": "bytes32"
+      }
+    ],
+    "name": "correctOutcome",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "signalId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "getOutcome",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "enum PerformanceLedger.OutcomeStatus",
+            "name": "status",
+            "type": "uint8"
+          },
+          {
+            "internalType": "int256",
+            "name": "realizedPnlBps",
+            "type": "int256"
+          },
+          {
+            "internalType": "int256",
+            "name": "slippageBps",
+            "type": "int256"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "outcomeHash",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "address",
+            "name": "recorder",
+            "type": "address"
+          },
+          {
+            "internalType": "uint64",
+            "name": "recordedAt",
+            "type": "uint64"
+          },
+          {
+            "internalType": "bool",
+            "name": "exists",
+            "type": "bool"
+          }
+        ],
+        "internalType": "struct PerformanceLedger.OutcomeSummary",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "signalId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "enum PerformanceLedger.OutcomeStatus",
+        "name": "status",
+        "type": "uint8"
+      },
+      {
+        "internalType": "int256",
+        "name": "realizedPnlBps",
+        "type": "int256"
+      },
+      {
+        "internalType": "int256",
+        "name": "slippageBps",
+        "type": "int256"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "outcomeHash",
+        "type": "bytes32"
+      }
+    ],
+    "name": "recordOutcome",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]

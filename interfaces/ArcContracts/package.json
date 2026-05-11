@@ -1,0 +1,19 @@
+{
+  "name": "proofalpha-arc-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:local": "hardhat run scripts/deploy.cjs --network hardhat",
+    "deploy:arc-testnet": "hardhat run scripts/deploy.cjs --network arcTestnet",
+    "publish-signal": "hardhat run scripts/publish-signal.cjs",
+    "export-abi": "node scripts/export-abi.cjs"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ethers": "^3.1.0",
+    "chai": "^4.4.1",
+    "ethers": "^6.15.0",
+    "hardhat": "^2.27.0"
+  }
+}

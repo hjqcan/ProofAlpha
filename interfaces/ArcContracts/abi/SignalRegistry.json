@@ -1,0 +1,219 @@
+[
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "signalId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "DuplicateSignal",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "EmptySignalId",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "EmptyVenue",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ZeroAgent",
+    "type": "error"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "signalId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "agent",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "venue",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "strategyKey",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "reasoningHash",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "riskEnvelopeHash",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "int256",
+        "name": "expectedEdgeBps",
+        "type": "int256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "maxNotionalUsdc",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "validUntil",
+        "type": "uint64"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "publishedAt",
+        "type": "uint64"
+      }
+    ],
+    "name": "SignalPublished",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "signalId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "getSignal",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "agent",
+            "type": "address"
+          },
+          {
+            "internalType": "string",
+            "name": "venue",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "strategyKey",
+            "type": "string"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "reasoningHash",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "riskEnvelopeHash",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "int256",
+            "name": "expectedEdgeBps",
+            "type": "int256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "maxNotionalUsdc",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint64",
+            "name": "validUntil",
+            "type": "uint64"
+          },
+          {
+            "internalType": "uint64",
+            "name": "publishedAt",
+            "type": "uint64"
+          },
+          {
+            "internalType": "bool",
+            "name": "exists",
+            "type": "bool"
+          }
+        ],
+        "internalType": "struct SignalRegistry.SignalSummary",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "signalId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "agent",
+        "type": "address"
+      },
+      {
+        "internalType": "string",
+        "name": "venue",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "strategyKey",
+        "type": "string"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "reasoningHash",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "riskEnvelopeHash",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "int256",
+        "name": "expectedEdgeBps",
+        "type": "int256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "maxNotionalUsdc",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint64",
+        "name": "validUntil",
+        "type": "uint64"
+      }
+    ],
+    "name": "publishSignal",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]

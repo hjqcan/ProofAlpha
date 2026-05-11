@@ -1,0 +1,27 @@
+[
+  {
+    "contractName": "SignalRegistry",
+    "abiPath": "abi/SignalRegistry.json",
+    "abiHash": "15b278517d9d9d7c738424f1fbb0dddf7fa644490c4d5abb59fb9c4937088809"
+  },
+  {
+    "contractName": "StrategyAccess",
+    "abiPath": "abi/StrategyAccess.json",
+    "abiHash": "61d0058c61af4f89089f83d57a57b4af49dac5abd55f2ed585e52b2620a6a58c"
+  },
+  {
+    "contractName": "PerformanceLedger",
+    "abiPath": "abi/PerformanceLedger.json",
+    "abiHash": "b5d91d402c201fcb5371c71b5cb50ece7c0ddf6a546177661a0d6f2898c27088"
+  },
+  {
+    "contractName": "RevenueSettlement",
+    "abiPath": "abi/RevenueSettlement.json",
+    "abiHash": "1d0932fd0490b2fefd15c97732352ceddd6350ac4f320b793c457fa1cdcd0bdc"
+  },
+  {
+    "contractName": "TestUsdc",
+    "abiPath": "abi/TestUsdc.json",
+    "abiHash": "48ec920e04ad6a441430b0dff973f8c739ae22133f8c454952ca3da8e14fd601"
+  }
+]

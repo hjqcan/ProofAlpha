@@ -1,4 +1,5 @@
 using Autotrade.EventBus.Extensions;
+using Autotrade.ArcSettlement.Infra.CrossCutting.IoC;
 using Autotrade.Infra.BackgroundJobs.Core;
 using Autotrade.MarketData.Infra.BackgroundJobs;
 using Autotrade.MarketData.Infra.CrossCutting.IoC;
@@ -31,7 +32,8 @@ public static class AutotradeModuleServiceCollectionExtensions
         new MarketDataModuleRegistration(),
         new StrategyModuleRegistration(),
         new SelfImproveModuleRegistration(),
-        new OpportunityDiscoveryModuleRegistration()
+        new OpportunityDiscoveryModuleRegistration(),
+        new ArcSettlementModuleRegistration()
     ];
 
     public static IServiceCollection AddAutotradeModules(
@@ -284,5 +286,28 @@ public static class AutotradeModuleServiceCollectionExtensions
 
         protected override void RegisterBackgroundJobs(IServiceCollection services, IConfiguration configuration)
             => services.AddOpportunityDiscoveryBackgroundJobs(configuration);
+    }
+
+    private sealed class ArcSettlementModuleRegistration : AutotradeModuleRegistrationBase
+    {
+        public override string Name => "ArcSettlement";
+
+        public override string DataContextName => "JsonFileArcSignalPublicationStore";
+
+        protected override void RegisterDataContext(IServiceCollection services, string? connectionString)
+        {
+            // Phase 3 accepted scope stores Arc publication intents as local records
+            // through IArcSignalPublicationStore instead of an EF DbContext.
+        }
+
+        protected override void RegisterApplicationServices(
+            IServiceCollection services,
+            IConfiguration configuration,
+            IHostEnvironment environment)
+            => services.AddArcSettlementServices(configuration);
+
+        protected override void RegisterBackgroundJobs(IServiceCollection services, IConfiguration configuration)
+        {
+        }
     }
 }

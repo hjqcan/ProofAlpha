@@ -3,7 +3,8 @@ Phase 0: Paid-Agent Thesis and Demo Contract
 
 Status
 ------
-[TODO]
+[DONE] Accepted by the Phase 0 hackathon documents, full build, per-project
+test suite, and deterministic repricing-lag replay evidence.
 
 
 Intent
@@ -40,7 +41,7 @@ Out of Scope
 
 Tasks
 -----
-[TODO] AH-P0-T001 Write the final one-liner and pitch paragraph.
+[DONE] AH-P0-T001 Write the final one-liner and pitch paragraph.
 
 Required one-liner:
 
@@ -55,7 +56,7 @@ Pitch paragraph must include:
 - Polymarket remains execution venue
 - builder attribution makes the agent a monetizable entry point
 
-[TODO] AH-P0-T002 Define subscription tiers.
+[DONE] AH-P0-T002 Define subscription tiers.
 
 Minimum tiers:
 
@@ -77,7 +78,7 @@ Each tier needs:
 - allowed API/CLI/WebApp actions
 - disabled reason when missing
 
-[TODO] AH-P0-T003 Define the strategy utility proof standard.
+[DONE] AH-P0-T003 Define the strategy utility proof standard.
 
 A strategy is "useful" in demo only if it has:
 
@@ -90,7 +91,7 @@ A strategy is "useful" in demo only if it has:
 
 The proof must not imply future profit.
 
-[TODO] AH-P0-T004 Freeze the demo flow.
+[DONE] AH-P0-T004 Freeze the demo flow.
 
 Demo happy path:
 
@@ -104,7 +105,7 @@ Demo happy path:
 8. Record revenue settlement/split event.
 9. Show agent reputation and subscriber access in WebApp.
 
-[TODO] AH-P0-T005 Write source notes and assumptions.
+[DONE] AH-P0-T005 Write source notes and assumptions.
 
 Create:
 
@@ -120,7 +121,7 @@ Capture:
 - Circle tool usage assumptions
 - any unresolved rule questions
 
-[TODO] AH-P0-T006 Define no-go language.
+[DONE] AH-P0-T006 Define no-go language.
 
 Reject any UI/doc/pitch line that says or implies:
 
@@ -146,4 +147,6 @@ Evidence
 - `docs/hackathon/arc-proofalpha-submission.md`
 - `docs/hackathon/arc-proofalpha-demo-script.md`
 - `docs/hackathon/arc-hackathon-source-notes.md`
-
+- `dotnet build`
+- per-project `dotnet test --no-build`
+- `dotnet test context/Strategy/Autotrade.Strategy.Tests/Autotrade.Strategy.Tests.csproj --filter FullyQualifiedName~RepricingLagArbitrageStrategyTests.ReplayRunner_ProducesDeterministicLagSummary --no-build`

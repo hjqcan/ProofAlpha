@@ -1,0 +1,134 @@
+[
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "settlementId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "DuplicateSettlement",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "EmptySettlementId",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidShareBps",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ShareLengthMismatch",
+    "type": "error"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "settlementId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "signalId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "grossAmount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "address[]",
+        "name": "recipients",
+        "type": "address[]"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint16[]",
+        "name": "shareBps",
+        "type": "uint16[]"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "recordedAt",
+        "type": "uint64"
+      }
+    ],
+    "name": "SettlementRecorded",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "settlementId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "signalId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "grossAmount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address[]",
+        "name": "recipients",
+        "type": "address[]"
+      },
+      {
+        "internalType": "uint16[]",
+        "name": "shareBps",
+        "type": "uint16[]"
+      }
+    ],
+    "name": "recordSettlement",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "name": "settlementRecorded",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]

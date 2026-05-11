@@ -3,7 +3,8 @@ Phase 1: Strategy Utility Proof Model
 
 Status
 ------
-[TODO]
+[DONE] Accepted by the ArcSettlement proof model implementation, targeted
+tests, solution build, and Phase 1 evidence note.
 
 
 Intent
@@ -86,13 +87,13 @@ Proof Documents
 
 Tasks
 -----
-[TODO] AH-P1-T001 Define proof DTOs.
+[DONE] AH-P1-T001 Define proof DTOs.
 
 - Add DTOs in `ArcSettlement.Application.Contract`.
 - Keep them independent from EF entities.
 - Include JSON serializer options for stable output.
 
-[TODO] AH-P1-T002 Define utility metrics.
+[DONE] AH-P1-T002 Define utility metrics.
 
 Minimum:
 
@@ -106,7 +107,7 @@ Minimum:
 - average time from signal to execution
 - max drawdown-like Paper metric if available
 
-[TODO] AH-P1-T003 Define anti-cherry-pick rules.
+[DONE] AH-P1-T003 Define anti-cherry-pick rules.
 
 - Every published signal needs a terminal outcome:
   - executed
@@ -117,8 +118,11 @@ Minimum:
 - Outcome deadline must be derived from `validUntilUtc`.
 - Reputation includes losing and expired signals.
 - Manual deletion of poor signals is not allowed; use tombstone/revoked status.
+- Implemented by counting explicit terminal outcomes plus expired signals
+  derived from `validUntilUtc`. Future-dated signals remain pending until the
+  proof deadline passes.
 
-[TODO] AH-P1-T004 Implement hash service.
+[DONE] AH-P1-T004 Implement hash service.
 
 - Hash canonical signal document.
 - Hash canonical outcome document.
@@ -126,7 +130,7 @@ Minimum:
 - Tests prove same input gives same hash.
 - Tests prove modified edge/market/legs/outcome changes hash.
 
-[TODO] AH-P1-T005 Implement redaction guard.
+[DONE] AH-P1-T005 Implement redaction guard.
 
 - Scan proof documents before persistence/publication for:
   - private key
@@ -136,8 +140,10 @@ Minimum:
   - mnemonic
   - raw CLOB signature if not explicitly allowed as redacted evidence
 - Fail publication if sensitive fields are detected.
+- Guard allows normal 32-byte chain hashes so Arc `bytes32` proof ids can be
+  published without being misclassified as private keys.
 
-[TODO] AH-P1-T006 Create local proof export.
+[DONE] AH-P1-T006 Create local proof export.
 
 Export folder:
 
@@ -149,7 +155,7 @@ artifacts/arc-hackathon/demo-run/proofs/
   hash-manifest.json
 ```
 
-[TODO] AH-P1-T007 Add tests.
+[DONE] AH-P1-T007 Add tests.
 
 - deterministic signal hash
 - deterministic outcome hash
@@ -169,6 +175,11 @@ Acceptance Criteria
 
 Evidence
 --------
-- `artifacts/arc-hackathon/demo-run/proofs/*`
-- targeted ArcSettlement proof model tests
-
+- `docs/hackathon/arc-phase-1-utility-proof-evidence.md`
+- `dotnet test context\ArcSettlement\Autotrade.ArcSettlement.Tests\Autotrade.ArcSettlement.Tests.csproj --no-restore -v minimal`
+  - Passed: 7
+  - Failed: 0
+  - Skipped: 0
+- `dotnet build Autotrade.sln --no-restore -v minimal`
+  - Warnings: 0
+  - Errors: 0

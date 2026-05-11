@@ -3,7 +3,9 @@ Phase 2: Arc Contract Suite Foundation
 
 Status
 ------
-[TODO]
+[DONE] Accepted by the ArcContracts Hardhat workspace, local contract tests,
+local deployment artifact, ABI export, ArcSettlement .NET skeleton, backend
+config validation tests, solution build, and evidence note.
 
 
 Intent
@@ -38,7 +40,7 @@ Optional/stretch:
 
 Tasks
 -----
-[TODO] AH-P2-T001 Create `interfaces/ArcContracts`.
+[DONE] AH-P2-T001 Create `interfaces/ArcContracts`.
 
 Required npm scripts:
 
@@ -56,7 +58,7 @@ Required folders:
 - `deployments/`
 - `abi/`
 
-[TODO] AH-P2-T002 Implement contract interfaces first.
+[DONE] AH-P2-T002 Implement contract interfaces first.
 
 Add interface or abstract design notes for:
 
@@ -66,7 +68,7 @@ Add interface or abstract design notes for:
 - outcome recording
 - revenue recording
 
-[TODO] AH-P2-T003 Implement `SignalRegistry`.
+[DONE] AH-P2-T003 Implement `SignalRegistry`.
 
 Required:
 
@@ -76,7 +78,7 @@ Required:
 - signal metadata stored or event emitted with enough fields
 - read method for public signal summary
 
-[TODO] AH-P2-T004 Implement `StrategyAccess`.
+[DONE] AH-P2-T004 Implement `StrategyAccess`.
 
 Required:
 
@@ -87,7 +89,7 @@ Required:
 - `accessExpiresAt(user, strategyKey)`
 - emits `StrategySubscribed`
 
-[TODO] AH-P2-T005 Implement `PerformanceLedger`.
+[DONE] AH-P2-T005 Implement `PerformanceLedger`.
 
 Required:
 
@@ -96,7 +98,7 @@ Required:
 - emits `OutcomeRecorded`
 - includes status, realized pnl bps, slippage bps, and outcome hash
 
-[TODO] AH-P2-T006 Implement `RevenueSettlement`.
+[DONE] AH-P2-T006 Implement `RevenueSettlement`.
 
 MVP:
 
@@ -104,13 +106,13 @@ MVP:
 - records settlement id, signal id, gross amount, shares, token, and timestamp
 - no actual fund distribution required for MVP
 
-[TODO] AH-P2-T007 Add local/mock token for contract tests.
+[DONE] AH-P2-T007 Add local/mock token for contract tests.
 
 - Use a clearly named test ERC20 fixture.
 - Do not label it as production USDC.
 - If Arc testnet USDC is available, configure it only in deployment artifact.
 
-[TODO] AH-P2-T008 Add deployment artifacts.
+[DONE] AH-P2-T008 Add deployment artifacts.
 
 Artifact fields:
 
@@ -125,7 +127,7 @@ Artifact fields:
 - ABI hash
 - deployedAtUtc
 
-[TODO] AH-P2-T009 Create ArcSettlement .NET projects.
+[DONE] AH-P2-T009 Create ArcSettlement .NET projects.
 
 Add projects:
 
@@ -140,7 +142,7 @@ Add projects:
 
 Register in `Autotrade.sln`.
 
-[TODO] AH-P2-T010 Add backend config.
+[DONE] AH-P2-T010 Add backend config.
 
 Config section:
 
@@ -177,7 +179,22 @@ Acceptance Criteria
 
 Evidence
 --------
-- `interfaces/ArcContracts/test/*`
-- `artifacts/arc-hackathon/contract-deployments/*.json`
+- `interfaces/ArcContracts/test/proofalpha-contracts.test.cjs`
+- `interfaces/ArcContracts/deployments/hardhat-31337.json`
+- `interfaces/ArcContracts/abi/abi-manifest.json`
 - `docs/hackathon/arc-contract-suite.md`
-
+- `npm run build`
+  - Success
+- `npm test`
+  - Passing: 4
+- `npm run export-abi`
+  - Exported ABI files: 5
+- `npm run deploy:local`
+  - Wrote local deployment artifact
+- `dotnet test context\ArcSettlement\Autotrade.ArcSettlement.Tests\Autotrade.ArcSettlement.Tests.csproj --no-restore -v minimal`
+  - Passed: 11
+  - Failed: 0
+  - Skipped: 0
+- `dotnet build Autotrade.sln --no-restore -v minimal`
+  - Warnings: 0
+  - Errors: 0

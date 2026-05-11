@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="..\..\context\ArcSettlement\Autotrade.ArcSettlement.Application.Contract\Autotrade.ArcSettlement.Application.Contract.csproj" />
     <ProjectReference Include="..\..\context\MarketData\Autotrade.MarketData.Application\Autotrade.MarketData.Application.csproj" />
     <ProjectReference Include="..\..\context\MarketData\Autotrade.MarketData.Application.Contract\Autotrade.MarketData.Application.Contract.csproj" />
     <ProjectReference Include="..\..\context\OpportunityDiscovery\Autotrade.OpportunityDiscovery.Application.Contract\Autotrade.OpportunityDiscovery.Application.Contract.csproj" />

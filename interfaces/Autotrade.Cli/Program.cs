@@ -808,6 +808,93 @@ accountCommand.Add(accountStatusCommand);
 accountCommand.Add(accountSyncCommand);
 
 // ============================================================================
+// arc command group
+// ============================================================================
+
+var arcCommand = new Command("arc", "Arc settlement and proof commands");
+var arcSignalCommand = new Command("signal", "Arc signal proof publication commands");
+
+var arcSignalProofFileOption = CreateRequiredOption<FileInfo>("--proof-file", "Canonical Arc signal proof JSON file");
+var arcSignalSourceOption = CreateRequiredOption<string>("--source", "Source type: opportunity or decision");
+var arcSignalIdOption = CreateRequiredOption<string>("--id", "Opportunity ID or strategy decision ID");
+var arcSignalStatusOption = CreateOptionWithDefault("--status", "Approved", "Source review status");
+var arcSignalActorOption = CreateRequiredOption<string>("--actor", "Operator publishing the signal");
+var arcSignalReasonOption = CreateRequiredOption<string>("--reason", "Audit reason for publishing the signal");
+var arcSignalSourcePolicyHashOption = CreateOption<string?>("--source-policy-hash", "Optional compiled source policy hash");
+var arcSignalLimitOption = CreateOptionWithDefault("--limit", 20, "Maximum records to return");
+var arcSignalSignalIdOption = CreateRequiredOption<string>("--signal-id", "Arc signal ID");
+
+var arcSignalPublishCommand = new Command("publish", "Publish a reviewed signal proof to Arc settlement");
+arcSignalPublishCommand.Add(arcSignalProofFileOption);
+arcSignalPublishCommand.Add(arcSignalSourceOption);
+arcSignalPublishCommand.Add(arcSignalIdOption);
+arcSignalPublishCommand.Add(arcSignalStatusOption);
+arcSignalPublishCommand.Add(arcSignalActorOption);
+arcSignalPublishCommand.Add(arcSignalReasonOption);
+arcSignalPublishCommand.Add(arcSignalSourcePolicyHashOption);
+SetAction(arcSignalPublishCommand, async pr =>
+{
+    var options = CreateGlobalOptions(pr);
+    var resolvedConfigPath = ResolveConfigPathFromParse(pr);
+    var proofFile = pr.GetRequiredValue(arcSignalProofFileOption);
+    var source = pr.GetRequiredValue(arcSignalSourceOption);
+    var sourceId = pr.GetRequiredValue(arcSignalIdOption);
+    var status = pr.GetValue(arcSignalStatusOption) ?? "Approved";
+    var actor = pr.GetRequiredValue(arcSignalActorOption);
+    var reason = pr.GetRequiredValue(arcSignalReasonOption);
+    var sourcePolicyHash = pr.GetValue(arcSignalSourcePolicyHashOption);
+    return await CommandAuditService.ExecuteWithAuditAsync(
+            "arc signal publish",
+            new { source, sourceId, status, actor, proofFile = proofFile.FullName },
+            resolvedConfigPath,
+            host => ArcSignalCommands.PublishAsync(
+                CreateContext(host, options),
+                proofFile,
+                source,
+                sourceId,
+                status,
+                actor,
+                reason,
+                sourcePolicyHash))
+        .ConfigureAwait(false);
+});
+
+var arcSignalListCommand = new Command("list", "List Arc signal publication records");
+arcSignalListCommand.Add(arcSignalLimitOption);
+SetAction(arcSignalListCommand, async pr =>
+{
+    var options = CreateGlobalOptions(pr);
+    var resolvedConfigPath = ResolveConfigPathFromParse(pr);
+    var limit = pr.GetValue(arcSignalLimitOption);
+    return await CommandAuditService.ExecuteWithAuditAsync(
+            "arc signal list",
+            new { limit },
+            resolvedConfigPath,
+            host => ArcSignalCommands.ListAsync(CreateContext(host, options), limit))
+        .ConfigureAwait(false);
+});
+
+var arcSignalShowCommand = new Command("show", "Show one Arc signal publication record");
+arcSignalShowCommand.Add(arcSignalSignalIdOption);
+SetAction(arcSignalShowCommand, async pr =>
+{
+    var options = CreateGlobalOptions(pr);
+    var resolvedConfigPath = ResolveConfigPathFromParse(pr);
+    var signalId = pr.GetRequiredValue(arcSignalSignalIdOption);
+    return await CommandAuditService.ExecuteWithAuditAsync(
+            "arc signal show",
+            new { signalId },
+            resolvedConfigPath,
+            host => ArcSignalCommands.ShowAsync(CreateContext(host, options), signalId))
+        .ConfigureAwait(false);
+});
+
+arcSignalCommand.Add(arcSignalPublishCommand);
+arcSignalCommand.Add(arcSignalListCommand);
+arcSignalCommand.Add(arcSignalShowCommand);
+arcCommand.Add(arcSignalCommand);
+
+// ============================================================================
 // 注册所有命令
 // ============================================================================
 
@@ -826,6 +913,7 @@ rootCommand.Add(exportCommand);
 rootCommand.Add(selfImproveCommand);
 rootCommand.Add(opportunityCommand);
 rootCommand.Add(accountCommand);
+rootCommand.Add(arcCommand);
 
 // 默认行为：无子命令时等同于 run
 SetAction(rootCommand, ExecuteRunAsync);

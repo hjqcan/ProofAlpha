@@ -3,7 +3,11 @@ Arc Hackathon: ProofAlpha Paid Agent Trading Gateway
 
 Status
 ------
-[TODO] Revised hackathon board. This board is independent from the existing
+[WIP] Phase 0, Phase 1, and Phase 2 are complete. The paid-agent thesis is
+frozen, the ArcSettlement offline proof model is implemented, and the
+ArcContracts foundation now has local contract tests, ABI export, local
+deployment artifacts, backend config schema, config validation tests, and
+solution build evidence. This board is independent from the existing
 product-hardening board and must preserve every Paper-first, Live-arming, risk,
 audit, bounded-context, and secret-handling invariant documented in
 `docs/product/*`.
@@ -215,6 +219,8 @@ Planned Evidence
 - `docs/hackathon/arc-proofalpha-submission.md`
 - `docs/hackathon/arc-proofalpha-demo-script.md`
 - `docs/hackathon/arc-hackathon-source-notes.md`
+- `docs/hackathon/arc-phase-1-utility-proof-evidence.md`
+- `docs/hackathon/arc-contract-suite.md`
 - `artifacts/arc-hackathon/contract-deployments/*.json`
 - `artifacts/arc-hackathon/demo-run/*.json`
 - `artifacts/arc-hackathon/demo-run/demo-summary.md`
@@ -238,4 +244,3 @@ npm --prefix .\interfaces\ArcContracts test
 If Arc network or testnet services are unavailable, record the exact failed
 command, UTC timestamp, endpoint, error, and fallback evidence. Do not hide
 external availability failures behind local mocks.
-

@@ -1,0 +1,73 @@
+{
+  "chainId": 31337,
+  "networkName": "hardhat",
+  "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "paymentToken": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+  "treasury": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "deployedAtUtc": "2026-05-11T17:02:48.404Z",
+  "contracts": [
+    {
+      "chainId": 31337,
+      "networkName": "hardhat",
+      "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "deployedAtUtc": "2026-05-11T17:02:48.404Z",
+      "contractName": "TestUsdc",
+      "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+      "txHash": "0x97dc78baae9d548ee8452071a38922352558f9317462de964a325f36302b462e",
+      "blockNumber": 1,
+      "constructorArgs": [],
+      "abiHash": "48ec920e04ad6a441430b0dff973f8c739ae22133f8c454952ca3da8e14fd601"
+    },
+    {
+      "chainId": 31337,
+      "networkName": "hardhat",
+      "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "deployedAtUtc": "2026-05-11T17:02:48.404Z",
+      "contractName": "SignalRegistry",
+      "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+      "txHash": "0x3249414d12935115620739e8ee741bf7aea4310668c62fb71711e60c39b60aa5",
+      "blockNumber": 2,
+      "constructorArgs": [],
+      "abiHash": "15b278517d9d9d7c738424f1fbb0dddf7fa644490c4d5abb59fb9c4937088809"
+    },
+    {
+      "chainId": 31337,
+      "networkName": "hardhat",
+      "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "deployedAtUtc": "2026-05-11T17:02:48.404Z",
+      "contractName": "StrategyAccess",
+      "address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+      "txHash": "0x963da3dafa3cc99e71cc93321d8bf841ebcfc62209bd3069e34c5ea5eb488c61",
+      "blockNumber": 3,
+      "constructorArgs": [
+        "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+        "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+      ],
+      "abiHash": "61d0058c61af4f89089f83d57a57b4af49dac5abd55f2ed585e52b2620a6a58c"
+    },
+    {
+      "chainId": 31337,
+      "networkName": "hardhat",
+      "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "deployedAtUtc": "2026-05-11T17:02:48.404Z",
+      "contractName": "PerformanceLedger",
+      "address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+      "txHash": "0xd6dc884083cea7846f3c9f72176eb23bf5f4c1c31977db66f73c4052890bf394",
+      "blockNumber": 4,
+      "constructorArgs": [],
+      "abiHash": "b5d91d402c201fcb5371c71b5cb50ece7c0ddf6a546177661a0d6f2898c27088"
+    },
+    {
+      "chainId": 31337,
+      "networkName": "hardhat",
+      "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "deployedAtUtc": "2026-05-11T17:02:48.404Z",
+      "contractName": "RevenueSettlement",
+      "address": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+      "txHash": "0x86a96d91f09163e1ca104a69b1914e11189b89b83a0c612417aca1e2ddeb791b",
+      "blockNumber": 5,
+      "constructorArgs": [],
+      "abiHash": "1d0932fd0490b2fefd15c97732352ceddd6350ac4f320b793c457fa1cdcd0bdc"
+    }
+  ]
+}

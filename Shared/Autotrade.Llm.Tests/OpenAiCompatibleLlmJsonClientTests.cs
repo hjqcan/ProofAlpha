@@ -59,9 +59,54 @@ public sealed class OpenAiCompatibleLlmJsonClientTests
         Assert.Contains("score must be positive", exception.Errors);
     }
 
+    [Fact]
+    public async Task CompleteJsonAsync_UsesGoodMemoryStyleEnvPrefixOverrides()
+    {
+        const string prefix = "PROOFALPHA_TEST_LLM";
+        var previousProvider = Environment.GetEnvironmentVariable($"{prefix}_PROVIDER");
+        var previousModel = Environment.GetEnvironmentVariable($"{prefix}_MODEL");
+        var previousApiKey = Environment.GetEnvironmentVariable($"{prefix}_API_KEY");
+        var previousBaseUrl = Environment.GetEnvironmentVariable($"{prefix}_BASE_URL");
+        try
+        {
+            Environment.SetEnvironmentVariable($"{prefix}_PROVIDER", "openai");
+            Environment.SetEnvironmentVariable($"{prefix}_MODEL", "env-model");
+            Environment.SetEnvironmentVariable($"{prefix}_API_KEY", "env-key");
+            Environment.SetEnvironmentVariable($"{prefix}_BASE_URL", "https://llm-gateway.test/v1");
+
+            HttpRequestMessage? capturedRequest = null;
+            string? capturedBody = null;
+            var client = CreateClient(
+                new QueueHttpHandler(request =>
+                {
+                    capturedRequest = request;
+                    capturedBody = request.Content?.ReadAsStringAsync().GetAwaiter().GetResult();
+                    return Response(HttpStatusCode.OK, ChatResponse("{\"name\":\"env\",\"score\":5}"));
+                }),
+                envPrefix: prefix);
+
+            var result = await client.CompleteJsonAsync<TestDocument>(
+                new LlmJsonRequest("system", "user"));
+
+            Assert.Equal("env", result.Value.Name);
+            Assert.Equal(new Uri("https://llm-gateway.test/v1/chat/completions"), capturedRequest?.RequestUri);
+            Assert.Equal("Bearer", capturedRequest?.Headers.Authorization?.Scheme);
+            Assert.Equal("env-key", capturedRequest?.Headers.Authorization?.Parameter);
+            Assert.Contains("\"model\":\"env-model\"", capturedBody, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable($"{prefix}_PROVIDER", previousProvider);
+            Environment.SetEnvironmentVariable($"{prefix}_MODEL", previousModel);
+            Environment.SetEnvironmentVariable($"{prefix}_API_KEY", previousApiKey);
+            Environment.SetEnvironmentVariable($"{prefix}_BASE_URL", previousBaseUrl);
+        }
+    }
+
     private static OpenAiCompatibleLlmJsonClient CreateClient(
         HttpMessageHandler handler,
-        int maxRetries = 1)
+        int maxRetries = 1,
+        string? envPrefix = null)
     {
         var httpClient = new HttpClient(handler)
         {
@@ -71,6 +116,7 @@ public sealed class OpenAiCompatibleLlmJsonClientTests
         {
             BaseUrl = "http://localhost",
             ApiKeyEnvVar = "AUTOTRADE_TEST_MISSING_API_KEY",
+            EnvPrefix = envPrefix,
             Model = "test-model",
             MaxRetries = maxRetries,
             TimeoutSeconds = 10

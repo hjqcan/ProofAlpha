@@ -54,6 +54,8 @@ public sealed class OpenAiCompatibleLlmOptions
 
     public string Provider { get; set; } = "OpenAICompatible";
 
+    public string? EnvPrefix { get; set; }
+
     public string Model { get; set; } = "gpt-4.1-mini";
 
     public string? BaseUrl { get; set; }
@@ -73,6 +75,9 @@ public sealed class OpenAiCompatibleLlmOptions
             {
                 case "provider":
                     options.Provider = property.Value.GetString() ?? options.Provider;
+                    break;
+                case "envprefix":
+                    options.EnvPrefix = property.Value.GetString();
                     break;
                 case "model":
                     options.Model = property.Value.GetString() ?? options.Model;

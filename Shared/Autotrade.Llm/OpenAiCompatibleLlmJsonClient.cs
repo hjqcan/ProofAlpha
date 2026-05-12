@@ -76,11 +76,15 @@ public sealed class OpenAiCompatibleLlmJsonClient : ILlmJsonClient
     private async Task<string> RequestTextAsync(LlmJsonRequest request, CancellationToken cancellationToken)
     {
         var options = _options.CurrentValue;
-        var baseUrl = string.IsNullOrWhiteSpace(options.BaseUrl)
+        var provider = ResolveSetting(options.Provider, options.EnvPrefix, "PROVIDER") ?? options.Provider;
+        EnsureOpenAiCompatibleProvider(provider);
+        var model = ResolveSetting(options.Model, options.EnvPrefix, "MODEL") ?? options.Model;
+        var resolvedBaseUrl = ResolveSetting(options.BaseUrl, options.EnvPrefix, "BASE_URL");
+        var baseUrl = string.IsNullOrWhiteSpace(resolvedBaseUrl)
             ? "https://api.openai.com/v1"
-            : options.BaseUrl.TrimEnd('/');
+            : resolvedBaseUrl.TrimEnd('/');
         var requestUri = new Uri($"{baseUrl}/chat/completions");
-        var apiKey = ResolveApiKey(options.ApiKeyEnvVar);
+        var apiKey = ResolveSetting(null, options.EnvPrefix, "API_KEY") ?? ResolveApiKey(options.ApiKeyEnvVar);
         var timeout = TimeSpan.FromSeconds(Math.Clamp(options.TimeoutSeconds, 10, 600));
         var attempts = Math.Max(1, options.MaxRetries);
         Exception? lastError = null;
@@ -98,7 +102,7 @@ public sealed class OpenAiCompatibleLlmJsonClient : ILlmJsonClient
 
             httpRequest.Content = JsonContent.Create(new
             {
-                model = options.Model,
+                model,
                 messages = new[]
                 {
                     new { role = "system", content = request.SystemPrompt },
@@ -244,6 +248,19 @@ public sealed class OpenAiCompatibleLlmJsonClient : ILlmJsonClient
         return value.Length <= 500 ? value : value[..500];
     }
 
+    private static void EnsureOpenAiCompatibleProvider(string provider)
+    {
+        var normalized = provider.Trim().Replace("-", string.Empty, StringComparison.Ordinal);
+        if (normalized.Equals("openai", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("openaicompatible", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        throw new LlmClientException(
+            $"LLM provider '{provider}' is not supported by {nameof(OpenAiCompatibleLlmJsonClient)}.");
+    }
+
     private static string? ResolveApiKey(string envVarName)
     {
         if (string.IsNullOrWhiteSpace(envVarName))
@@ -258,5 +275,28 @@ public sealed class OpenAiCompatibleLlmJsonClient : ILlmJsonClient
         }
 
         return DotEnvReader.TryGetValue(envVarName);
+    }
+
+    private static string? ResolveSetting(
+        string? configuredValue,
+        string? envPrefix,
+        string suffix)
+    {
+        if (!string.IsNullOrWhiteSpace(envPrefix))
+        {
+            var key = $"{envPrefix.Trim()}_{suffix}";
+            var value = Environment.GetEnvironmentVariable(key);
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                value = DotEnvReader.TryGetValue(key);
+            }
+
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value.Trim();
+            }
+        }
+
+        return string.IsNullOrWhiteSpace(configuredValue) ? null : configuredValue.Trim();
     }
 }

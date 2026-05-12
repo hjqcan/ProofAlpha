@@ -92,9 +92,9 @@ public sealed class MarketOpportunity : Entity, IAggregateRoot
 
     public void Approve(DateTimeOffset now)
     {
-        if (Status is OpportunityStatus.Expired)
+        if (Status is not OpportunityStatus.Candidate)
         {
-            throw new InvalidOperationException("Expired opportunities cannot be approved.");
+            throw new InvalidOperationException("Only candidate opportunities can be approved.");
         }
 
         if (ValidUntilUtc <= (now == default ? DateTimeOffset.UtcNow : now))

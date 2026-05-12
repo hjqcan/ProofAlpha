@@ -52,6 +52,29 @@ public sealed class OpportunityDiscoveryServiceTests
     }
 
     [Fact]
+    public async Task ScanAsync_InvalidLlmDocumentCreatesNeedsReviewAndCannotPublish()
+    {
+        await using var context = CreateContext();
+        var repositories = CreateRepositories(context);
+        var service = CreateService(
+            repositories,
+            new FakeMarketCatalogReader(Market()),
+            [new StaticEvidenceSource()],
+            new LowConfidenceLlmClient());
+        var query = new OpportunityQueryService(repositories.OpportunityRepository, repositories.EvidenceRepository);
+
+        var result = await service.ScanAsync(new OpportunityScanRequest("test", 0m, 0m, 5));
+
+        var opportunity = Assert.Single(result.Opportunities);
+        Assert.Equal(OpportunityStatus.NeedsReview, opportunity.Status);
+        Assert.Contains("confidence", opportunity.ScoreJson, StringComparison.OrdinalIgnoreCase);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.ApproveAsync(new OpportunityReviewRequest(opportunity.Id, "test")));
+        Assert.Empty(await query.GetPublishedAsync());
+    }
+
+    [Fact]
     public async Task PublishAsync_RejectsOpportunityThatWasNotApproved()
     {
         await using var context = CreateContext();
@@ -236,6 +259,45 @@ public sealed class OpportunityDiscoveryServiceTests
                         Confidence = 0.72m,
                         Edge = 0.05m,
                         Reason = "Fresh evidence supports a paper-only candidate.",
+                        EvidenceIds = [evidenceId],
+                        EntryMaxPrice = 0.57m,
+                        TakeProfitPrice = 0.65m,
+                        StopLossPrice = 0.49m,
+                        MaxSpread = 0.04m,
+                        Quantity = 1m,
+                        MaxNotional = 5m,
+                        ValidUntilUtc = DateTimeOffset.UtcNow.AddHours(4)
+                    }
+                ],
+                null);
+
+            return Task.FromResult(new LlmJsonResult<T>((T)(object)response, "{}", "{}"));
+        }
+    }
+
+    private sealed class LowConfidenceLlmClient : ILlmJsonClient
+    {
+        public Task<LlmJsonResult<T>> CompleteJsonAsync<T>(
+            LlmJsonRequest request,
+            Func<T, IReadOnlyList<string>>? validator = null,
+            CancellationToken cancellationToken = default)
+            where T : class
+        {
+            using var prompt = JsonDocument.Parse(request.UserPrompt);
+            var root = prompt.RootElement;
+            var marketId = root.GetProperty("market").GetProperty("marketId").GetString()
+                ?? throw new InvalidOperationException("Prompt missing market id.");
+            var evidenceId = root.GetProperty("evidence").EnumerateArray().First().GetProperty("id").GetGuid();
+            var response = new OpportunityAnalysisResponse(
+                [
+                    new OpportunityAnalysisDocument
+                    {
+                        MarketId = marketId,
+                        Outcome = OutcomeSide.Yes,
+                        FairProbability = 0.62m,
+                        Confidence = 0.20m,
+                        Edge = 0.05m,
+                        Reason = "Weak evidence should not pass the publish gate.",
                         EvidenceIds = [evidenceId],
                         EntryMaxPrice = 0.57m,
                         TakeProfitPrice = 0.65m,

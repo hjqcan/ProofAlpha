@@ -4,7 +4,9 @@ const hre = require("hardhat");
 const { recordOutcomeFromRequest } = require("./lib/performance-ledger.cjs");
 
 async function main() {
-  const artifactRoot = path.resolve(__dirname, "../../..", "artifacts", "arc-hackathon", "demo-run");
+  const artifactRoot = process.env.ARC_PERFORMANCE_DEMO_ROOT
+    ? path.resolve(process.env.ARC_PERFORMANCE_DEMO_ROOT)
+    : path.resolve(__dirname, "../../..", "artifacts", "arc-hackathon", "demo-run");
   fs.mkdirSync(artifactRoot, { recursive: true });
 
   const signalPublication = readJsonIfExists(path.join(artifactRoot, "signal-publication.json"));
@@ -19,7 +21,8 @@ async function main() {
   await ledger.waitForDeployment();
   const performanceLedger = await ledger.getAddress();
 
-  const outcomeHash = hre.ethers.id("proofalpha-phase7-outcome-loss-risk-adjusted");
+  const outcomeHash = process.env.ARC_PERFORMANCE_OUTCOME_ID ||
+    hre.ethers.id("proofalpha-phase7-outcome-loss-risk-adjusted");
   const request = {
     chainId,
     performanceLedger,
@@ -111,23 +114,14 @@ async function main() {
 
   const performanceOutcomePath = path.join(artifactRoot, "performance-outcome.json");
   const agentReputationPath = path.join(artifactRoot, "agent-reputation.json");
-  let writeError = null;
-  try {
-    fs.writeFileSync(performanceOutcomePath, `${JSON.stringify(performanceOutcome, null, 2)}\n`);
-    fs.writeFileSync(agentReputationPath, `${JSON.stringify(agentReputation, null, 2)}\n`);
-  } catch (error) {
-    writeError = {
-      code: error.code ?? "UNKNOWN",
-      message: error.message
-    };
-  }
+  fs.writeFileSync(performanceOutcomePath, `${JSON.stringify(performanceOutcome, null, 2)}\n`);
+  fs.writeFileSync(agentReputationPath, `${JSON.stringify(agentReputation, null, 2)}\n`);
 
   console.log(JSON.stringify({
     performanceOutcomePath,
     agentReputationPath,
     outcomeTransactionHash: result.transactionHash,
     blockNumber: result.blockNumber,
-    writeError,
     performanceOutcome,
     agentReputation
   }, null, 2));

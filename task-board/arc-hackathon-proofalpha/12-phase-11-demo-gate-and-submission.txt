@@ -3,7 +3,7 @@ Phase 11: Demo Gate and Submission
 
 Status
 ------
-[TODO]
+[DONE]
 
 
 Intent
@@ -70,14 +70,14 @@ Submission Doc Outline
 
 Tasks
 -----
-[TODO] AH-P11-T001 Create demo runner.
+[DONE] AH-P11-T001 Create demo runner.
 
 - fail fast on missing tools
 - never print secrets
 - write logs under `artifacts/arc-hackathon/demo-run/logs`
 - write all final artifacts under `artifacts/arc-hackathon/demo-run`
 
-[TODO] AH-P11-T002 Create final architecture diagram.
+[DONE] AH-P11-T002 Create final architecture diagram.
 
 Must include:
 
@@ -94,7 +94,7 @@ Must include:
 - RevenueSettlement
 - Control Room
 
-[TODO] AH-P11-T003 Record five-minute video script.
+[DONE] AH-P11-T003 Record five-minute video script.
 
 Flow:
 
@@ -107,7 +107,7 @@ Flow:
 7. revenue settlement records monetization
 8. safety posture
 
-[TODO] AH-P11-T004 Run final quality gate.
+[DONE] AH-P11-T004 Run final quality gate.
 
 Commands:
 
@@ -119,7 +119,7 @@ npm --prefix .\interfaces\WebApp run build
 npm --prefix .\interfaces\ArcContracts test
 ```
 
-[TODO] AH-P11-T005 Capture screenshots.
+[DONE] AH-P11-T005 Capture screenshots.
 
 Minimum:
 
@@ -130,7 +130,7 @@ Minimum:
 - revenue settlement view
 - auto-trading permission blocked/allowed state
 
-[TODO] AH-P11-T006 Run secret scan.
+[DONE] AH-P11-T006 Run secret scan.
 
 Scan:
 
@@ -142,7 +142,7 @@ Scan:
 
 No real keys, private keys, mnemonics, passphrases, or API secrets.
 
-[TODO] AH-P11-T007 Final claim review.
+[DONE] AH-P11-T007 Final claim review.
 
 Review every public claim:
 
@@ -166,7 +166,46 @@ Acceptance Criteria
 Evidence
 --------
 - `artifacts/arc-hackathon/demo-run/demo-summary.md`
+- `artifacts/arc-hackathon/demo-run/demo-run-record.json`
+- `artifacts/arc-hackathon/demo-run/secret-scan.md`
+- `artifacts/arc-hackathon/demo-run/secret-scan.json`
+- `artifacts/arc-hackathon/demo-run/signal-proof.json`
+- `artifacts/arc-hackathon/demo-run/signal-publication.json`
+- `artifacts/arc-hackathon/demo-run/subscription.json`
+- `artifacts/arc-hackathon/demo-run/access-denied.json`
+- `artifacts/arc-hackathon/demo-run/access-allowed.json`
+- `artifacts/arc-hackathon/demo-run/builder-attribution.json`
+- `artifacts/arc-hackathon/demo-run/order-envelope-redacted.json`
+- `artifacts/arc-hackathon/demo-run/performance-outcome.json`
+- `artifacts/arc-hackathon/demo-run/agent-reputation.json`
+- `artifacts/arc-hackathon/demo-run/revenue-settlement.json`
+- `artifacts/arc-hackathon/demo-run/revenue-settlement-cli-journal.json`
+- `artifacts/arc-hackathon/demo-run/logs/*`
 - `docs/hackathon/arc-proofalpha-submission.md`
 - `docs/hackathon/arc-proofalpha-demo-script.md`
+- `docs/hackathon/arc-proofalpha-architecture.md`
+- `docs/hackathon/arc-proofalpha-claim-review.md`
 - `artifacts/arc-hackathon/screenshots/*`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\run-arc-hackathon-demo.ps1`
+- `git -c safe.directory=D:/workspace/ProofAlpha diff --check`
 
+
+Completion Notes
+----------------
+- `scripts/run-arc-hackathon-demo.ps1` now performs the repeatable final demo
+  gate: tool preflight, contract build/test, .NET restore/build/test, targeted
+  ArcSettlement and builder-attribution tests, WebApp build, local EVM signal
+  publication, local EVM subscription, mirrored entitlement checks, redacted
+  builder-attributed Paper order evidence, performance outcome, revenue
+  settlement, screenshot capture, secret scan, and summary export.
+- The final run recorded `access-denied.hasAccess=false` and
+  `access-allowed.hasAccess=true`, with the same signal id linked through
+  signal proof, builder attribution, performance outcome, and revenue
+  settlement artifacts.
+- `secret-scan.md` reports zero blocking findings; allowed contextual findings
+  are documentation placeholders, environment variable names, or public hash
+  fields such as `signatureHash`.
+- The final docs include the submission markdown, five-minute talk track,
+  architecture diagram, and claim review guardrails so public claims remain
+  limited to implemented local/testnet-style evidence and avoid investment
+  advice, custody, Live bypass, or Arc venue-settlement claims.

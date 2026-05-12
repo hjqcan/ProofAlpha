@@ -1,113 +1,173 @@
-# ProofAlpha Arc Hackathon Submission Contract
-
-Status: Phase 0 frozen for implementation.
+# ProofAlpha Arc Hackathon Submission
 
 ## One-Liner
 
-ProofAlpha proves alpha on Arc, sells access with USDC, and executes on
-Polymarket through a risk-gated agent.
+ProofAlpha is a paid, proof-backed Polymarket agent gateway: Arc records access,
+signal proof, performance history, and revenue settlement evidence while
+ProofAlpha keeps execution Paper-first and risk-gated.
 
-## Pitch Paragraph
+## Problem: AI Trading Agents Need Trust And Monetization
 
-ProofAlpha is a paid agent trading gateway for prediction markets. The AI agent
-discovers Polymarket opportunities, records the pre-execution signal and
-evidence hashes on Arc, and later records outcomes so subscribers can judge the
-agent by full history instead of selected wins. Users pay USDC for access to
-agent-generated arbitrage opportunities or for permission to request automated
-Paper trading. Polymarket remains the execution venue, and builder attribution
-turns the agent into a monetizable market entry point without weakening the
-existing ProofAlpha risk, compliance, audit, and Live-arming gates.
+Prediction-market agents can produce useful signals, but subscribers need more
+than a screenshot of a winning call. They need to know what the agent knew before
+execution, whether losing or rejected calls remain in history, and whether paid
+access is enforced by backend entitlement checks instead of UI state.
 
-## Paid-Agent Loop
+Agent builders also need a clean monetization path. A useful agent should be able
+to sell access, attribute downstream order flow, and record revenue splits without
+claiming custody of user funds or settlement of the venue trade.
 
-1. Agent discovers an opportunity from market data, evidence, or strategy
-   reasoning.
-2. ProofAlpha creates a redacted utility proof: signal hash, evidence hash,
-   reasoning hash, risk envelope, and current strategy version.
-3. Arc anchors publication intent and later records outcome, reputation, access,
-   and settlement events.
-4. A wallet pays or uses a labeled fixture for a USDC subscription.
-5. Backend entitlement checks unlock subscriber-safe opportunity details or
-   auto-trading permission.
-6. Paper execution runs through existing ProofAlpha risk, compliance, kill
-   switch, and audit behavior.
-7. Polymarket order evidence includes builder metadata so attributable flow can
-   be correlated with the Arc signal id.
-8. Outcome and revenue settlement records update the agent reputation view.
+## Product: Paid Arc-Backed ProofAlpha Agent Gateway
 
-## Subscription Tiers
+The demo packages ProofAlpha as a subscriber portal and backend proof pipeline:
 
-Demo prices are hackathon fixture prices, not production billing.
+1. The agent publishes a pre-execution signal proof.
+2. An unsubscribed wallet is blocked from full signal details.
+3. A USDC/testnet subscription is mirrored into local entitlement state.
+4. A subscribed wallet unlocks signal details and Paper auto-trade permission.
+5. A redacted Polymarket order envelope records builder attribution.
+6. Performance outcome and reputation records keep losses, rejects, and expired
+   signals in the ledger.
+7. Revenue settlement records split the subscription revenue path.
 
-| Tier | Strategy ids covered | Duration | Demo amount | Allowed actions | Disabled reason when missing |
-| --- | --- | --- | --- | --- | --- |
-| `SignalViewer` | `repricing_lag_arbitrage`, `dual_leg_arbitrage` | 14 days | 10 USDC | API/WebApp can view full published opportunity details, proof hashes, redacted reasoning, performance history, and Arc tx links. CLI can export subscriber-safe signal proof. | `subscription_required`: wallet has no active SignalViewer, AutoTrader, or Operator entitlement for the strategy. |
-| `AutoTrader` | `repricing_lag_arbitrage`, `dual_leg_arbitrage` | 14 days | 25 USDC | All SignalViewer actions plus API/CLI/WebApp can request Paper strategy start or copy-trade automation for the subscribed wallet. Live remains blocked unless existing Live arming, command confirmation, risk, compliance, and operator gates pass. | `autotrade_permission_required`: wallet lacks active AutoTrader or Operator entitlement, or the strategy/risk tier is outside the subscription scope. |
-| `Operator` | All demo strategies | Hackathon demo window | 0 USDC local/admin fixture | Local/admin can publish signals, replay outcomes, settle fixture revenue, and reset demo data. WebApp must label this as local/admin only. | `operator_only`: action requires local operator mode and cannot be unlocked by public subscription. |
+## Why Arc
 
-The first real gate for implementation is backend authorization, not UI state.
-At least one API or CLI path must reject an unsubscribed wallet before the WebApp
-renders locked content as unlocked.
+Arc is the proof and monetization layer in this demo:
 
-## Strategy Utility Proof Standard
+- `SignalRegistry` anchors the signal id, reasoning hash, risk envelope hash,
+  expected edge, max notional, and validity window before outcome.
+- `StrategyAccess` records paid access with a USDC/testnet token subscription.
+- `PerformanceLedger` records post-signal outcomes for reputation.
+- `RevenueSettlement` records monetization and split evidence.
 
-A strategy is useful in the demo only when all measurable fields exist:
+The default demo run uses local Hardhat EVM artifacts. The public copy must label
+that as local/testnet evidence unless a real Arc testnet deployment is supplied.
 
-| Requirement | Evidence |
-| --- | --- |
-| Pre-execution signal hash | Canonical signal JSON hash recorded before Paper execution or replay outcome. |
-| Strategy, evidence, and reasoning hash | Redacted hashes cover the strategy version, evidence inputs, and subscriber-safe reasoning. |
-| Risk envelope | Max notional, risk tier, execution mode, kill-switch state, and Live-arming state are captured. |
-| Paper execution or deterministic replay outcome | Existing Paper run report or replay summary identifies decisions, orders, fills, rejects, stale signals, and expired opportunities. |
-| Post-execution outcome record | Outcome includes win/loss/expired/rejected/stale status, PnL or simulated PnL, slippage, latency, and exposure notes. |
-| Performance ledger entry | Arc/local ledger record links signal id, outcome id, publication hash, and agent reputation inputs. |
+## Why Polymarket
 
-This standard proves process integrity and historical behavior. It does not
-predict future returns or imply profit.
+Polymarket is the execution venue and market data surface. ProofAlpha keeps
+Polymarket venue execution separate from Arc proof records:
 
-## Demo Path
+- Paper execution remains the default demo mode.
+- Builder attribution is captured as redacted signed-order evidence.
+- Arc does not settle the Polymarket trade; it records proof, access,
+  performance, and settlement events around the agent product.
 
-1. Show an unsubscribed wallet blocked from full signal details.
-2. Subscribe with Arc USDC or a clearly labeled testnet USDC fixture.
-3. Backend reads entitlement and returns a positive access decision.
-4. Subscriber unlocks a redacted arbitrage opportunity.
-5. Publish the signal proof to Arc, or record a labeled local/testnet fixture
-   if the network is unavailable.
-6. Execute a Paper order with Polymarket builder metadata in redacted evidence.
-7. Record the performance outcome on Arc or a labeled local/testnet fixture.
-8. Record revenue settlement or split event.
-9. Show agent reputation, subscriber access, proof ids, and fixture labels in
-   WebApp.
+## Architecture
 
-## Testnet, Fixture, And Real Boundaries
+See `docs/hackathon/arc-proofalpha-architecture.md` for the final Mermaid
+diagram. The main path is:
 
-| Surface | Phase 0 label | Implementation expectation |
-| --- | --- | --- |
-| USDC subscription | Testnet or fixture until Arc credentials and faucet funding are configured. | Store chain id, token address, tx hash, block number, and entitlement expiry when real. Store fixture id and reason when simulated. |
-| Arc contract writes | Testnet preferred, local fixture allowed only with explicit degraded state. | All writes must be idempotent by domain id and preserve local intent/result records. |
-| Polymarket execution | Paper by default. | Live is out of demo scope unless existing Live arming and operator gates pass manually. |
-| Builder attribution | Redacted signed-order evidence. | Never expose builder credentials or Polymarket secrets to browser/API responses. |
-| Revenue split | Simulated settlement journal until production billing exists. | Public copy must say settlement record or simulated split, not payout. |
+- OpportunityDiscovery and SelfImprove feed candidate strategies.
+- Strategy creates a signal under a risk envelope.
+- ArcSettlement publishes the signal proof and mirrors subscription access.
+- Control Room and Subscriber Portal render the gated experience.
+- Trading simulates or executes Paper orders against Polymarket CLOB interfaces.
+- Builder attribution links the order envelope back to the Arc signal id.
+- Performance and revenue records update reputation and monetization evidence.
 
-## No-Go Language
+## Demo Flow
 
-Reject any UI, doc, pitch, or API description that says or implies:
+Run:
 
-- guaranteed profit
-- risk-free or risk eliminated
-- fully autonomous Live trading
-- Arc settles the Polymarket venue trade
-- ProofAlpha safely custodies user funds
-- paid access bypasses ProofAlpha risk, compliance, kill switch, Live arming, or
-  command audit
+```powershell
+.\scripts\run-arc-hackathon-demo.ps1
+```
 
-## Acceptance Map
+The runner builds contracts, runs contract tests, restores/builds/tests .NET,
+builds the WebApp, publishes signal proof, records subscription/access evidence,
+exports builder-attributed Paper order evidence, records performance and revenue
+events, captures screenshots, scans for secrets, and writes:
 
-| Acceptance criterion | Evidence |
-| --- | --- |
-| Paid-agent loop described in one page | This document, sections One-Liner through Demo Path. |
-| Subscription tiers defined before contract work | Subscription Tiers table. |
-| Demo path includes a real entitlement gate | Paid-Agent Loop step 5 and Subscription Tiers gate note. |
-| Strategy utility proof is explicit and measurable | Strategy Utility Proof Standard table. |
-| Simulated/testnet parts are labeled | Testnet, Fixture, And Real Boundaries table. |
+- `artifacts/arc-hackathon/demo-run/demo-summary.md`
+- `artifacts/arc-hackathon/demo-run/demo-run-record.json`
+- `artifacts/arc-hackathon/demo-run/secret-scan.md`
+- `artifacts/arc-hackathon/screenshots/*.png`
 
+## Subscription And Entitlement Model
+
+The demo plan is `SignalViewer` for `repricing_lag_arbitrage`. A wallet without
+an active mirror record receives a denied access decision. After the local
+`StrategySubscribed` event is mirrored, the subscribed wallet receives an active
+status with `ViewSignals`, `ViewReasoning`, and `ExportSignal` permissions.
+
+Paid access does not bypass risk, compliance, kill switch, command audit, or Live
+arming gates. Paper auto-trade permission is separate from Live execution.
+
+## Strategy Utility Proof Model
+
+The signal proof includes:
+
+- `signalId` / opportunity hash
+- agent address
+- strategy and venue
+- evidence ids
+- reasoning hash
+- risk envelope hash
+- expected edge bps
+- max notional USDC
+- validity window
+
+This proves a pre-outcome record existed. It does not predict returns or imply
+future profitability.
+
+## Performance And Reputation Ledger
+
+The demo records an `ExecutedLoss` outcome to prove that the ledger can include
+negative results. Reputation evidence includes total signals, terminal signals,
+pending signals, wins, losses, expired signals, rejected signals, average PnL
+bps, slippage bps, and risk rejection rate.
+
+This is historical evidence only. It is not investment advice.
+
+## Revenue Settlement Model
+
+The revenue path records a `SubscriptionFee` settlement for the signal id and
+subscription transaction hash. The split is deterministic:
+
+- Agent owner: 70%
+- Strategy author: 20%
+- Platform: 10%
+
+The local EVM event proves the `RevenueSettlement` recording path. Production
+accounting, tax reporting, and mainnet payout distribution are out of scope.
+
+## Safety
+
+- Paper-first execution.
+- Live trading remains blocked unless the existing ProofAlpha Live arming,
+  operator confirmation, risk, compliance, and kill-switch checks pass.
+- Demo artifacts and browser state must not expose raw private keys, mnemonics,
+  API secrets, passphrases, bearer tokens, or unredacted signatures.
+- Redacted order evidence contains hashes, not raw signatures or CLOB secrets.
+
+## Testnet And Simulated Disclosures
+
+The default hackathon runner uses local Hardhat EVM contracts. If Arc testnet
+credentials are configured later, the same proof model can point at testnet
+transactions, but this submission should present the current artifacts as local
+EVM/testnet-style evidence.
+
+Polymarket execution evidence is Paper/demo evidence. The demo does not claim
+production live trading, venue settlement on Arc, custody of user funds, or
+guaranteed profit.
+
+## Evidence Links And Transaction Hashes
+
+Fresh hashes are generated by the runner and summarized in:
+
+- `artifacts/arc-hackathon/demo-run/demo-summary.md`
+- `artifacts/arc-hackathon/demo-run/signal-publication.json`
+- `artifacts/arc-hackathon/demo-run/subscription.json`
+- `artifacts/arc-hackathon/demo-run/builder-attribution.json`
+- `artifacts/arc-hackathon/demo-run/performance-outcome.json`
+- `artifacts/arc-hackathon/demo-run/revenue-settlement.json`
+- `artifacts/arc-hackathon/screenshots/revenue-settlement.png`
+
+## Next Steps
+
+1. Deploy the Arc contracts to a stable Arc testnet environment.
+2. Replace local fixture subscription funding with testnet USDC funding.
+3. Add wallet-scoped revenue and performance filtering in the public portal.
+4. Add a replay job for failed testnet writes from local intent records.
+5. Expand subscriber product copy after legal/compliance review.

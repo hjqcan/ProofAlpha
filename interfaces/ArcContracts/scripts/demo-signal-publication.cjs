@@ -15,15 +15,15 @@ async function main() {
   const request = {
     chainId,
     signalRegistry: await registry.getAddress(),
-    signalId: hash("proofalpha-demo-signal"),
-    agentAddress: await agent.getAddress(),
-    venue: "polymarket",
-    strategyKey: "repricing_lag_arbitrage",
-    reasoningHash: hash("reasoning trace hash for demo signal"),
-    riskEnvelopeHash: hash("risk envelope hash for demo signal"),
-    expectedEdgeBps: "42",
-    maxNotionalUsdcAtomic: "100000000",
-    validUntilUnixSeconds: "1800000000"
+    signalId: process.env.ARC_SIGNAL_ID || hash("proofalpha-demo-signal"),
+    agentAddress: process.env.ARC_SIGNAL_AGENT_ADDRESS || await agent.getAddress(),
+    venue: process.env.ARC_SIGNAL_VENUE || "polymarket",
+    strategyKey: process.env.ARC_SIGNAL_STRATEGY_KEY || "repricing_lag_arbitrage",
+    reasoningHash: process.env.ARC_SIGNAL_REASONING_HASH || hash("reasoning trace hash for demo signal"),
+    riskEnvelopeHash: process.env.ARC_SIGNAL_RISK_ENVELOPE_HASH || hash("risk envelope hash for demo signal"),
+    expectedEdgeBps: process.env.ARC_SIGNAL_EXPECTED_EDGE_BPS || "42",
+    maxNotionalUsdcAtomic: process.env.ARC_SIGNAL_MAX_NOTIONAL_USDC_ATOMIC || "100000000",
+    validUntilUnixSeconds: process.env.ARC_SIGNAL_VALID_UNTIL_UNIX_SECONDS || "1800000000"
   };
 
   const result = await publishSignalFromRequest(hre, request);

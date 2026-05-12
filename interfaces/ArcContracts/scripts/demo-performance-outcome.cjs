@@ -16,6 +16,9 @@ async function main() {
   const sourceSignalTransactionHash = process.env.ARC_PERFORMANCE_SIGNAL_TX_HASH ||
     signalPublication?.transactionHash ||
     null;
+  const strategyId = process.env.ARC_PERFORMANCE_STRATEGY_ID ||
+    signalPublication?.strategyId ||
+    "repricing_lag_arbitrage";
   const exportedAtUtc = new Date().toISOString();
   const network = await hre.ethers.provider.getNetwork();
   const chainId = Number(network.chainId);
@@ -50,7 +53,7 @@ async function main() {
     outcomeId: outcomeHash,
     signalId,
     executionId: "paper-order-phase7-loss-0001",
-    strategyId: "dual_leg_arbitrage",
+    strategyId,
     marketId: "demo-polymarket-market",
     status: "ExecutedLoss",
     realizedPnlBps: -12,

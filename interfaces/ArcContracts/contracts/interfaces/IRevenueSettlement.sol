@@ -12,7 +12,23 @@ interface IRevenueSettlement {
         uint64 recordedAt
     );
 
+    event SettlementDistributed(
+        bytes32 indexed settlementId,
+        address indexed token,
+        address[] recipients,
+        uint256[] amounts
+    );
+
     function recordSettlement(
+        bytes32 settlementId,
+        bytes32 signalId,
+        address token,
+        uint256 grossAmount,
+        address[] calldata recipients,
+        uint16[] calldata shareBps
+    ) external;
+
+    function recordAndDistributeSettlement(
         bytes32 settlementId,
         bytes32 signalId,
         address token,

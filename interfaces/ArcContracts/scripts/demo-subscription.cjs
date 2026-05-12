@@ -38,16 +38,16 @@ async function main() {
     strategyAccess: accessDeployment.deployment.address,
     subscriberAddress: subscriber.address,
     treasuryAddress: treasury.address,
-    planId: 1,
+    planId: 2,
     strategyKey: "repricing_lag_arbitrage",
-    tier: "SignalViewer",
-    planName: "Signal Viewer",
-    priceUsdc: "10.00",
-    priceUsdcAtomic: hre.ethers.parseUnits("10", 6).toString(),
+    tier: "PaperAutotrade",
+    planName: "Paper Autotrade",
+    priceUsdc: "25.00",
+    priceUsdcAtomic: hre.ethers.parseUnits("25", 6).toString(),
     durationSeconds: (7 * 24 * 60 * 60).toString(),
-    permissions: ["ViewSignals", "ViewReasoning", "ExportSignal"],
+    permissions: ["ViewSignals", "ViewReasoning", "ExportSignal", "RequestPaperAutoTrade"],
     maxMarkets: 12,
-    autoTradingAllowed: false,
+    autoTradingAllowed: true,
     liveTradingAllowed: false
   };
 
@@ -86,6 +86,7 @@ async function main() {
     },
     event: result.event,
     onchainSummary: result.onchainSummary,
+    paymentTransfer: result.paymentTransfer,
     exportedAtUtc: new Date().toISOString()
   };
 

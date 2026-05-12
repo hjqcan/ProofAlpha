@@ -15,6 +15,8 @@ async function subscribeFromRequest(hre, request) {
 
   const mintTx = await token.mint(request.subscriberAddress, price);
   const mintReceipt = await mintTx.wait();
+  const treasuryBalanceBeforePayment = await token.balanceOf(request.treasuryAddress);
+  const subscriberBalanceBeforePayment = await token.balanceOf(request.subscriberAddress);
 
   const planTx = await access.setPlan(
     BigInt(request.planId),
@@ -39,6 +41,8 @@ async function subscribeFromRequest(hre, request) {
   const hasAccess = await access.hasAccess(request.subscriberAddress, strategyKeyBytes32);
   const treasuryBalance = await token.balanceOf(request.treasuryAddress);
   const subscriberBalance = await token.balanceOf(request.subscriberAddress);
+  const treasuryDelta = treasuryBalance - treasuryBalanceBeforePayment;
+  const subscriberDelta = subscriberBalance - subscriberBalanceBeforePayment;
 
   return {
     chainId,
@@ -65,6 +69,15 @@ async function subscribeFromRequest(hre, request) {
       accessExpiresAt: accessExpiresAt.toString(),
       treasuryBalance: treasuryBalance.toString(),
       subscriberBalance: subscriberBalance.toString()
+    },
+    paymentTransfer: {
+      priceAtomic: price.toString(),
+      treasuryBeforeAtomic: treasuryBalanceBeforePayment.toString(),
+      treasuryAfterAtomic: treasuryBalance.toString(),
+      treasuryDeltaAtomic: treasuryDelta.toString(),
+      subscriberBeforeAtomic: subscriberBalanceBeforePayment.toString(),
+      subscriberAfterAtomic: subscriberBalance.toString(),
+      subscriberDeltaAtomic: subscriberDelta.toString()
     }
   };
 }

@@ -42,6 +42,8 @@ async function main() {
 
   const token = await deploy("TestUsdc");
   const settlement = await deploy("RevenueSettlement");
+  const fundTx = await token.contract.mint(settlement.deployment.address, BigInt(grossAmountMicroUsdc));
+  const fundReceipt = await fundTx.wait();
   const request = {
     chainId,
     revenueSettlement: settlement.deployment.address,
@@ -50,7 +52,8 @@ async function main() {
     tokenAddress: token.deployment.address,
     grossAmountMicroUsdc,
     recipients,
-    shareBps
+    shareBps,
+    distribute: true
   };
   const result = await recordSettlementFromRequest(hre, request);
   const exportedAtUtc = new Date().toISOString();
@@ -75,6 +78,12 @@ async function main() {
     transactionHash: result.transactionHash,
     confirmed: result.confirmed,
     blockNumber: result.blockNumber,
+    setupTransactions: {
+      fundSettlementVault: {
+        transactionHash: fundTx.hash,
+        blockNumber: fundReceipt ? Number(fundReceipt.blockNumber) : null
+      }
+    },
     deployments: [
       token.deployment,
       settlement.deployment
@@ -85,6 +94,7 @@ async function main() {
       shareBps: shareBps[index],
       amountMicroUsdc: ((BigInt(grossAmountMicroUsdc) * BigInt(shareBps[index])) / 10000n).toString()
     })),
+    distribution: result.distribution,
     request,
     exportedAtUtc
   };

@@ -17,7 +17,7 @@
   {
     "contractName": "RevenueSettlement",
     "abiPath": "abi/RevenueSettlement.json",
-    "abiHash": "1d0932fd0490b2fefd15c97732352ceddd6350ac4f320b793c457fa1cdcd0bdc"
+    "abiHash": "3fb51dfd6912eb3ee2729c2288a3584ed679c121023f2e693b3e9b9f6cfd60db"
   },
   {
     "contractName": "TestUsdc",

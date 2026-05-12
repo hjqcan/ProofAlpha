@@ -374,7 +374,7 @@ function New-SecretScan {
                     elseif ($line -match "EnvVar|EnvironmentVariable|OPENAI_API_KEY|[A-Z][A-Z0-9_]*(API_KEY|API_SECRET|PASSPHRASE|PRIVATE_KEY)") {
                         $allowedReason = "environment variable name only; no secret value is present"
                     }
-                    elseif ($relativeForMatch -like "scripts/*" -and $line -match "\[redacted\]|redact|regex\s*=|-match|privateKeyField|apiSecretField|apiKeyField|passphraseField|mnemonicField|hardhatPrivateKey|notForPublicMarker") {
+                    elseif ($relativeForMatch -like "scripts/*" -and $line -match "\[redacted\]|redact|regex\s*=|-match|-notmatch|privateKeyField|apiSecretField|apiKeyField|passphraseField|mnemonicField|hardhatPrivateKey|notForPublicMarker") {
                         $allowedReason = "script scanner pattern, redacted fixture, or redaction policy text; no secret value is present"
                     }
                     elseif ($relativeForMatch -like "docs/*" -and $line -match "apiKey|ApiKey|apiSecret|ApiSecret|passphrase|Passphrase|mnemonic|privateKey|PrivateKey|secret|private") {
@@ -464,6 +464,8 @@ $marketId = "demo-polymarket-market"
 $reasoningHash = "0x664020618931484b30288d9976c61e9ebf16d6ec304290c920bc891b24c6264a"
 $riskEnvelopeHash = "0x9c7b7b3ccfb4e55ab07a273b974365eb8fcee2659f80f0c9b3b27a2fde65987c"
 $unsubscribedWallet = "0x1234567890abcdef1234567890abcdef12345678"
+$subscriptionGrossUsdc = "25"
+$subscriptionGrossMicroUsdc = "25000000"
 
 $signalProofPath = Join-Path $artifactDir "signal-proof.json"
 $provenanceDir = Join-Path $artifactDir "provenance"
@@ -552,6 +554,17 @@ $revenueDemoConfig = [ordered]@{
 Write-JsonFile -Path $revenueConfigPath -Value $revenueDemoConfig
 
 if (-not $FinalizeOnly) {
+foreach ($stateStorePath in @(
+    (Join-Path $artifactDir "signal-publications-cli.json"),
+    (Join-Path $artifactDir "entitlements.json"),
+    (Join-Path $artifactDir "performance-outcomes-cli.json"),
+    (Join-Path $artifactDir "revenue-settlement-cli-journal.json")
+)) {
+    if (Test-Path -LiteralPath $stateStorePath) {
+        Remove-Item -LiteralPath $stateStorePath -Force
+    }
+}
+
 if ($SkipRestore) {
     Add-DemoSkip `
         -Name "dotnet restore" `
@@ -630,6 +643,25 @@ $allowed = Invoke-DemoStep `
     -TimeoutSeconds 600
 Copy-CommandJsonOutput -Result $allowed -Path (Join-Path $artifactDir "access-allowed.json")
 
+$accessAllowedForPermission = Read-JsonFile (Join-Path $artifactDir "access-allowed.json")
+$paperAutoTradePermission = [ordered]@{
+    documentVersion = "proofalpha-arc-paper-autotrade-permission.v1"
+    route = "POST /api/control-room/strategies/$strategyId/arc-paper-autotrade"
+    allowed = [bool]($accessAllowedForPermission.data.permissions -contains "RequestPaperAutoTrade")
+    status = if ([bool]($accessAllowedForPermission.data.permissions -contains "RequestPaperAutoTrade")) { "PermissionGranted" } else { "PermissionMissing" }
+    walletAddress = [string]$accessAllowedForPermission.data.walletAddress
+    strategyId = [string]$accessAllowedForPermission.data.strategyKey
+    requiredPermission = "RequestPaperAutoTrade"
+    commandMode = "Paper"
+    liveTradingAllowed = $false
+    liveTradingBlockedByDesign = $true
+    evidenceTransactionHash = [string]$accessAllowedForPermission.data.sourceTransactionHash
+    tier = [string]$accessAllowedForPermission.data.tier
+    expiresAtUtc = [string]$accessAllowedForPermission.data.expiresAtUtc
+    generatedAtUtc = (Get-Date).ToUniversalTime().ToString("O")
+}
+Write-JsonFile -Path (Join-Path $artifactDir "autotrade-permission.json") -Value $paperAutoTradePermission
+
 Invoke-DemoStep `
     -Name "Builder attributed paper order evidence" `
     -FilePath $dotnet `
@@ -664,6 +696,7 @@ Invoke-DemoStep `
         ARC_PERFORMANCE_DEMO_ROOT = $tempPerformanceDir
         ARC_PERFORMANCE_SIGNAL_ID = $signalId
         ARC_PERFORMANCE_SIGNAL_TX_HASH = [string](Read-JsonFile (Join-Path $artifactDir "signal-publication.json")).transactionHash
+        ARC_PERFORMANCE_STRATEGY_ID = $strategyId
     } `
     -TimeoutSeconds 900 | Out-Null
 Assert-Artifact (Join-Path $tempPerformanceDir "performance-outcome.json")
@@ -679,7 +712,7 @@ Invoke-DemoStep `
         ARC_REVENUE_DEMO_RESULT = $tempRevenuePath
         ARC_REVENUE_SIGNAL_ID = $signalId
         ARC_REVENUE_SOURCE_TX_HASH = $subscriptionTx
-        ARC_REVENUE_GROSS_MICRO_USDC = "10000000"
+        ARC_REVENUE_GROSS_MICRO_USDC = $subscriptionGrossMicroUsdc
     } `
     -TimeoutSeconds 900 | Out-Null
 Assert-Artifact $tempRevenuePath
@@ -694,7 +727,7 @@ Invoke-DemoStep `
         "arc", "revenue", "record",
         "--source-kind", "SubscriptionFee",
         "--signal-id", $signalId,
-        "--gross-usdc", "10",
+        "--gross-usdc", $subscriptionGrossUsdc,
         "--source-tx-hash", $subscriptionTx,
         "--reason", "phase 11 demo subscription settlement",
         "--wallet", $subscriberWallet,
@@ -708,6 +741,7 @@ Invoke-DemoStep -Name "WebApp screenshot capture" -FilePath $node -Arguments @("
 
 $secretScan = New-SecretScan
 
+$signalProofArtifact = Read-JsonFile (Join-Path $artifactDir "signal-proof.json")
 $signalPublication = Read-JsonFile (Join-Path $artifactDir "signal-publication.json")
 $subscriptionArtifact = Read-JsonFile (Join-Path $artifactDir "subscription.json")
 $performanceOutcome = Read-JsonFile (Join-Path $artifactDir "performance-outcome.json")
@@ -715,14 +749,23 @@ $revenueSettlement = Read-JsonFile (Join-Path $artifactDir "revenue-settlement.j
 $builderEvidence = Read-JsonFile (Join-Path $artifactDir "builder-attribution.json")
 $accessDenied = Read-JsonFile (Join-Path $artifactDir "access-denied.json")
 $accessAllowed = Read-JsonFile (Join-Path $artifactDir "access-allowed.json")
+$autoTradePermission = Read-JsonFile (Join-Path $artifactDir "autotrade-permission.json")
 $subscriptionTx = [string]$subscriptionArtifact.transactionHash
 
+Assert-DemoInvariant -Condition ([string]$signalProofArtifact.strategyId -eq $strategyId) -Message "Signal proof strategy id does not match the demo strategy."
 Assert-DemoInvariant -Condition ([string]$signalPublication.signalId -eq $signalId) -Message "Signal publication id does not match the demo signal id."
 Assert-DemoInvariant -Condition (-not [bool]$accessDenied.data.hasAccess) -Message "Access denied artifact unexpectedly grants access."
 Assert-DemoInvariant -Condition ([bool]$accessAllowed.data.hasAccess) -Message "Access allowed artifact does not grant access."
+Assert-DemoInvariant -Condition ([string]$accessAllowed.data.strategyKey -eq $strategyId) -Message "Access allowed artifact is not linked to the demo strategy id."
+Assert-DemoInvariant -Condition ([bool]($accessAllowed.data.permissions -contains "RequestPaperAutoTrade")) -Message "Access allowed artifact does not grant paper auto-trade permission."
 Assert-DemoInvariant -Condition ([string]$builderEvidence.arcSignalId -eq $signalId) -Message "Builder attribution artifact is not linked to the demo signal id."
+Assert-DemoInvariant -Condition ([string]$builderEvidence.strategyId -eq $strategyId) -Message "Builder attribution artifact is not linked to the demo strategy id."
 Assert-DemoInvariant -Condition ([string]$performanceOutcome.signalId -eq $signalId) -Message "Performance outcome artifact is not linked to the demo signal id."
+Assert-DemoInvariant -Condition ([string]$performanceOutcome.strategyId -eq $strategyId) -Message "Performance outcome artifact is not linked to the demo strategy id."
 Assert-DemoInvariant -Condition ([string]$revenueSettlement.signalId -eq $signalId) -Message "Revenue settlement artifact is not linked to the demo signal id."
+Assert-DemoInvariant -Condition ([string]$revenueSettlement.strategyId -eq $strategyId) -Message "Revenue settlement artifact is not linked to the demo strategy id."
+Assert-DemoInvariant -Condition ([bool]$autoTradePermission.allowed) -Message "Paper auto-trade permission artifact is not allowed."
+Assert-DemoInvariant -Condition ([string]$autoTradePermission.evidenceTransactionHash -eq $subscriptionTx) -Message "Paper auto-trade permission is not linked to the subscription transaction."
 Assert-DemoInvariant -Condition ([string]$secretScan.status -eq "Passed") -Message "Secret scan did not pass."
 
 $evidence = @(
@@ -731,6 +774,7 @@ $evidence = @(
     (Get-FileEvidence -Path (Join-Path $artifactDir "subscription.json") -Description "local EVM StrategySubscribed event artifact")
     (Get-FileEvidence -Path (Join-Path $artifactDir "access-denied.json") -Description "unsubscribed wallet access decision")
     (Get-FileEvidence -Path (Join-Path $artifactDir "access-allowed.json") -Description "subscribed wallet access decision")
+    (Get-FileEvidence -Path (Join-Path $artifactDir "autotrade-permission.json") -Description "paper auto-trade permission entitlement")
     (Get-FileEvidence -Path (Join-Path $artifactDir "builder-attribution.json") -Description "redacted Polymarket builder attribution evidence")
     (Get-FileEvidence -Path (Join-Path $artifactDir "order-envelope-redacted.json") -Description "redacted signed order envelope hash evidence")
     (Get-FileEvidence -Path (Join-Path $artifactDir "performance-outcome.json") -Description "local EVM OutcomeRecorded artifact")
@@ -757,6 +801,7 @@ $summary.Add("- Signal publication tx: ``$($signalPublication.transactionHash)``
 $summary.Add("- Subscription tx: ``$subscriptionTx``") | Out-Null
 $summary.Add("- Access denied allowed flag: ``$($accessDenied.data.hasAccess)``") | Out-Null
 $summary.Add("- Access allowed flag: ``$($accessAllowed.data.hasAccess)``") | Out-Null
+$summary.Add("- Paper auto-trade permission: ``$($autoTradePermission.allowed)``") | Out-Null
 $summary.Add("- Builder evidence signal id: ``$($builderEvidence.arcSignalId)``") | Out-Null
 $summary.Add("- Performance outcome signal id: ``$($performanceOutcome.signalId)``") | Out-Null
 $summary.Add("- Performance outcome tx: ``$($performanceOutcome.transactionHash)``") | Out-Null

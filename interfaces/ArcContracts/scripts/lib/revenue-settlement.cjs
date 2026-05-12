@@ -8,8 +8,25 @@ async function recordSettlementFromRequest(hre, request) {
   }
 
   const settlement = await hre.ethers.getContractAt("RevenueSettlement", request.revenueSettlement);
+  const shouldDistribute = request.distribute === true;
+  const token = shouldDistribute
+    ? await hre.ethers.getContractAt("TestUsdc", request.tokenAddress)
+    : null;
+  const vaultBalanceBefore = token ? await token.balanceOf(request.revenueSettlement) : null;
+  const recipientBalancesBefore = token
+    ? await Promise.all(request.recipients.map((recipient) => token.balanceOf(recipient)))
+    : [];
   try {
-    const tx = await settlement.recordSettlement(
+    const tx = shouldDistribute
+      ? await settlement.recordAndDistributeSettlement(
+        request.settlementId,
+        request.signalId,
+        request.tokenAddress,
+        BigInt(request.grossAmountMicroUsdc),
+        request.recipients,
+        request.shareBps
+      )
+      : await settlement.recordSettlement(
       request.settlementId,
       request.signalId,
       request.tokenAddress,
@@ -18,6 +35,10 @@ async function recordSettlementFromRequest(hre, request) {
       request.shareBps
     );
     const receipt = await tx.wait();
+    const vaultBalanceAfter = token ? await token.balanceOf(request.revenueSettlement) : null;
+    const recipientBalancesAfter = token
+      ? await Promise.all(request.recipients.map((recipient) => token.balanceOf(recipient)))
+      : [];
     return {
       transactionHash: tx.hash,
       confirmed: receipt?.status === 1,
@@ -25,7 +46,21 @@ async function recordSettlementFromRequest(hre, request) {
       errorCode: null,
       chainId,
       networkName: hre.network.name,
-      blockNumber: receipt ? Number(receipt.blockNumber) : null
+      blockNumber: receipt ? Number(receipt.blockNumber) : null,
+      distribution: token ? {
+        distributed: true,
+        vaultBeforeAtomic: vaultBalanceBefore.toString(),
+        vaultAfterAtomic: vaultBalanceAfter.toString(),
+        vaultDeltaAtomic: (vaultBalanceAfter - vaultBalanceBefore).toString(),
+        recipients: request.recipients.map((recipient, index) => ({
+          walletAddress: recipient,
+          beforeAtomic: recipientBalancesBefore[index].toString(),
+          afterAtomic: recipientBalancesAfter[index].toString(),
+          deltaAtomic: (recipientBalancesAfter[index] - recipientBalancesBefore[index]).toString()
+        }))
+      } : {
+        distributed: false
+      }
     };
   } catch (error) {
     if (!isDuplicateSettlementError(error)) {

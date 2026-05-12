@@ -36,7 +36,7 @@ async function main() {
   const network = await hre.ethers.provider.getNetwork();
   const chainId = Number(network.chainId);
   const deployerAddress = await deployer.getAddress();
-  const treasury = process.env.ARC_SETTLEMENT_TREASURY || deployerAddress;
+  const settlementTreasuryRecipient = process.env.ARC_SETTLEMENT_TREASURY || deployerAddress;
 
   let paymentTokenAddress = process.env.ARC_SETTLEMENT_USDC_ADDRESS;
   const deployments = [];
@@ -51,16 +51,17 @@ async function main() {
     deployments.push(testToken.deployment);
   }
 
-  const signalRegistry = await deployContract("SignalRegistry");
-  const strategyAccess = await deployContract("StrategyAccess", [paymentTokenAddress, treasury]);
-  const performanceLedger = await deployContract("PerformanceLedger");
   const revenueSettlement = await deployContract("RevenueSettlement");
+  const signalRegistry = await deployContract("SignalRegistry");
+  const strategyAccessTreasury = revenueSettlement.deployment.address;
+  const strategyAccess = await deployContract("StrategyAccess", [paymentTokenAddress, strategyAccessTreasury]);
+  const performanceLedger = await deployContract("PerformanceLedger");
 
   deployments.push(
+    revenueSettlement.deployment,
     signalRegistry.deployment,
     strategyAccess.deployment,
-    performanceLedger.deployment,
-    revenueSettlement.deployment
+    performanceLedger.deployment
   );
 
   const exportedAt = new Date().toISOString();
@@ -69,7 +70,9 @@ async function main() {
     networkName: hre.network.name,
     deployer: deployerAddress,
     paymentToken: paymentTokenAddress,
-    treasury,
+    treasury: strategyAccessTreasury,
+    strategyAccessTreasury,
+    settlementTreasuryRecipient,
     deployedAtUtc: exportedAt,
     contracts: deployments.map((deployment) => ({
       chainId,

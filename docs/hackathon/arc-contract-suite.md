@@ -54,9 +54,10 @@ Contracts
   - supports explicit correction event path
   - emits `OutcomeRecorded` and `OutcomeCorrected`
 - `RevenueSettlement`
-  - event-only settlement journal for MVP
+  - settlement journal plus ERC20 payout distribution path
   - records settlement id, signal id, token, gross amount, recipients, bps
     shares, and timestamp
+  - can distribute held subscription revenue to configured recipients
   - rejects duplicate settlement ids
 - `TestUsdc`
   - local test ERC20 fixture only

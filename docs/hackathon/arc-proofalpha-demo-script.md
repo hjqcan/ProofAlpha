@@ -44,10 +44,11 @@ Show `subscriber-blocked.png` and `access-denied.json`.
 ### 1:35 - User Subscribes With USDC/Testnet Token
 
 "The demo subscription uses a local Hardhat USDC-style token and
-`StrategyAccess`. The subscription event is mirrored into ProofAlpha
-entitlement state."
+`StrategyAccess`. The PaperAutotrade subscription event is mirrored into
+ProofAlpha entitlement state."
 
-Show `subscription.json`, then `access-allowed.json`.
+Show `subscription.json`, then `access-allowed.json` and
+`autotrade-permission.json`.
 
 ### 2:05 - Signal Proof Published To Arc
 
@@ -73,9 +74,9 @@ Show `performance-ledger.png` and `performance-outcome.json`.
 
 ### 4:05 - Revenue Settlement Records Monetization
 
-"Finally the revenue path records a subscription-fee settlement split: 70% agent
-owner, 20% strategy author, and 10% platform. This is settlement evidence, not a
-claim that Arc settles Polymarket venue trades."
+"Finally the revenue path records and distributes a subscription-fee split: 70%
+agent owner, 20% strategy author, and 10% platform. This is agent-product
+monetization evidence, not a claim that Arc settles Polymarket venue trades."
 
 Show `revenue-settlement.png` and `revenue-settlement.json`.
 

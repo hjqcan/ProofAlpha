@@ -67,7 +67,7 @@ contract StrategyAccess {
         uint64 durationSeconds,
         bool active
     ) external onlyOwner {
-        if (planId == 0 || strategyKey == bytes32(0) || durationSeconds == 0) {
+        if (planId == 0 || strategyKey == bytes32(0) || price == 0 || durationSeconds == 0) {
             revert InvalidPlan();
         }
 

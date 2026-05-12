@@ -110,6 +110,7 @@ describe("ProofAlpha Arc contract suite", function () {
     expect(await token.balanceOf(treasury.address)).to.equal(price);
 
     await expectRevert(access.connect(subscriber).subscribe(ethers.id("wrong_strategy"), planId), "StrategyPlanMismatch");
+    await expectRevert(access.setPlan(2, strategyKey, 0, 1, true), "InvalidPlan");
     await expectRevert(access.connect(subscriber).setPlan(2, strategyKey, price, 1, true), "NotOwner");
     expect(await access.owner()).to.equal(deployer.address);
   });
@@ -136,17 +137,47 @@ describe("ProofAlpha Arc contract suite", function () {
     expect(corrected.realizedPnlBps).to.equal(-20n);
   });
 
-  it("RevenueSettlement records event-only settlement journals without duplicate ids", async function () {
+  it("RevenueSettlement records settlement journals and can distribute held USDC", async function () {
     const [, agent, platform, subscriber, token] = await ethers.getSigners();
     const settlement = await deploy("RevenueSettlement");
+    const testUsdc = await deploy("TestUsdc");
     const settlementId = ethers.id("settlement-1");
     const signalId = ethers.id("signal-1");
     const recipients = [agent.address, platform.address, subscriber.address];
     const shares = [7000, 2000, 1000];
+    const gross = ethers.parseUnits("10", 6);
 
-    await settlement.recordSettlement(settlementId, signalId, token.address, ethers.parseUnits("10", 6), recipients, shares);
+    await settlement.recordSettlement(settlementId, signalId, token.address, gross, recipients, shares);
     expect(await settlement.settlementRecorded(settlementId)).to.equal(true);
 
+    const distributedSettlementId = ethers.id("settlement-distributed");
+    await testUsdc.mint(await settlement.getAddress(), gross);
+    await settlement.recordAndDistributeSettlement(
+      distributedSettlementId,
+      signalId,
+      await testUsdc.getAddress(),
+      gross,
+      recipients,
+      shares
+    );
+    expect(await testUsdc.balanceOf(agent.address)).to.equal(ethers.parseUnits("7", 6));
+    expect(await testUsdc.balanceOf(platform.address)).to.equal(ethers.parseUnits("2", 6));
+    expect(await testUsdc.balanceOf(subscriber.address)).to.equal(ethers.parseUnits("1", 6));
+    expect(await testUsdc.balanceOf(await settlement.getAddress())).to.equal(0n);
+    expect(await settlement.settlementRecorded(distributedSettlementId)).to.equal(true);
+
+    await expectRevert(
+      settlement.recordSettlement(ethers.id("settlement-empty-signal"), ethers.ZeroHash, token.address, 1, recipients, shares),
+      "EmptySignalId"
+    );
+    await expectRevert(
+      settlement.recordSettlement(ethers.id("settlement-zero-token"), signalId, ethers.ZeroAddress, 1, recipients, shares),
+      "ZeroToken"
+    );
+    await expectRevert(
+      settlement.recordSettlement(ethers.id("settlement-zero-gross"), signalId, token.address, 0, recipients, shares),
+      "ZeroGrossAmount"
+    );
     await expectRevert(
       settlement.recordSettlement(settlementId, signalId, token.address, ethers.parseUnits("10", 6), recipients, shares),
       "DuplicateSettlement"

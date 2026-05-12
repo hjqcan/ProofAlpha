@@ -548,9 +548,9 @@ async function resolveApiPayload(url, request) {
     const body = wallet === unlockedWallet.toLowerCase()
       ? {
           status: 'Accepted',
-          message: 'Strategy dual_leg_arbitrage target state set to Running.',
+          message: `Strategy ${strategyKey} target state set to Running.`,
           accessDecision: allowedDecision('arc-paper-autotrade', strategyKey, 'RequestPaperAutoTrade'),
-          command: { status: 'Accepted', commandMode: 'paper', message: 'Strategy dual_leg_arbitrage target state set to Running.', snapshot }
+          command: { status: 'Accepted', commandMode: 'paper', message: `Strategy ${strategyKey} target state set to Running.`, snapshot }
         }
       : {
           status: 'AccessDenied',

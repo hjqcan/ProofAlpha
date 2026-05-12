@@ -16,11 +16,17 @@ public sealed record ArcSettlementOptions
 
     public string SignalPublicationStorePath { get; init; } = "artifacts/arc-settlement/signals.json";
 
+    public string EntitlementMirrorStorePath { get; init; } = "artifacts/arc-settlement/entitlements.json";
+
     public ArcSettlementContractsOptions Contracts { get; init; } = new();
 
     public ArcSettlementWalletOptions Wallet { get; init; } = new();
 
     public ArcSettlementEvmPublisherOptions EvmPublisher { get; init; } = new();
+
+    public ArcSettlementSignalProofOptions SignalProof { get; init; } = new();
+
+    public IReadOnlyList<ArcSettlementSubscriptionPlanOptions> SubscriptionPlans { get; init; } = [];
 }
 
 public sealed record ArcSettlementContractsOptions
@@ -49,4 +55,44 @@ public sealed record ArcSettlementEvmPublisherOptions
     public string NetworkName { get; init; } = "localhost";
 
     public int RequestTimeoutSeconds { get; init; } = 120;
+}
+
+public sealed record ArcSettlementSignalProofOptions
+{
+    public string AgentAddress { get; init; } = string.Empty;
+
+    public string Venue { get; init; } = "polymarket";
+
+    public string OpportunityStrategyId { get; init; } = "llm_opportunity";
+
+    public int DecisionValidForMinutes { get; init; } = 30;
+
+    public string DefaultRiskTier { get; init; } = "paper";
+}
+
+public sealed record ArcSettlementSubscriptionPlanOptions
+{
+    public int PlanId { get; init; }
+
+    public string StrategyKey { get; init; } = string.Empty;
+
+    public string PlanName { get; init; } = string.Empty;
+
+    public string Tier { get; init; } = string.Empty;
+
+    public decimal PriceUsdc { get; init; }
+
+    public int DurationDays { get; init; }
+
+    public long DurationSeconds { get; init; }
+
+    public IReadOnlyList<string> Permissions { get; init; } = [];
+
+    public int? MaxMarkets { get; init; }
+
+    public bool AutoTradingAllowed { get; init; }
+
+    public bool LiveTradingAllowed { get; init; }
+
+    public DateTimeOffset? CreatedAtUtc { get; init; }
 }

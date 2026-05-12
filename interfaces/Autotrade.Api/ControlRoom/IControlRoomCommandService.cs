@@ -12,6 +12,11 @@ public interface IControlRoomCommandService
         SetStrategyStateRequest request,
         CancellationToken cancellationToken = default);
 
+    Task<ArcPaperAutoTradeResponse> RequestArcPaperAutoTradeAsync(
+        string strategyId,
+        ArcPaperAutoTradeRequest request,
+        CancellationToken cancellationToken = default);
+
     Task<ControlRoomCommandResponse> SetKillSwitchAsync(
         SetKillSwitchRequest request,
         CancellationToken cancellationToken = default);

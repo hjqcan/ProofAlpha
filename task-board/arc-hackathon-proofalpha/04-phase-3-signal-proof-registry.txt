@@ -3,7 +3,18 @@ Phase 3: Signal Proof Registry
 
 Status
 ------
-[TODO]
+[DONE]
+
+Current verified state:
+
+- canonical signal proof publication path is implemented
+- source-driven proof publication is implemented for approved opportunities and
+  strategy decisions
+- local publication records are persisted and idempotent
+- disabled Arc mode records explicit skipped state and does not write chain
+- Hardhat-backed EVM publisher path is implemented
+- local in-process Hardhat demo publishes `SignalPublished`
+- CLI and API expose publication records and source-driven publish commands
 
 
 Intent
@@ -31,7 +42,7 @@ Out of Scope
 
 Tasks
 -----
-[TODO] AH-P3-T001 Implement local signal publication entity.
+[DONE] AH-P3-T001 Implement local signal publication entity.
 
 Fields:
 
@@ -52,7 +63,7 @@ Fields:
 - createdAtUtc
 - publishedAtUtc
 
-[TODO] AH-P3-T002 Implement publication statuses.
+[DONE] AH-P3-T002 Implement publication statuses.
 
 Statuses:
 
@@ -64,7 +75,7 @@ Statuses:
 - `Duplicate`
 - `RejectedUnsafe`
 
-[TODO] AH-P3-T003 Implement `IArcSignalPublisher`.
+[DONE] AH-P3-T003 Implement `IArcSignalPublisher`.
 
 Rules:
 
@@ -75,14 +86,16 @@ Rules:
 - store transaction hash
 - return explorer URL when configured
 
-[TODO] AH-P3-T004 Connect OpportunityDiscovery source.
+[DONE] AH-P3-T004 Connect OpportunityDiscovery source.
 
 - Only `Approved` or `Published` opportunities can become public trade-ready
   signals.
 - Include evidence ids and compiled policy hash.
 - Include valid-until check.
+- CLI and API can resolve `--source opportunity --id <guid>` without requiring
+  `--proof-file`.
 
-[TODO] AH-P3-T005 Connect StrategyDecision source.
+[DONE] AH-P3-T005 Connect StrategyDecision source.
 
 - Allow publishing a selected strategy decision only if it has:
   - market id
@@ -90,27 +103,38 @@ Rules:
   - decision context
   - risk envelope
   - non-empty reasoning/context hash
+- Generated proof derives reasoning/context hash and risk envelope hash from
+  the decision context.
+- CLI and API can resolve `--source decision --id <guid>` without requiring
+  `--proof-file`.
 
-[TODO] AH-P3-T006 Add CLI commands.
+[DONE] AH-P3-T006 Add CLI commands.
 
 Commands:
 
 ```powershell
-dotnet run --project .\interfaces\Autotrade.Cli\Autotrade.Cli.csproj -- arc signal publish --source opportunity --id <guid>
-dotnet run --project .\interfaces\Autotrade.Cli\Autotrade.Cli.csproj -- arc signal publish --source decision --id <guid>
+dotnet run --project .\interfaces\Autotrade.Cli\Autotrade.Cli.csproj -- arc signal publish --source opportunity --id <guid> --actor <actor> --reason <reason>
+dotnet run --project .\interfaces\Autotrade.Cli\Autotrade.Cli.csproj -- arc signal publish --source decision --id <guid> --actor <actor> --reason <reason>
 dotnet run --project .\interfaces\Autotrade.Cli\Autotrade.Cli.csproj -- arc signal list --limit 20
-dotnet run --project .\interfaces\Autotrade.Cli\Autotrade.Cli.csproj -- arc signal show --id <signal-id>
+dotnet run --project .\interfaces\Autotrade.Cli\Autotrade.Cli.csproj -- arc signal show --signal-id <signal-id>
 ```
 
-[TODO] AH-P3-T007 Add API endpoints.
+Canonical proof-file publication remains available as an explicit fallback:
+
+```powershell
+dotnet run --project .\interfaces\Autotrade.Cli\Autotrade.Cli.csproj -- arc signal publish --proof-file <path> --source opportunity --id <id> --actor <actor> --reason <reason>
+```
+
+[DONE] AH-P3-T007 Add API endpoints.
 
 - `GET /api/arc/signals`
 - `GET /api/arc/signals/{signalId}`
 - `POST /api/arc/signals/publish`
+- `POST /api/arc/signals/publish-source`
 
 Post command requires actor/reason.
 
-[TODO] AH-P3-T008 Add tests.
+[DONE] AH-P3-T008 Add tests.
 
 - disabled mode returns skipped result
 - duplicate source is idempotent
@@ -118,6 +142,10 @@ Post command requires actor/reason.
 - unreviewed opportunity rejected
 - transaction hash persisted
 - API returns no secrets
+- opportunity source proof resolver builds proof from local opportunity,
+  evidence ids, and compiled policy hash
+- strategy decision source proof resolver builds proof from decision context
+- source resolution errors are surfaced as explicit CLI/API errors
 
 
 Acceptance Criteria
@@ -133,5 +161,23 @@ Evidence
 --------
 - `artifacts/arc-hackathon/demo-run/signal-proof.json`
 - `artifacts/arc-hackathon/demo-run/signal-publication.json`
-- tx hash for `SignalPublished`
+- tx hash for `SignalPublished`:
+  `0x1ee470dbf1da6fe37598a596857655d7c6a97d41290d606c3a59d986a222d31c`
 
+Verified commands:
+
+```powershell
+dotnet restore Autotrade.sln
+dotnet test context\ArcSettlement\Autotrade.ArcSettlement.Tests\Autotrade.ArcSettlement.Tests.csproj --no-restore -v minimal
+dotnet test interfaces\Autotrade.Api.Tests\Autotrade.Api.Tests.csproj --no-restore -v minimal
+dotnet test Autotrade.sln --no-build -v minimal
+dotnet build Autotrade.sln --no-restore -v minimal
+dotnet build interfaces\Autotrade.Cli\Autotrade.Cli.csproj --no-restore -v minimal
+npm run build
+npm test
+npm run demo:signal
+dotnet run --no-build --project interfaces\Autotrade.Cli\Autotrade.Cli.csproj -- arc signal publish --help
+dotnet run --no-build --project interfaces\Autotrade.Cli\Autotrade.Cli.csproj -- --json arc signal publish --source opportunity --id not-a-guid --actor codex --reason "phase 3 invalid native source smoke"
+dotnet run --no-build --project interfaces\Autotrade.Cli\Autotrade.Cli.csproj -- --json arc signal publish --proof-file D:\workspace\ProofAlpha\artifacts\arc-hackathon\demo-run\signal-proof.json --source opportunity --id demo-opportunity-arc-phase-3 --status Approved --actor codex --reason "phase 3 proof-file regression"
+dotnet run --no-build --project interfaces\Autotrade.Cli\Autotrade.Cli.csproj -- --json arc signal list --limit 5
+```

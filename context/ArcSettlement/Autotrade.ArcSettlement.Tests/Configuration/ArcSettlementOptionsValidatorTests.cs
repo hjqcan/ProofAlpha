@@ -41,6 +41,10 @@ public sealed class ArcSettlementOptionsValidatorTests
             Wallet = new ArcSettlementWalletOptions
             {
                 PrivateKeyEnvironmentVariable = "ARC_SETTLEMENT_PRIVATE_KEY"
+            },
+            SignalProof = new ArcSettlementSignalProofOptions
+            {
+                AgentAddress = "0x9999999999999999999999999999999999999999"
             }
         };
 
@@ -63,6 +67,47 @@ public sealed class ArcSettlementOptionsValidatorTests
         Assert.Empty(result.Errors);
     }
 
+    [Fact]
+    public void EnabledReadConfig_ValidatesConfiguredSubscriptionPlans()
+    {
+        var validator = new ArcSettlementOptionsValidator(new StaticSecretSource(hasSecret: false));
+        var options = CreateValidEnabledOptions() with
+        {
+            SubscriptionPlans =
+            [
+                new ArcSettlementSubscriptionPlanOptions
+                {
+                    PlanId = 1,
+                    StrategyKey = "",
+                    Tier = "SignalViewer",
+                    PriceUsdc = -1m,
+                    DurationDays = 0,
+                    DurationSeconds = 0,
+                    Permissions = ["ViewSignals", "UnknownPermission"]
+                },
+                new ArcSettlementSubscriptionPlanOptions
+                {
+                    PlanId = 1,
+                    StrategyKey = "repricing_lag_arbitrage",
+                    Tier = "",
+                    PriceUsdc = 10m,
+                    DurationDays = 7,
+                    Permissions = ["ViewSignals"]
+                }
+            ]
+        };
+
+        var result = validator.Validate(options, ArcSettlementOptionsValidationMode.ReadOnly);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.Contains("StrategyKey is required", StringComparison.Ordinal));
+        Assert.Contains(result.Errors, error => error.Contains("PriceUsdc cannot be negative", StringComparison.Ordinal));
+        Assert.Contains(result.Errors, error => error.Contains("DurationSeconds or DurationDays", StringComparison.Ordinal));
+        Assert.Contains(result.Errors, error => error.Contains("UnknownPermission", StringComparison.Ordinal));
+        Assert.Contains(result.Errors, error => error.Contains("PlanId must be unique", StringComparison.Ordinal));
+        Assert.Contains(result.Errors, error => error.Contains("Tier is required", StringComparison.Ordinal));
+    }
+
     private static ArcSettlementOptions CreateValidEnabledOptions()
         => new()
         {
@@ -80,6 +125,10 @@ public sealed class ArcSettlementOptionsValidatorTests
             Wallet = new ArcSettlementWalletOptions
             {
                 PrivateKeyEnvironmentVariable = "ARC_SETTLEMENT_PRIVATE_KEY"
+            },
+            SignalProof = new ArcSettlementSignalProofOptions
+            {
+                AgentAddress = "0x9999999999999999999999999999999999999999"
             }
         };
 

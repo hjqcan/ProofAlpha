@@ -1,4 +1,5 @@
 using Autotrade.Api.ControlRoom;
+using Microsoft.AspNetCore.Http;
 using Autotrade.Trading.Application.Contract.Execution;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,6 +12,8 @@ public sealed class ControlRoomController(
     IControlRoomMarketDataService marketDataService,
     IControlRoomCommandService commandService) : ControllerBase
 {
+    private const string ArcWalletHeaderName = "X-Arc-Wallet";
+
     [HttpGet("snapshot")]
     public async Task<ActionResult<ControlRoomSnapshotResponse>> GetSnapshot(CancellationToken cancellationToken)
     {
@@ -92,6 +95,30 @@ public sealed class ControlRoomController(
             .ConfigureAwait(false);
 
         return Accepted(response);
+    }
+
+    [HttpPost("strategies/{strategyId}/arc-paper-autotrade")]
+    public async Task<ActionResult<ArcPaperAutoTradeResponse>> RequestArcPaperAutoTrade(
+        string strategyId,
+        [FromBody] ArcPaperAutoTradeRequest request,
+        [FromQuery] string? walletAddress,
+        CancellationToken cancellationToken)
+    {
+        var response = await commandService
+            .RequestArcPaperAutoTradeAsync(
+                strategyId,
+                request with { WalletAddress = ResolveArcWalletAddress(walletAddress, request.WalletAddress) },
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return response.Status switch
+        {
+            "Accepted" => Accepted(response),
+            "AccessDenied" => StatusCode(StatusCodes.Status403Forbidden, response),
+            "StrategyNotFound" => NotFound(response),
+            "Disabled" or "LiveTradingBlocked" or "Unsupported" => Conflict(response),
+            _ => BadRequest(response)
+        };
     }
 
     [HttpPost("risk/kill-switch")]
@@ -178,5 +205,22 @@ public sealed class ControlRoomController(
             .ConfigureAwait(false);
 
         return Accepted(response);
+    }
+
+    private string? ResolveArcWalletAddress(string? queryWalletAddress, string? bodyWalletAddress)
+    {
+        if (!string.IsNullOrWhiteSpace(queryWalletAddress))
+        {
+            return queryWalletAddress;
+        }
+
+        if (!string.IsNullOrWhiteSpace(bodyWalletAddress))
+        {
+            return bodyWalletAddress;
+        }
+
+        return ControllerContext.HttpContext?.Request.Headers.TryGetValue(ArcWalletHeaderName, out var header) == true
+            ? header.ToString()
+            : null;
     }
 }

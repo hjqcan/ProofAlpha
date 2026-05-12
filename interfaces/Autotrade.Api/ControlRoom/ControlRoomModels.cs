@@ -1,3 +1,4 @@
+using Autotrade.ArcSettlement.Application.Contract.Access;
 using Autotrade.Strategy.Application.Contract.Strategies;
 using Autotrade.Trading.Application.Contract.Execution;
 
@@ -229,6 +230,18 @@ public sealed record SetStrategyStateRequest(
     string? ReasonCode = null,
     string? Reason = null,
     string? ConfirmationText = null);
+
+public sealed record ArcPaperAutoTradeRequest(
+    string? WalletAddress = null,
+    string? Actor = null,
+    string? Reason = null,
+    string? ConfirmationText = null);
+
+public sealed record ArcPaperAutoTradeResponse(
+    string Status,
+    string Message,
+    ArcAccessDecision AccessDecision,
+    ControlRoomCommandResponse? Command = null);
 
 public sealed record SetKillSwitchRequest(
     bool Active,

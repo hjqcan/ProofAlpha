@@ -813,8 +813,9 @@ accountCommand.Add(accountSyncCommand);
 
 var arcCommand = new Command("arc", "Arc settlement and proof commands");
 var arcSignalCommand = new Command("signal", "Arc signal proof publication commands");
+var arcAccessCommand = new Command("access", "Arc subscription and entitlement commands");
 
-var arcSignalProofFileOption = CreateRequiredOption<FileInfo>("--proof-file", "Canonical Arc signal proof JSON file");
+var arcSignalProofFileOption = CreateOption<FileInfo?>("--proof-file", "Canonical Arc signal proof JSON file; omit to resolve --source/--id from local data");
 var arcSignalSourceOption = CreateRequiredOption<string>("--source", "Source type: opportunity or decision");
 var arcSignalIdOption = CreateRequiredOption<string>("--id", "Opportunity ID or strategy decision ID");
 var arcSignalStatusOption = CreateOptionWithDefault("--status", "Approved", "Source review status");
@@ -823,6 +824,12 @@ var arcSignalReasonOption = CreateRequiredOption<string>("--reason", "Audit reas
 var arcSignalSourcePolicyHashOption = CreateOption<string?>("--source-policy-hash", "Optional compiled source policy hash");
 var arcSignalLimitOption = CreateOptionWithDefault("--limit", 20, "Maximum records to return");
 var arcSignalSignalIdOption = CreateRequiredOption<string>("--signal-id", "Arc signal ID");
+var arcAccessWalletOption = CreateRequiredOption<string>("--wallet", "Arc wallet address");
+var arcAccessStrategyOption = CreateRequiredOption<string>("--strategy", "Strategy key");
+var arcAccessPlanIdOption = CreateRequiredOption<int>("--plan-id", "Subscription plan id");
+var arcAccessTxHashOption = CreateRequiredOption<string>("--tx-hash", "StrategySubscribed transaction hash");
+var arcAccessExpiresAtOption = CreateRequiredOption<DateTimeOffset>("--expires-at", "Subscription expiry time in UTC");
+var arcAccessBlockOption = CreateOption<long?>("--block", "Source block number");
 
 var arcSignalPublishCommand = new Command("publish", "Publish a reviewed signal proof to Arc settlement");
 arcSignalPublishCommand.Add(arcSignalProofFileOption);
@@ -836,7 +843,7 @@ SetAction(arcSignalPublishCommand, async pr =>
 {
     var options = CreateGlobalOptions(pr);
     var resolvedConfigPath = ResolveConfigPathFromParse(pr);
-    var proofFile = pr.GetRequiredValue(arcSignalProofFileOption);
+    var proofFile = pr.GetValue(arcSignalProofFileOption);
     var source = pr.GetRequiredValue(arcSignalSourceOption);
     var sourceId = pr.GetRequiredValue(arcSignalIdOption);
     var status = pr.GetValue(arcSignalStatusOption) ?? "Approved";
@@ -845,7 +852,7 @@ SetAction(arcSignalPublishCommand, async pr =>
     var sourcePolicyHash = pr.GetValue(arcSignalSourcePolicyHashOption);
     return await CommandAuditService.ExecuteWithAuditAsync(
             "arc signal publish",
-            new { source, sourceId, status, actor, proofFile = proofFile.FullName },
+            new { source, sourceId, status, actor, proofFile = proofFile?.FullName },
             resolvedConfigPath,
             host => ArcSignalCommands.PublishAsync(
                 CreateContext(host, options),
@@ -892,7 +899,74 @@ SetAction(arcSignalShowCommand, async pr =>
 arcSignalCommand.Add(arcSignalPublishCommand);
 arcSignalCommand.Add(arcSignalListCommand);
 arcSignalCommand.Add(arcSignalShowCommand);
+
+var arcAccessPlansCommand = new Command("plans", "List Arc subscription plans");
+SetAction(arcAccessPlansCommand, async pr =>
+{
+    var options = CreateGlobalOptions(pr);
+    var resolvedConfigPath = ResolveConfigPathFromParse(pr);
+    return await CommandAuditService.ExecuteWithAuditAsync(
+            "arc access plans",
+            new { },
+            resolvedConfigPath,
+            host => ArcAccessCommands.PlansAsync(CreateContext(host, options)))
+        .ConfigureAwait(false);
+});
+
+var arcAccessStatusCommand = new Command("status", "Show Arc access status for a wallet and strategy");
+arcAccessStatusCommand.Add(arcAccessWalletOption);
+arcAccessStatusCommand.Add(arcAccessStrategyOption);
+SetAction(arcAccessStatusCommand, async pr =>
+{
+    var options = CreateGlobalOptions(pr);
+    var resolvedConfigPath = ResolveConfigPathFromParse(pr);
+    var wallet = pr.GetRequiredValue(arcAccessWalletOption);
+    var strategy = pr.GetRequiredValue(arcAccessStrategyOption);
+    return await CommandAuditService.ExecuteWithAuditAsync(
+            "arc access status",
+            new { wallet, strategy },
+            resolvedConfigPath,
+            host => ArcAccessCommands.StatusAsync(CreateContext(host, options), wallet, strategy))
+        .ConfigureAwait(false);
+});
+
+var arcAccessSyncCommand = new Command("sync", "Ingest a known StrategySubscribed transaction into the local access mirror");
+arcAccessSyncCommand.Add(arcAccessWalletOption);
+arcAccessSyncCommand.Add(arcAccessStrategyOption);
+arcAccessSyncCommand.Add(arcAccessPlanIdOption);
+arcAccessSyncCommand.Add(arcAccessTxHashOption);
+arcAccessSyncCommand.Add(arcAccessExpiresAtOption);
+arcAccessSyncCommand.Add(arcAccessBlockOption);
+SetAction(arcAccessSyncCommand, async pr =>
+{
+    var options = CreateGlobalOptions(pr);
+    var resolvedConfigPath = ResolveConfigPathFromParse(pr);
+    var wallet = pr.GetRequiredValue(arcAccessWalletOption);
+    var strategy = pr.GetRequiredValue(arcAccessStrategyOption);
+    var planId = pr.GetRequiredValue(arcAccessPlanIdOption);
+    var txHash = pr.GetRequiredValue(arcAccessTxHashOption);
+    var expiresAt = pr.GetRequiredValue(arcAccessExpiresAtOption);
+    var block = pr.GetValue(arcAccessBlockOption);
+    return await CommandAuditService.ExecuteWithAuditAsync(
+            "arc access sync",
+            new { wallet, strategy, planId, txHash, expiresAt, block },
+            resolvedConfigPath,
+            host => ArcAccessCommands.SyncAsync(
+                CreateContext(host, options),
+                wallet,
+                strategy,
+                planId,
+                txHash,
+                expiresAt,
+                block))
+        .ConfigureAwait(false);
+});
+
+arcAccessCommand.Add(arcAccessPlansCommand);
+arcAccessCommand.Add(arcAccessStatusCommand);
+arcAccessCommand.Add(arcAccessSyncCommand);
 arcCommand.Add(arcSignalCommand);
+arcCommand.Add(arcAccessCommand);
 
 // ============================================================================
 // 注册所有命令

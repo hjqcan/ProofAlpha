@@ -3,7 +3,23 @@ Phase 4: USDC Subscription and Entitlements
 
 Status
 ------
-[TODO]
+[DONE]
+
+Current verified state:
+
+- StrategyAccess deployment config exists under `ArcSettlement:Contracts`.
+- local Arc deployment artifact includes `paymentToken` for local TestUsdc.
+- backend subscription plan config is bound and validated.
+- entitlement mirror/access contracts are implemented in ArcSettlement.
+- JSON-file entitlement mirror store is registered for local/demo operation.
+- access reader returns active, expired, missing-wallet, invalid-wallet,
+  missing-strategy, not-found, and disabled states.
+- manual known-transaction sync can ingest a `StrategySubscribed` tx hash into
+  the mirror with wallet/strategy/plan/expiry/block audit fields.
+- CLI exposes `arc access plans`, `arc access status`, and `arc access sync`.
+- API exposes plans, access status, and sync endpoints.
+- local EVM demo produces `StrategySubscribed` evidence.
+- entitlement status artifact shows active access and `canViewSignals: true`.
 
 
 Intent
@@ -59,13 +75,13 @@ Permissions:
 
 Tasks
 -----
-[TODO] AH-P4-T001 Implement `StrategyAccess` deployment config.
+[DONE] AH-P4-T001 Implement `StrategyAccess` deployment config.
 
 - Store contract address in `ArcSettlement:Contracts:StrategyAccess`.
 - Store USDC/test token address in deployment artifact.
 - Never hardcode private key.
 
-[TODO] AH-P4-T002 Add backend subscription plan config.
+[DONE] AH-P4-T002 Add backend subscription plan config.
 
 Example:
 
@@ -86,7 +102,7 @@ Example:
 }
 ```
 
-[TODO] AH-P4-T003 Implement entitlement domain model.
+[DONE] AH-P4-T003 Implement entitlement domain model.
 
 Entities:
 
@@ -105,7 +121,7 @@ Mirror fields:
 - sourceTransactionHash
 - syncedAtUtc
 
-[TODO] AH-P4-T004 Implement access reader.
+[DONE] AH-P4-T004 Implement access reader.
 
 Interface:
 
@@ -119,7 +135,7 @@ public interface IArcStrategyAccessReader
 }
 ```
 
-[TODO] AH-P4-T005 Implement subscription sync.
+[DONE] AH-P4-T005 Implement subscription sync.
 
 MVP options:
 
@@ -134,23 +150,23 @@ Sync must:
 - record source block/tx
 - handle expired subscription
 
-[TODO] AH-P4-T006 Add CLI commands.
+[DONE] AH-P4-T006 Add CLI commands.
 
 Commands:
 
 ```powershell
 autotrade arc access plans
 autotrade arc access status --wallet <address> --strategy two_leg_arbitrage
-autotrade arc access sync --wallet <address> --strategy two_leg_arbitrage
+autotrade arc access sync --wallet <address> --strategy two_leg_arbitrage --plan-id 1 --tx-hash <tx> --expires-at <utc> [--block <number>]
 ```
 
-[TODO] AH-P4-T007 Add API endpoints.
+[DONE] AH-P4-T007 Add API endpoints.
 
 - `GET /api/arc/access/plans`
 - `GET /api/arc/access/{walletAddress}/{strategyKey}`
 - `POST /api/arc/access/sync`
 
-[TODO] AH-P4-T008 Add tests.
+[DONE] AH-P4-T008 Add tests.
 
 - expired access denied
 - active access allowed
@@ -173,5 +189,22 @@ Evidence
 --------
 - `artifacts/arc-hackathon/demo-run/subscription.json`
 - `artifacts/arc-hackathon/demo-run/entitlement-status.json`
-- tx hash for `StrategySubscribed`
+- tx hash for `StrategySubscribed`:
+  `0xf5f60a2de3f184f38ed7b66b919d8f5056c0025f8a70ab9baad9d535b7b6c28d`
 
+Verified commands:
+
+```powershell
+dotnet test context\ArcSettlement\Autotrade.ArcSettlement.Tests\Autotrade.ArcSettlement.Tests.csproj --no-restore -v minimal
+dotnet test interfaces\Autotrade.Api.Tests\Autotrade.Api.Tests.csproj --no-restore -v minimal
+dotnet build interfaces\Autotrade.Cli\Autotrade.Cli.csproj --no-restore -v minimal
+npm run build
+npm test
+$env:ARC_SUBSCRIPTION_DEMO_OUTPUT='D:\workspace\ProofAlpha\artifacts\arc-hackathon\demo-run\subscription.json'; npm run demo:subscription; Remove-Item Env:ARC_SUBSCRIPTION_DEMO_OUTPUT
+dotnet run --no-build --project interfaces\Autotrade.Cli\Autotrade.Cli.csproj -- arc access --help
+dotnet run --no-build --project interfaces\Autotrade.Cli\Autotrade.Cli.csproj -- --json arc access plans
+dotnet run --no-build --project interfaces\Autotrade.Cli\Autotrade.Cli.csproj -- --json arc access status --wallet 0x1234567890abcdef1234567890abcdef12345678 --strategy repricing_lag_arbitrage
+dotnet run --no-build --project interfaces\Autotrade.Cli\Autotrade.Cli.csproj -- --json arc access sync --wallet 0x1234567890abcdef1234567890abcdef12345678 --strategy repricing_lag_arbitrage --plan-id 1 --tx-hash not-a-tx --expires-at 2026-05-19T00:00:00Z
+dotnet run --no-build --project interfaces\Autotrade.Cli\Autotrade.Cli.csproj -- --config D:\workspace\ProofAlpha\artifacts\arc-hackathon\demo-run\arc-phase4-cli.config.json --json arc access sync --wallet 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 --strategy repricing_lag_arbitrage --plan-id 1 --tx-hash 0xf5f60a2de3f184f38ed7b66b919d8f5056c0025f8a70ab9baad9d535b7b6c28d --expires-at 2026-05-18T23:17:38.000Z --block 6
+dotnet run --no-build --project interfaces\Autotrade.Cli\Autotrade.Cli.csproj -- --config D:\workspace\ProofAlpha\artifacts\arc-hackathon\demo-run\arc-phase4-cli.config.json --json arc access status --wallet 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 --strategy repricing_lag_arbitrage
+```

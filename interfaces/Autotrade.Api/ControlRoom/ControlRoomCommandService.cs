@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using Autotrade.ArcSettlement.Application.Contract.Access;
 using Autotrade.Strategy.Application.Audit;
 using Autotrade.Strategy.Application.Contract.Strategies;
 using Autotrade.Strategy.Application.Engine;
@@ -123,6 +124,138 @@ public sealed class ControlRoomCommandService(
             $"Strategy {strategyId} target state set to {state}.",
             success: true,
             exitCode: 0,
+            stopwatch,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<ArcPaperAutoTradeResponse> RequestArcPaperAutoTradeAsync(
+        string strategyId,
+        ArcPaperAutoTradeRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        ArgumentException.ThrowIfNullOrWhiteSpace(strategyId);
+        ArgumentNullException.ThrowIfNull(request);
+        var actor = ResolveActor(request.Actor);
+        var commandMode = options.CurrentValue.EffectiveCommandMode;
+        var audit = BuildArcPaperAutoTradeAudit(strategyId, request, actor, commandMode);
+
+        var accessDecisionService = serviceProvider.GetService<IArcAccessDecisionService>();
+        if (accessDecisionService is null)
+        {
+            return await BuildArcPaperAutoTradeResponseAsync(
+                audit,
+                actor,
+                "Unsupported",
+                "Arc access decision service is unavailable. Enable AutotradeApi:EnableModules and ArcSettlement services.",
+                CreateFallbackDecision(strategyId, request.WalletAddress, "ARC_ACCESS_UNAVAILABLE"),
+                command: null,
+                success: false,
+                exitCode: 2,
+                stopwatch,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        var decision = await accessDecisionService
+            .EvaluateAsync(
+                new ArcAccessDecisionRequest(
+                    request.WalletAddress,
+                    strategyId,
+                    ArcEntitlementPermission.RequestPaperAutoTrade,
+                    "arc-paper-autotrade",
+                    strategyId),
+                cancellationToken)
+            .ConfigureAwait(false);
+        AddAccessDecisionAudit(audit, decision);
+
+        if (!decision.Allowed)
+        {
+            return await BuildArcPaperAutoTradeResponseAsync(
+                audit,
+                actor,
+                "AccessDenied",
+                decision.Reason,
+                decision,
+                command: null,
+                success: false,
+                exitCode: 2,
+                stopwatch,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        if (!options.CurrentValue.AllowsControlCommands)
+        {
+            return await BuildArcPaperAutoTradeResponseAsync(
+                audit,
+                actor,
+                "Disabled",
+                "Control room commands are disabled by configuration or command mode.",
+                decision,
+                command: null,
+                success: false,
+                exitCode: 2,
+                stopwatch,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        if (string.Equals(commandMode, ControlRoomCommandModes.LiveServices, StringComparison.Ordinal))
+        {
+            return await BuildArcPaperAutoTradeResponseAsync(
+                audit,
+                actor,
+                "LiveTradingBlocked",
+                "Arc paper auto-trade permission cannot start a LiveServices command path.",
+                decision,
+                command: null,
+                success: false,
+                exitCode: 2,
+                stopwatch,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        var snapshot = await queryService.GetSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        var strategyExists = snapshot.Strategies.Any(
+            strategy => string.Equals(strategy.StrategyId, strategyId, StringComparison.OrdinalIgnoreCase));
+        audit["strategyExists"] = strategyExists;
+        if (!strategyExists)
+        {
+            return await BuildArcPaperAutoTradeResponseAsync(
+                audit,
+                actor,
+                "StrategyNotFound",
+                $"Strategy '{strategyId}' was not found in the control-room snapshot.",
+                decision,
+                command: null,
+                success: false,
+                exitCode: 2,
+                stopwatch,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        var command = await SetStrategyStateAsync(
+                strategyId,
+                new SetStrategyStateRequest(
+                    "Running",
+                    actor,
+                    "ARC_PAPER_AUTOTRADE",
+                    string.IsNullOrWhiteSpace(request.Reason)
+                        ? "Arc subscription authorized paper auto-trade request."
+                        : request.Reason,
+                    request.ConfirmationText),
+                cancellationToken)
+            .ConfigureAwait(false);
+        audit["stateCommandStatus"] = command.Status;
+        audit["stateCommandMessage"] = command.Message;
+
+        return await BuildArcPaperAutoTradeResponseAsync(
+            audit,
+            actor,
+            command.Status,
+            command.Message,
+            decision,
+            command,
+            success: string.Equals(command.Status, "Accepted", StringComparison.Ordinal),
+            exitCode: string.Equals(command.Status, "Accepted", StringComparison.Ordinal) ? 0 : 1,
             stopwatch,
             cancellationToken).ConfigureAwait(false);
     }
@@ -791,6 +924,77 @@ public sealed class ControlRoomCommandService(
             ["errorMessage"] = errorMessage
         };
     }
+
+    private async Task<ArcPaperAutoTradeResponse> BuildArcPaperAutoTradeResponseAsync(
+        Dictionary<string, object?> audit,
+        string actor,
+        string status,
+        string message,
+        ArcAccessDecision decision,
+        ControlRoomCommandResponse? command,
+        bool success,
+        int exitCode,
+        Stopwatch stopwatch,
+        CancellationToken cancellationToken)
+    {
+        stopwatch.Stop();
+        audit["outcome"] = status;
+        audit["durationMs"] = stopwatch.ElapsedMilliseconds;
+
+        await LogAuditAsync(
+            "arc paper autotrade permission",
+            audit,
+            actor,
+            success,
+            exitCode,
+            stopwatch.ElapsedMilliseconds,
+            cancellationToken).ConfigureAwait(false);
+
+        return new ArcPaperAutoTradeResponse(status, message, decision, command);
+    }
+
+    private static Dictionary<string, object?> BuildArcPaperAutoTradeAudit(
+        string strategyId,
+        ArcPaperAutoTradeRequest request,
+        string actor,
+        string commandMode)
+        => new()
+        {
+            ["source"] = "control-room-api",
+            ["actor"] = actor,
+            ["commandMode"] = commandMode,
+            ["strategyId"] = strategyId,
+            ["walletAddress"] = request.WalletAddress,
+            ["requiredPermission"] = ArcEntitlementPermission.RequestPaperAutoTrade.ToString(),
+            ["reason"] = request.Reason,
+            ["confirmationProvided"] = !string.IsNullOrWhiteSpace(request.ConfirmationText),
+            ["targetState"] = StrategyState.Running.ToString()
+        };
+
+    private static void AddAccessDecisionAudit(
+        Dictionary<string, object?> audit,
+        ArcAccessDecision decision)
+    {
+        audit["accessAllowed"] = decision.Allowed;
+        audit["accessReasonCode"] = decision.ReasonCode;
+        audit["accessTier"] = decision.Tier;
+        audit["accessExpiresAtUtc"] = decision.ExpiresAtUtc?.ToString("O");
+        audit["accessEvidenceTransactionHash"] = decision.EvidenceTransactionHash;
+    }
+
+    private static ArcAccessDecision CreateFallbackDecision(
+        string strategyId,
+        string? walletAddress,
+        string reasonCode)
+        => new(
+            Allowed: false,
+            reasonCode,
+            "Arc access decision service is unavailable.",
+            ArcEntitlementPermission.RequestPaperAutoTrade,
+            strategyId,
+            walletAddress,
+            "arc-paper-autotrade",
+            strategyId);
 
     private async Task<ControlRoomCommandResponse> BuildCommandResponseAsync(
         string commandName,

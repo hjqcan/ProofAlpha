@@ -1,5 +1,7 @@
 using Autotrade.EventBus.Extensions;
+using Autotrade.ArcSettlement.Application.Contract.Signals;
 using Autotrade.ArcSettlement.Infra.CrossCutting.IoC;
+using Autotrade.Hosting.ArcSettlement;
 using Autotrade.Infra.BackgroundJobs.Core;
 using Autotrade.MarketData.Infra.BackgroundJobs;
 using Autotrade.MarketData.Infra.CrossCutting.IoC;
@@ -71,6 +73,14 @@ public static class AutotradeModuleServiceCollectionExtensions
         var modules = DefaultModules
             .Select(module => module.Register(services, configuration, environment, options, connectionString))
             .ToArray();
+
+        if (options.RegisterApplicationServices)
+        {
+            services.TryAddEnumerable(
+                ServiceDescriptor.Scoped<IArcSignalProofSourceResolver, ArcOpportunitySignalProofResolver>());
+            services.TryAddEnumerable(
+                ServiceDescriptor.Scoped<IArcSignalProofSourceResolver, ArcStrategyDecisionSignalProofResolver>());
+        }
 
         services.AddSingleton<IAutotradeModuleInventory>(
             new AutotradeModuleInventory(

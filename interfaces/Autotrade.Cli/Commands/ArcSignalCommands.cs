@@ -9,7 +9,7 @@ public static class ArcSignalCommands
 {
     public static async Task<int> PublishAsync(
         CommandContext context,
-        FileInfo proofFile,
+        FileInfo? proofFile,
         string source,
         string sourceId,
         string sourceStatus,
@@ -18,16 +18,37 @@ public static class ArcSignalCommands
         string? sourcePolicyHash,
         CancellationToken cancellationToken = default)
     {
-        if (!proofFile.Exists)
-        {
-            OutputFormatter.WriteError($"Proof file not found: {proofFile.FullName}", "PROOF_FILE_NOT_FOUND", context.GlobalOptions, ExitCodes.NotFound);
-            return ExitCodes.NotFound;
-        }
-
         if (!TryParseSourceKind(source, out var sourceKind))
         {
             OutputFormatter.WriteError("source must be 'opportunity' or 'decision'.", "INVALID_SOURCE", context.GlobalOptions, ExitCodes.ValidationFailed);
             return ExitCodes.ValidationFailed;
+        }
+
+        var service = context.Services.GetRequiredService<IArcSignalPublicationService>();
+        if (proofFile is null)
+        {
+            try
+            {
+                var resolvedResult = await service.PublishFromSourceAsync(
+                        new PublishArcSignalSourceRequest(sourceKind, sourceId, actor, reason),
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                OutputFormatter.WriteSuccess("Arc signal publication recorded.", resolvedResult, context.GlobalOptions);
+                return ExitCodes.Success;
+            }
+            catch (ArcSignalSourceResolutionException ex)
+            {
+                var exitCode = IsNotFound(ex.ErrorCode) ? ExitCodes.NotFound : ExitCodes.ValidationFailed;
+                OutputFormatter.WriteError(ex.Message, ex.ErrorCode, context.GlobalOptions, exitCode);
+                return exitCode;
+            }
+        }
+
+        if (!proofFile.Exists)
+        {
+            OutputFormatter.WriteError($"Proof file not found: {proofFile.FullName}", "PROOF_FILE_NOT_FOUND", context.GlobalOptions, ExitCodes.NotFound);
+            return ExitCodes.NotFound;
         }
 
         if (!Enum.TryParse<ArcSignalSourceReviewStatus>(sourceStatus, ignoreCase: true, out var reviewStatus))
@@ -52,7 +73,6 @@ public static class ArcSignalCommands
             return ExitCodes.ValidationFailed;
         }
 
-        var service = context.Services.GetRequiredService<IArcSignalPublicationService>();
         var result = await service.PublishAsync(
                 new PublishArcSignalRequest(proof, reviewStatus, actor, reason, sourcePolicyHash),
                 cancellationToken)
@@ -108,4 +128,7 @@ public static class ArcSignalCommands
         sourceKind = default;
         return false;
     }
+
+    private static bool IsNotFound(string errorCode)
+        => string.Equals(errorCode, "SOURCE_NOT_FOUND", StringComparison.OrdinalIgnoreCase);
 }

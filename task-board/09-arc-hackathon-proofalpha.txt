@@ -3,11 +3,13 @@ Arc Hackathon: ProofAlpha Paid Agent Trading Gateway
 
 Status
 ------
-[WIP] Phase 0, Phase 1, and Phase 2 are complete. The paid-agent thesis is
-frozen, the ArcSettlement offline proof model is implemented, and the
-ArcContracts foundation now has local contract tests, ABI export, local
-deployment artifacts, backend config schema, config validation tests, and
-solution build evidence. This board is independent from the existing
+[WIP] Phase 0, Phase 1, Phase 2, Phase 3, and Phase 4 are complete. The
+paid-agent thesis is frozen, the ArcSettlement offline proof model is
+implemented, signal proofs can be published from canonical proof files or
+native opportunity/strategy-decision sources, and local TestUsdc subscription
+evidence now mirrors into backend entitlement status. Phase 5 is next. This
+board is
+independent from the existing
 product-hardening board and must preserve every Paper-first, Live-arming, risk,
 audit, bounded-context, and secret-handling invariant documented in
 `docs/product/*`.

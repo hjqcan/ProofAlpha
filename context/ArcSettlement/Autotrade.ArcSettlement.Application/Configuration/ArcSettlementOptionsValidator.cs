@@ -1,3 +1,4 @@
+using Autotrade.ArcSettlement.Application.Contract.Access;
 using Autotrade.ArcSettlement.Application.Contract.Configuration;
 
 namespace Autotrade.ArcSettlement.Application.Configuration;
@@ -67,6 +68,8 @@ public sealed class ArcSettlementOptionsValidator(IArcSettlementSecretSource sec
         AddRequiredAddress(errors, "StrategyAccess", options.Contracts.StrategyAccess);
         AddRequiredAddress(errors, "PerformanceLedger", options.Contracts.PerformanceLedger);
         AddRequiredAddress(errors, "RevenueSettlement", options.Contracts.RevenueSettlement);
+        AddRequiredAddress(errors, "SignalProof:AgentAddress", options.SignalProof.AgentAddress);
+        AddSubscriptionPlanErrors(options, errors);
     }
 
     private void AddWriteSecretErrors(ArcSettlementOptions options, List<string> errors)
@@ -92,7 +95,55 @@ public sealed class ArcSettlementOptionsValidator(IArcSettlementSecretSource sec
             return;
         }
 
-        errors.Add($"{ArcSettlementOptions.SectionName}:Contracts:{contractName} must be a non-zero EVM address.");
+        var path = contractName.Contains(':', StringComparison.Ordinal)
+            ? contractName
+            : $"Contracts:{contractName}";
+        errors.Add($"{ArcSettlementOptions.SectionName}:{path} must be a non-zero EVM address.");
+    }
+
+    private static void AddSubscriptionPlanErrors(ArcSettlementOptions options, List<string> errors)
+    {
+        var planIds = new HashSet<int>();
+        foreach (var plan in options.SubscriptionPlans)
+        {
+            var planPath = $"{ArcSettlementOptions.SectionName}:SubscriptionPlans:{plan.PlanId}";
+            if (plan.PlanId <= 0)
+            {
+                errors.Add($"{planPath}:PlanId must be greater than zero.");
+            }
+            else if (!planIds.Add(plan.PlanId))
+            {
+                errors.Add($"{planPath}:PlanId must be unique.");
+            }
+
+            if (string.IsNullOrWhiteSpace(plan.StrategyKey))
+            {
+                errors.Add($"{planPath}:StrategyKey is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(plan.Tier))
+            {
+                errors.Add($"{planPath}:Tier is required.");
+            }
+
+            if (plan.PriceUsdc < 0)
+            {
+                errors.Add($"{planPath}:PriceUsdc cannot be negative.");
+            }
+
+            if (plan.DurationSeconds <= 0 && plan.DurationDays <= 0)
+            {
+                errors.Add($"{planPath}:DurationSeconds or DurationDays must be greater than zero.");
+            }
+
+            foreach (var permission in plan.Permissions)
+            {
+                if (!Enum.TryParse<ArcEntitlementPermission>(permission, ignoreCase: true, out _))
+                {
+                    errors.Add($"{planPath}:Permissions contains unknown value '{permission}'.");
+                }
+            }
+        }
     }
 
     private static bool IsLikelyEvmAddress(string value)

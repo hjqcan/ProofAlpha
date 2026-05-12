@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Autotrade.Application.DTOs;
 using Autotrade.Api.ControlRoom;
+using Autotrade.ArcSettlement.Application.Contract.Access;
 using Autotrade.Strategy.Application.Audit;
 using Autotrade.Strategy.Application.Contract.Strategies;
 using Autotrade.Strategy.Application.Engine;
@@ -196,6 +197,119 @@ public sealed class ControlRoomCommandServiceTests
         using var payload = JsonDocument.Parse(audit.ArgumentsJson);
         Assert.Equal("Rejected", payload.RootElement.GetProperty("outcome").GetString());
         Assert.Equal("manager rejected command", payload.RootElement.GetProperty("error").GetString());
+    }
+
+    [Fact]
+    public async Task RequestArcPaperAutoTradeDeniesWhenEntitlementIsMissing()
+    {
+        var strategyManager = new FakeStrategyManager();
+        var auditLogger = new FakeCommandAuditLogger();
+        var access = new FakeArcAccessDecisionService(CreateArcDecision(allowed: false, "ACCESS_NOT_FOUND"));
+        var service = CreateService(
+            new ControlRoomOptions
+            {
+                EnableControlCommands = true,
+                CommandMode = ControlRoomCommandModes.Paper
+            },
+            strategyManager: strategyManager,
+            auditLogger: auditLogger,
+            accessDecisionService: access);
+
+        var response = await service.RequestArcPaperAutoTradeAsync(
+            "strategy-main",
+            new ArcPaperAutoTradeRequest(WalletAddress: Wallet, Actor: "subscriber"),
+            CancellationToken.None);
+
+        Assert.Equal("AccessDenied", response.Status);
+        Assert.False(response.AccessDecision.Allowed);
+        Assert.Equal(0, strategyManager.SetDesiredStateCallCount);
+        var audit = Assert.Single(auditLogger.Entries);
+        Assert.False(audit.Success);
+        using var payload = JsonDocument.Parse(audit.ArgumentsJson);
+        Assert.Equal("ACCESS_NOT_FOUND", payload.RootElement.GetProperty("accessReasonCode").GetString());
+    }
+
+    [Fact]
+    public async Task RequestArcPaperAutoTradeBlocksLiveServicesCommandMode()
+    {
+        var strategyManager = new FakeStrategyManager();
+        var service = CreateService(
+            new ControlRoomOptions
+            {
+                EnableControlCommands = true,
+                CommandMode = ControlRoomCommandModes.LiveServices
+            },
+            strategyManager: strategyManager,
+            accessDecisionService: new FakeArcAccessDecisionService(CreateArcDecision(allowed: true, "ACCESS_ALLOWED")));
+
+        var response = await service.RequestArcPaperAutoTradeAsync(
+            "strategy-main",
+            new ArcPaperAutoTradeRequest(WalletAddress: Wallet),
+            CancellationToken.None);
+
+        Assert.Equal("LiveTradingBlocked", response.Status);
+        Assert.Equal(0, strategyManager.SetDesiredStateCallCount);
+    }
+
+    [Fact]
+    public async Task RequestArcPaperAutoTradeRequiresStrategyInSnapshot()
+    {
+        var strategyManager = new FakeStrategyManager();
+        var service = CreateService(
+            new ControlRoomOptions
+            {
+                EnableControlCommands = true,
+                CommandMode = ControlRoomCommandModes.Paper
+            },
+            strategyManager: strategyManager,
+            accessDecisionService: new FakeArcAccessDecisionService(CreateArcDecision(allowed: true, "ACCESS_ALLOWED")),
+            queryService: new FakeControlRoomQueryService
+            {
+                Snapshot = CreateSnapshot(openOrders: 0, killSwitchActive: false, includeStrategy: false)
+            });
+
+        var response = await service.RequestArcPaperAutoTradeAsync(
+            "missing-strategy",
+            new ArcPaperAutoTradeRequest(WalletAddress: Wallet),
+            CancellationToken.None);
+
+        Assert.Equal("StrategyNotFound", response.Status);
+        Assert.Equal(0, strategyManager.SetDesiredStateCallCount);
+    }
+
+    [Fact]
+    public async Task RequestArcPaperAutoTradeStartsStrategyThroughExistingStateCommand()
+    {
+        var strategyManager = new FakeStrategyManager();
+        var auditLogger = new FakeCommandAuditLogger();
+        var service = CreateService(
+            new ControlRoomOptions
+            {
+                EnableControlCommands = true,
+                CommandMode = ControlRoomCommandModes.Paper
+            },
+            strategyManager: strategyManager,
+            auditLogger: auditLogger,
+            accessDecisionService: new FakeArcAccessDecisionService(CreateArcDecision(allowed: true, "ACCESS_ALLOWED")),
+            queryService: new FakeControlRoomQueryService
+            {
+                Snapshot = CreateSnapshot(openOrders: 0, killSwitchActive: false, includeStrategy: true)
+            });
+
+        var response = await service.RequestArcPaperAutoTradeAsync(
+            "strategy-main",
+            new ArcPaperAutoTradeRequest(WalletAddress: Wallet, Actor: "subscriber", Reason: "arc demo"),
+            CancellationToken.None);
+
+        Assert.Equal("Accepted", response.Status);
+        Assert.NotNull(response.Command);
+        Assert.Equal(("strategy-main", StrategyState.Running), strategyManager.LastDesiredState);
+        Assert.Equal(2, auditLogger.Entries.Count);
+        var arcAudit = auditLogger.Entries.Single(entry => entry.CommandName == "arc paper autotrade permission");
+        Assert.True(arcAudit.Success);
+        using var payload = JsonDocument.Parse(arcAudit.ArgumentsJson);
+        Assert.Equal("ACCESS_ALLOWED", payload.RootElement.GetProperty("accessReasonCode").GetString());
+        Assert.Equal("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", payload.RootElement.GetProperty("accessEvidenceTransactionHash").GetString());
     }
 
     [Fact]
@@ -653,6 +767,7 @@ public sealed class ControlRoomCommandServiceTests
         IRiskManager? riskManager = null,
         ICommandAuditLogger? auditLogger = null,
         ILiveArmingService? liveArmingService = null,
+        IArcAccessDecisionService? accessDecisionService = null,
         IOrderRepository? orderRepository = null,
         IExecutionService? executionService = null,
         IControlRoomQueryService? queryService = null)
@@ -678,6 +793,11 @@ public sealed class ControlRoomCommandServiceTests
             services.AddSingleton(liveArmingService);
         }
 
+        if (accessDecisionService is not null)
+        {
+            services.AddSingleton(accessDecisionService);
+        }
+
         if (orderRepository is not null)
         {
             services.AddSingleton(orderRepository);
@@ -693,6 +813,24 @@ public sealed class ControlRoomCommandServiceTests
             queryService ?? new FakeControlRoomQueryService(),
             new TestOptionsMonitor<ControlRoomOptions>(options));
     }
+
+    private const string Wallet = "0x1234567890abcdef1234567890abcdef12345678";
+
+    private static ArcAccessDecision CreateArcDecision(bool allowed, string reasonCode)
+        => new(
+            allowed,
+            reasonCode,
+            allowed
+                ? "Access allowed by active Arc subscription entitlement."
+                : "No active Arc subscription entitlement was found for this wallet and strategy.",
+            ArcEntitlementPermission.RequestPaperAutoTrade,
+            "strategy-main",
+            Wallet,
+            "arc-paper-autotrade",
+            "strategy-main",
+            Tier: allowed ? "PaperAutotrade" : null,
+            ExpiresAtUtc: allowed ? new DateTimeOffset(2026, 5, 10, 8, 30, 0, TimeSpan.Zero) : null,
+            EvidenceTransactionHash: allowed ? "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" : null);
 
     private static ControlRoomSnapshotResponse CreateSnapshot(
         int openOrders,
@@ -1260,6 +1398,20 @@ public sealed class ControlRoomCommandServiceTests
                 now,
                 null,
                 [reason]);
+        }
+    }
+
+    private sealed class FakeArcAccessDecisionService(
+        ArcAccessDecision decision) : IArcAccessDecisionService
+    {
+        public ArcAccessDecisionRequest? LastRequest { get; private set; }
+
+        public Task<ArcAccessDecision> EvaluateAsync(
+            ArcAccessDecisionRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            LastRequest = request;
+            return Task.FromResult(decision);
         }
     }
 

@@ -1,8 +1,11 @@
 using Autotrade.ArcSettlement.Application.Configuration;
+using Autotrade.ArcSettlement.Application.Access;
+using Autotrade.ArcSettlement.Application.Contract.Access;
 using Autotrade.ArcSettlement.Application.Contract.Configuration;
 using Autotrade.ArcSettlement.Application.Contract.Signals;
 using Autotrade.ArcSettlement.Application.Proofs;
 using Autotrade.ArcSettlement.Application.Signals;
+using Autotrade.ArcSettlement.Infra.Data.Access;
 using Autotrade.ArcSettlement.Infra.Data.Signals;
 using Autotrade.ArcSettlement.Infra.Evm.Signals;
 using Microsoft.Extensions.Configuration;
@@ -30,8 +33,13 @@ public static class ArcSettlementServiceCollectionExtensions
         services.TryAddScoped<IArcProofRedactionGuard, ArcProofRedactionGuard>();
         services.TryAddScoped<IArcProofExportService, ArcProofExportService>();
         services.TryAddScoped<IArcUtilityMetricsCalculator, ArcUtilityMetricsCalculator>();
+        services.TryAddScoped<IArcSubscriptionPlanService, ArcSubscriptionPlanService>();
+        services.TryAddScoped<IArcSubscriptionSyncService, ArcSubscriptionSyncService>();
+        services.TryAddScoped<IArcAccessDecisionService, ArcAccessDecisionService>();
         services.TryAddScoped<IArcSettlementSecretSource, EnvironmentArcSettlementSecretSource>();
         services.TryAddScoped<ArcSettlementOptionsValidator>();
+        services.TryAddScoped<IArcEntitlementMirrorStore, JsonFileArcEntitlementMirrorStore>();
+        services.TryAddScoped<IArcStrategyAccessReader, ArcStrategyAccessReader>();
         services.TryAddScoped<IArcSignalPublicationStore, JsonFileArcSignalPublicationStore>();
         services.TryAddScoped<IArcHardhatSignalPublisherProcessRunner, HardhatSignalPublisherProcessRunner>();
         services.TryAddScoped<IArcSignalRegistryPublisher, HardhatArcSignalRegistryPublisher>();

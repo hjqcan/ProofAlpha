@@ -57,6 +57,7 @@ public sealed class ArcSignalPublicationService(
     IArcProofHashService hashService,
     ArcSettlementOptionsValidator optionsValidator,
     IOptionsMonitor<ArcSettlementOptions> options,
+    IEnumerable<IArcSignalProofSourceResolver> sourceResolvers,
     TimeProvider timeProvider) : IArcSignalPublicationService
 {
     public async Task<ArcSignalPublicationResult> PublishAsync(
@@ -177,6 +178,35 @@ public sealed class ArcSignalPublicationService(
             await store.UpsertAsync(failed, cancellationToken).ConfigureAwait(false);
             return new ArcSignalPublicationResult(failed, AlreadyExisted: false);
         }
+    }
+
+    public async Task<ArcSignalPublicationResult> PublishFromSourceAsync(
+        PublishArcSignalSourceRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.SourceId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.Actor);
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.Reason);
+
+        var resolver = sourceResolvers.FirstOrDefault(item => item.SourceKind == request.SourceKind);
+        if (resolver is null)
+        {
+            throw new ArcSignalSourceResolutionException(
+                "SOURCE_RESOLVER_NOT_REGISTERED",
+                $"No Arc signal proof resolver is registered for source kind '{request.SourceKind}'.");
+        }
+
+        var resolution = await resolver.ResolveAsync(request, cancellationToken).ConfigureAwait(false);
+        return await PublishAsync(
+                new PublishArcSignalRequest(
+                    resolution.SignalProof,
+                    resolution.SourceReviewStatus,
+                    request.Actor,
+                    request.Reason,
+                    resolution.SourcePolicyHash),
+                cancellationToken)
+            .ConfigureAwait(false);
     }
 
     public Task<IReadOnlyList<ArcSignalPublicationRecord>> ListAsync(

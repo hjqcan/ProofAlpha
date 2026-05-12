@@ -2,11 +2,13 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Autotrade.Api.ControlRoom;
 using Autotrade.Api.Controllers;
+using Autotrade.ArcSettlement.Application.Contract.Access;
 using Autotrade.Strategy.Application.Contract.Strategies;
 using Autotrade.Strategy.Application.Engine;
 using Autotrade.Strategy.Application.Parameters;
 using Autotrade.Trading.Application.Contract.Execution;
 using Autotrade.Trading.Application.Contract.Risk;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Autotrade.Api.Tests;
@@ -181,6 +183,58 @@ public sealed class ControlRoomControllerContractTests
         Assert.Equal(decisionStatus, response.Status);
         Assert.Equal("paper", response.CommandMode);
         Assert.Equal(("strategy-main", request), commandService.LastStrategyStateCommand);
+    }
+
+    [Fact]
+    public async Task RequestArcPaperAutoTradeForwardsDemoWalletAndReturnsAcceptedEnvelope()
+    {
+        var commandResponse = new ArcPaperAutoTradeResponse(
+            "Accepted",
+            "Strategy strategy-main target state set to Running.",
+            ControlRoomFixture.CreateAllowedArcAccessDecision(),
+            ControlRoomFixture.CreateCommandResponse("Accepted"));
+        var commandService = new FakeControlRoomCommandService
+        {
+            ArcPaperAutoTradeResponse = commandResponse
+        };
+        var controller = CreateController(commandService: commandService);
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        controller.ControllerContext.HttpContext.Request.Headers["X-Arc-Wallet"] = ControlRoomFixture.Wallet;
+
+        var request = new ArcPaperAutoTradeRequest(Actor: "subscriber", Reason: "demo");
+        var result = await controller.RequestArcPaperAutoTrade(
+            "strategy-main",
+            request,
+            walletAddress: null,
+            CancellationToken.None);
+
+        var accepted = Assert.IsType<AcceptedResult>(result.Result);
+        Assert.Same(commandResponse, accepted.Value);
+        Assert.Equal(("strategy-main", request with { WalletAddress = ControlRoomFixture.Wallet }), commandService.LastArcPaperAutoTradeCommand);
+    }
+
+    [Fact]
+    public async Task RequestArcPaperAutoTradeMapsAccessDeniedToForbidden()
+    {
+        var commandResponse = new ArcPaperAutoTradeResponse(
+            "AccessDenied",
+            "No active Arc subscription entitlement was found for this wallet and strategy.",
+            ControlRoomFixture.CreateDeniedArcAccessDecision());
+        var commandService = new FakeControlRoomCommandService
+        {
+            ArcPaperAutoTradeResponse = commandResponse
+        };
+        var controller = CreateController(commandService: commandService);
+
+        var result = await controller.RequestArcPaperAutoTrade(
+            "strategy-main",
+            new ArcPaperAutoTradeRequest(WalletAddress: ControlRoomFixture.Wallet),
+            walletAddress: null,
+            CancellationToken.None);
+
+        var forbidden = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(StatusCodes.Status403Forbidden, forbidden.StatusCode);
+        Assert.Same(commandResponse, forbidden.Value);
     }
 
     [Theory]
@@ -435,6 +489,9 @@ public sealed class ControlRoomControllerContractTests
     {
         public ControlRoomCommandResponse StrategyStateResponse { get; init; } = ControlRoomFixture.CreateCommandResponse("accepted");
 
+        public ArcPaperAutoTradeResponse ArcPaperAutoTradeResponse { get; init; } =
+            new("Accepted", "accepted", ControlRoomFixture.CreateAllowedArcAccessDecision(), ControlRoomFixture.CreateCommandResponse("accepted"));
+
         public ControlRoomCommandResponse KillSwitchResponse { get; init; } = ControlRoomFixture.CreateCommandResponse("accepted");
 
         public IncidentActionCatalog IncidentActionCatalog { get; init; } = ControlRoomFixture.CreateIncidentActionCatalog();
@@ -450,6 +507,8 @@ public sealed class ControlRoomControllerContractTests
         public ControlRoomCommandResponse DisarmLiveResponse { get; init; } = ControlRoomFixture.CreateCommandResponse("accepted");
 
         public (string StrategyId, SetStrategyStateRequest Request)? LastStrategyStateCommand { get; private set; }
+
+        public (string StrategyId, ArcPaperAutoTradeRequest Request)? LastArcPaperAutoTradeCommand { get; private set; }
 
         public SetKillSwitchRequest? LastKillSwitchCommand { get; private set; }
 
@@ -475,6 +534,15 @@ public sealed class ControlRoomControllerContractTests
         {
             LastStrategyStateCommand = (strategyId, request);
             return Task.FromResult(StrategyStateResponse);
+        }
+
+        public Task<ArcPaperAutoTradeResponse> RequestArcPaperAutoTradeAsync(
+            string strategyId,
+            ArcPaperAutoTradeRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            LastArcPaperAutoTradeCommand = (strategyId, request);
+            return Task.FromResult(ArcPaperAutoTradeResponse);
         }
 
         public Task<ControlRoomCommandResponse> SetKillSwitchAsync(
@@ -527,6 +595,7 @@ public sealed class ControlRoomControllerContractTests
     private static class ControlRoomFixture
     {
         private static readonly DateTimeOffset Now = new(2026, 5, 3, 8, 30, 0, TimeSpan.Zero);
+        public const string Wallet = "0x1234567890abcdef1234567890abcdef12345678";
 
         public static ControlRoomSnapshotResponse CreateSnapshot()
         {
@@ -722,6 +791,31 @@ public sealed class ControlRoomControllerContractTests
                 Message: $"Command {status}.",
                 Snapshot: CreateSnapshot());
         }
+
+        public static ArcAccessDecision CreateAllowedArcAccessDecision()
+            => new(
+                Allowed: true,
+                "ACCESS_ALLOWED",
+                "Access allowed by active Arc subscription entitlement.",
+                ArcEntitlementPermission.RequestPaperAutoTrade,
+                "strategy-main",
+                Wallet,
+                "arc-paper-autotrade",
+                "strategy-main",
+                Tier: "PaperAutotrade",
+                ExpiresAtUtc: Now.AddDays(7),
+                EvidenceTransactionHash: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+
+        public static ArcAccessDecision CreateDeniedArcAccessDecision()
+            => new(
+                Allowed: false,
+                "ACCESS_NOT_FOUND",
+                "No active Arc subscription entitlement was found for this wallet and strategy.",
+                ArcEntitlementPermission.RequestPaperAutoTrade,
+                "strategy-main",
+                Wallet,
+                "arc-paper-autotrade",
+                "strategy-main");
 
         public static IncidentActionCatalog CreateIncidentActionCatalog()
         {

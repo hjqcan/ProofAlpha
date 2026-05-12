@@ -32,6 +32,17 @@ public sealed record PublishArcSignalRequest(
     string Reason,
     string? SourcePolicyHash = null);
 
+public sealed record PublishArcSignalSourceRequest(
+    ArcProofSourceKind SourceKind,
+    string SourceId,
+    string Actor,
+    string Reason);
+
+public sealed record ArcSignalSourceProofResolution(
+    ArcStrategySignalProofDocument SignalProof,
+    ArcSignalSourceReviewStatus SourceReviewStatus,
+    string? SourcePolicyHash = null);
+
 public sealed record ArcSignalPublicationRecord(
     string SignalId,
     ArcProofSourceKind SourceKind,
@@ -62,10 +73,30 @@ public sealed record ArcSignalPublicationResult(
 
 public sealed record ArcSignalPublicationQuery(int Limit = 20);
 
+public interface IArcSignalProofSourceResolver : IApplicationService
+{
+    ArcProofSourceKind SourceKind { get; }
+
+    Task<ArcSignalSourceProofResolution> ResolveAsync(
+        PublishArcSignalSourceRequest request,
+        CancellationToken cancellationToken = default);
+}
+
+public sealed class ArcSignalSourceResolutionException(
+    string errorCode,
+    string message) : InvalidOperationException(message)
+{
+    public string ErrorCode { get; } = errorCode;
+}
+
 public interface IArcSignalPublicationService : IApplicationService
 {
     Task<ArcSignalPublicationResult> PublishAsync(
         PublishArcSignalRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<ArcSignalPublicationResult> PublishFromSourceAsync(
+        PublishArcSignalSourceRequest request,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<ArcSignalPublicationRecord>> ListAsync(

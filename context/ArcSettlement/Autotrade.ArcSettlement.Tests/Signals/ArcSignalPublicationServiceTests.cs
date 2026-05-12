@@ -106,17 +106,49 @@ public sealed class ArcSignalPublicationServiceTests
         Assert.Equal("ARC_SIGNAL_DUPLICATE", result.Record.ErrorCode);
     }
 
+    [Fact]
+    public async Task PublishFromSourceAsync_ResolvesSourceProofThenPublishes()
+    {
+        var resolver = new FakeSignalProofSourceResolver(
+            new ArcSignalSourceProofResolution(
+                CreateSignal() with
+                {
+                    SourceKind = ArcProofSourceKind.StrategyDecision,
+                    SourceId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+                },
+                ArcSignalSourceReviewStatus.Approved,
+                Hash("policy")));
+        var service = CreateService(
+            new InMemorySignalPublicationStore(),
+            new FakeSignalRegistryPublisher(),
+            new ArcSettlementOptions { Enabled = false },
+            sourceResolvers: [resolver]);
+
+        var result = await service.PublishFromSourceAsync(
+            new PublishArcSignalSourceRequest(
+                ArcProofSourceKind.StrategyDecision,
+                "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                "test-operator",
+                "publish selected decision"));
+
+        Assert.Equal(1, resolver.CallCount);
+        Assert.Equal(ArcSignalPublicationStatus.SkippedDisabled, result.Record.Status);
+        Assert.Equal(ArcProofSourceKind.StrategyDecision, result.Record.SourceKind);
+    }
+
     private static ArcSignalPublicationService CreateService(
         IArcSignalPublicationStore store,
         IArcSignalRegistryPublisher publisher,
         ArcSettlementOptions options,
-        bool hasSecret = true)
+        bool hasSecret = true,
+        IEnumerable<IArcSignalProofSourceResolver>? sourceResolvers = null)
         => new(
             store,
             publisher,
             new ArcProofHashService(),
             new ArcSettlementOptionsValidator(new StaticSecretSource(hasSecret)),
             new StaticOptionsMonitor<ArcSettlementOptions>(options),
+            sourceResolvers ?? [],
             new FixedTimeProvider(Now));
 
     private static ArcSettlementOptions CreateEnabledOptions(bool hasSecret)
@@ -136,6 +168,10 @@ public sealed class ArcSignalPublicationServiceTests
             Wallet = new ArcSettlementWalletOptions
             {
                 PrivateKeyEnvironmentVariable = hasSecret ? "ARC_SETTLEMENT_PRIVATE_KEY" : "MISSING_PRIVATE_KEY"
+            },
+            SignalProof = new ArcSettlementSignalProofOptions
+            {
+                AgentAddress = "0x9999999999999999999999999999999999999999"
             }
         };
 
@@ -233,6 +269,22 @@ public sealed class ArcSignalPublicationServiceTests
             }
 
             return Task.FromResult(new ArcSignalRegistryPublishResult(transactionHash, Confirmed: true));
+        }
+    }
+
+    private sealed class FakeSignalProofSourceResolver(
+        ArcSignalSourceProofResolution resolution) : IArcSignalProofSourceResolver
+    {
+        public ArcProofSourceKind SourceKind => resolution.SignalProof.SourceKind;
+
+        public int CallCount { get; private set; }
+
+        public Task<ArcSignalSourceProofResolution> ResolveAsync(
+            PublishArcSignalSourceRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            return Task.FromResult(resolution);
         }
     }
 

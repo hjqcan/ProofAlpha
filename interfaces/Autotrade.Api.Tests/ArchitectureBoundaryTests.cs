@@ -12,6 +12,7 @@ public sealed class ArchitectureBoundaryTests
 {
     private static readonly string[] HostingOwnedBoundedContextInfraReferences =
     [
+        "context/ArcSettlement/Autotrade.ArcSettlement.Infra.CrossCutting.IoC/Autotrade.ArcSettlement.Infra.CrossCutting.IoC.csproj",
         "context/MarketData/Autotrade.MarketData.Infra.BackgroundJobs/Autotrade.MarketData.Infra.BackgroundJobs.csproj",
         "context/MarketData/Autotrade.MarketData.Infra.CrossCutting.IoC/Autotrade.MarketData.Infra.CrossCutting.IoC.csproj",
         "context/MarketData/Autotrade.MarketData.Infra.Data/Autotrade.MarketData.Infra.Data.csproj",
@@ -31,6 +32,7 @@ public sealed class ArchitectureBoundaryTests
 
     private static readonly string[] ForbiddenInterfaceNamespaces =
     [
+        "Autotrade.ArcSettlement.Infra.",
         "Autotrade.MarketData.Infra.",
         "Autotrade.OpportunityDiscovery.Infra.",
         "Autotrade.SelfImprove.Infra.",

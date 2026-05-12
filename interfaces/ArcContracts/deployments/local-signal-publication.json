@@ -1,0 +1,39 @@
+{
+  "documentVersion": "proofalpha-local-evm-signal-publication.v1",
+  "networkName": "hardhat",
+  "chainId": 31337,
+  "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "signalRegistry": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+  "signalId": "0x7cc384e6393c4b85f9340bec439a81eca1d31778996494429c750946c7bb5cff",
+  "agentAddress": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+  "transactionHash": "0x1ee470dbf1da6fe37598a596857655d7c6a97d41290d606c3a59d986a222d31c",
+  "confirmed": true,
+  "blockNumber": 2,
+  "eventName": "SignalPublished",
+  "request": {
+    "chainId": 31337,
+    "signalRegistry": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "signalId": "0x7cc384e6393c4b85f9340bec439a81eca1d31778996494429c750946c7bb5cff",
+    "agentAddress": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+    "venue": "polymarket",
+    "strategyKey": "repricing_lag_arbitrage",
+    "reasoningHash": "0x664020618931484b30288d9976c61e9ebf16d6ec304290c920bc891b24c6264a",
+    "riskEnvelopeHash": "0x9c7b7b3ccfb4e55ab07a273b974365eb8fcee2659f80f0c9b3b27a2fde65987c",
+    "expectedEdgeBps": "42",
+    "maxNotionalUsdcAtomic": "100000000",
+    "validUntilUnixSeconds": "1800000000"
+  },
+  "onchainSummary": {
+    "agent": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+    "venue": "polymarket",
+    "strategyKey": "repricing_lag_arbitrage",
+    "reasoningHash": "0x664020618931484b30288d9976c61e9ebf16d6ec304290c920bc891b24c6264a",
+    "riskEnvelopeHash": "0x9c7b7b3ccfb4e55ab07a273b974365eb8fcee2659f80f0c9b3b27a2fde65987c",
+    "expectedEdgeBps": "42",
+    "maxNotionalUsdc": "100000000",
+    "validUntil": "1800000000",
+    "publishedAt": "1778539861",
+    "exists": true
+  },
+  "exportedAtUtc": "2026-05-11T22:51:00.542Z"
+}

@@ -3,7 +3,7 @@ Phase 9: Control Room Subscriber Portal
 
 Status
 ------
-[TODO]
+[DONE]
 
 
 Intent
@@ -33,7 +33,7 @@ Out of Scope
 
 Tasks
 -----
-[TODO] AH-P9-T001 Add WebApp Arc API client and types.
+[DONE] AH-P9-T001 Add WebApp Arc API client and types.
 
 Types:
 
@@ -45,7 +45,7 @@ Types:
 - PerformanceSummary
 - RevenueSettlementSummary
 
-[TODO] AH-P9-T002 Add subscriber identity UI.
+[DONE] AH-P9-T002 Add subscriber identity UI.
 
 MVP:
 
@@ -59,7 +59,7 @@ Stretch:
 - wallet connect
 - signed challenge
 
-[TODO] AH-P9-T003 Add subscription panel.
+[DONE] AH-P9-T003 Add subscription panel.
 
 Show:
 
@@ -72,7 +72,7 @@ Show:
 - expires at
 - missing/expired reason
 
-[TODO] AH-P9-T004 Add gated opportunity UI.
+[DONE] AH-P9-T004 Add gated opportunity UI.
 
 Unsubscribed:
 
@@ -86,7 +86,7 @@ Subscribed:
 - show evidence/provenance
 - show Arc tx links
 
-[TODO] AH-P9-T005 Add auto-trading permission UI.
+[DONE] AH-P9-T005 Add auto-trading permission UI.
 
 Show:
 
@@ -96,7 +96,7 @@ Show:
 - blocked reason
 - audit id if available
 
-[TODO] AH-P9-T006 Add performance/reputation UI.
+[DONE] AH-P9-T006 Add performance/reputation UI.
 
 Show:
 
@@ -107,7 +107,7 @@ Show:
 - confidence coverage
 - last outcome tx hash
 
-[TODO] AH-P9-T007 Add settlement UI.
+[DONE] AH-P9-T007 Add settlement UI.
 
 Show:
 
@@ -117,7 +117,7 @@ Show:
 - settlement tx hash
 - testnet/simulated label
 
-[TODO] AH-P9-T008 Add screenshots and visual QA.
+[DONE] AH-P9-T008 Add screenshots and visual QA.
 
 Required screenshots:
 
@@ -142,6 +142,32 @@ Evidence
 --------
 - `artifacts/arc-hackathon/screenshots/subscriber-blocked.png`
 - `artifacts/arc-hackathon/screenshots/subscriber-unlocked.png`
+- `artifacts/arc-hackathon/screenshots/signal-proof.png`
 - `artifacts/arc-hackathon/screenshots/performance-ledger.png`
+- `artifacts/arc-hackathon/screenshots/revenue-settlement.png`
+- `artifacts/arc-hackathon/screenshots/subscriber-mobile.png`
 - `npm --prefix .\interfaces\WebApp run build`
+- `node .codex-run\phase9-webapp-check.mjs`
+- `dotnet build Autotrade.sln --no-restore -v minimal`
+- `dotnet test Autotrade.sln --no-build -v minimal`
+- `npm --prefix .\interfaces\ArcContracts test`
+- `git -c safe.directory=D:/workspace/ProofAlpha diff --check`
+- redaction scan over provenance, screenshots, and the Phase 9 WebApp smoke
+  script returned no matches for secret-like material.
 
+
+Completion Notes
+----------------
+- Subscriber identity stores a wallet fixture locally, supports plan selection,
+  and refreshes backend entitlement state via `GET /api/arc/access/{wallet}/{strategy}`.
+- Opportunity and signal detail panes render API-returned 403
+  `ArcAccessDecision` bodies for blocked wallets and only show reasoning,
+  execution policy, hashes, evidence, and transaction links after API unlock.
+- Paper auto-trading uses
+  `POST /api/control-room/strategies/{strategyId}/arc-paper-autotrade`; Live is
+  explicitly disabled in the subscriber portal.
+- Performance panel loads the selected signal outcome via
+  `/api/arc/performance/signals/{signalId}/outcome` and shows the copyable
+  outcome transaction hash.
+- Settlement panel is honestly labeled `testnet` or `simulated`; Phase 10 owns
+  durable revenue settlement backend records and split distribution.

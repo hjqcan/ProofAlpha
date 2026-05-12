@@ -257,7 +257,9 @@ public sealed class ArcSignalPublicationService(
             createdAtUtc,
             publishedAtUtc,
             request.Actor,
-            request.Reason);
+            request.Reason,
+            request.SignalProof.ProvenanceHash,
+            request.SignalProof.EvidenceUri);
 
     private static string? ResolveUnsafeErrorCode(PublishArcSignalRequest request, DateTimeOffset now)
     {

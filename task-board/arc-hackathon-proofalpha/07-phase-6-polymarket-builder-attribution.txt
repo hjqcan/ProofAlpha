@@ -3,7 +3,7 @@ Phase 6: Polymarket Builder Attribution
 
 Status
 ------
-[TODO]
+[DONE]
 
 
 Intent
@@ -42,7 +42,7 @@ Out of Scope
 
 Tasks
 -----
-[TODO] AH-P6-T001 Add builder readiness probe.
+[DONE] AH-P6-T001 Add builder readiness probe.
 
 Report:
 
@@ -51,7 +51,7 @@ Report:
 - redacted builder code hash
 - mode: disabled/demo/live
 
-[TODO] AH-P6-T002 Add signer tests.
+[DONE] AH-P6-T002 Add signer tests.
 
 Tests:
 
@@ -60,7 +60,7 @@ Tests:
 - invalid builder code fails before HTTP call
 - empty builder falls back to zero bytes32 when configured that way
 
-[TODO] AH-P6-T003 Add builder evidence exporter.
+[DONE] AH-P6-T003 Add builder evidence exporter.
 
 Export redacted JSON:
 
@@ -77,7 +77,7 @@ Export redacted JSON:
 
 Do not export private key or raw reusable signature material.
 
-[TODO] AH-P6-T004 Add execution correlation.
+[DONE] AH-P6-T004 Add execution correlation.
 
 Persist or expose:
 
@@ -88,7 +88,7 @@ Persist or expose:
 - runSessionId
 - command audit id
 
-[TODO] AH-P6-T005 Add optional builder trades reader.
+[DONE] AH-P6-T005 Add optional builder trades reader.
 
 If endpoint is available:
 
@@ -101,7 +101,7 @@ If unavailable:
 - record as external verification not used
 - rely on signed order evidence for demo
 
-[TODO] AH-P6-T006 Add tests and docs.
+[DONE] AH-P6-T006 Add tests and docs.
 
 - tests for redaction
 - docs explaining what builder attribution proves
@@ -120,7 +120,27 @@ Acceptance Criteria
 
 Evidence
 --------
+- API and CLI readiness now report `polymarket.builder_attribution.ready` with
+  configured/format/mode evidence and redacted builder-code hash.
+- Signed order builder propagation is covered for configured builder code,
+  per-order overrides, invalid builder code, and zero-bytes32 fallback.
+- `arc builder evidence --demo` exports redacted builder attribution evidence
+  and a separate redacted order envelope.
+- Execution correlation is exposed in the evidence as `arcSignalId`,
+  `clientOrderId`, optional `orderId`, optional `runSessionId`, and optional
+  `commandAuditId`.
+- External builder-trades verification is explicitly recorded as not used for
+  demo evidence because it requires real attributed order flow.
 - `artifacts/arc-hackathon/demo-run/builder-attribution.json`
 - `artifacts/arc-hackathon/demo-run/order-envelope-redacted.json`
-- targeted Polymarket builder tests
-
+- `docs/hackathon/arc-builder-attribution.md`
+- `dotnet test Shared\Autotrade.Polymarket.Tests\Autotrade.Polymarket.Tests.csproj --no-build -v minimal`
+  - 26 passed
+- `dotnet test Shared\Autotrade.Application.Tests\Autotrade.Application.Tests.csproj --no-build -v minimal`
+  - 12 passed
+- `dotnet test interfaces\Autotrade.Api.Tests\Autotrade.Api.Tests.csproj --no-build -v minimal`
+  - 129 passed
+- `dotnet build Autotrade.sln --no-restore -v minimal`
+  - 0 warnings, 0 errors
+- `dotnet test Autotrade.sln --no-build -v minimal`
+  - 564 passed

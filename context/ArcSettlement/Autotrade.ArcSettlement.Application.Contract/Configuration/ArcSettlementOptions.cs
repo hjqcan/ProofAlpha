@@ -18,6 +18,10 @@ public sealed record ArcSettlementOptions
 
     public string EntitlementMirrorStorePath { get; init; } = "artifacts/arc-settlement/entitlements.json";
 
+    public string PerformanceOutcomeStorePath { get; init; } = "artifacts/arc-settlement/performance-outcomes.json";
+
+    public string ProvenanceStorePath { get; init; } = "artifacts/arc-settlement/provenance.json";
+
     public ArcSettlementContractsOptions Contracts { get; init; } = new();
 
     public ArcSettlementWalletOptions Wallet { get; init; } = new();

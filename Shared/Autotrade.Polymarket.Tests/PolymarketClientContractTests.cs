@@ -1,4 +1,5 @@
 using Autotrade.Polymarket.Abstractions;
+using Autotrade.Polymarket.BuilderAttribution;
 using Autotrade.Polymarket.Extensions;
 using Autotrade.Polymarket.Http;
 using Autotrade.Polymarket.Models;
@@ -513,6 +514,113 @@ public sealed class PolymarketClientContractTests : IClassFixture<MockServerFixt
     }
 
     [Fact]
+    public void PolymarketOrderSigner_PropagatesConfiguredBuilderCode_ToSignedOrder()
+    {
+        var builderCode = Bytes32('1');
+        var signer = CreateSigner(builderCode);
+
+        var signed = signer.CreatePostOrderRequest(CreateOrderRequest(), "client-order-1");
+
+        signed.Order.Builder.Should().Be(builderCode);
+    }
+
+    [Fact]
+    public void PolymarketOrderSigner_PerOrderBuilder_OverridesConfiguredBuilderCode()
+    {
+        var configuredBuilder = Bytes32('1');
+        var overrideBuilder = Bytes32('2');
+        var signer = CreateSigner(configuredBuilder);
+
+        var signed = signer.CreatePostOrderRequest(CreateOrderRequest(overrideBuilder), "client-order-1");
+
+        signed.Order.Builder.Should().Be(overrideBuilder);
+    }
+
+    [Fact]
+    public void PolymarketOrderSigner_InvalidBuilderCode_FailsBeforeOrderEnvelopeIsCreated()
+    {
+        var signer = CreateSigner("not-bytes32");
+
+        var act = () => signer.CreatePostOrderRequest(CreateOrderRequest(), "client-order-1");
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*builder metadata must be a bytes32 hex string*");
+    }
+
+    [Fact]
+    public void PolymarketOrderSigner_EmptyConfiguredBuilder_FallsBackToZeroBytes32()
+    {
+        var signer = CreateSigner(builderCode: string.Empty);
+
+        var signed = signer.CreatePostOrderRequest(CreateOrderRequest(), "client-order-1");
+
+        signed.Order.Builder.Should().Be(PolymarketBuilderAttribution.ZeroBytes32);
+    }
+
+    [Fact]
+    public void BuilderReadiness_RedactsConfiguredBuilderCode()
+    {
+        var builderCode = Bytes32('a');
+
+        var readiness = PolymarketBuilderAttribution.EvaluateReadiness(
+            new PolymarketClobOptions { BuilderCode = builderCode },
+            "Paper");
+
+        readiness.BuilderCodeConfigured.Should().BeTrue();
+        readiness.FormatValid.Should().BeTrue();
+        readiness.Mode.Should().Be("demo");
+        readiness.BuilderCodeHash.Should().NotBeNull();
+        readiness.BuilderCodeHash.Should().NotBe(builderCode);
+    }
+
+    [Fact]
+    public void BuilderReadiness_InvalidConfiguredBuilder_IsUnreadyWithoutHash()
+    {
+        var readiness = PolymarketBuilderAttribution.EvaluateReadiness(
+            new PolymarketClobOptions { BuilderCode = "invalid" },
+            "Paper");
+
+        readiness.BuilderCodeConfigured.Should().BeTrue();
+        readiness.FormatValid.Should().BeFalse();
+        readiness.Mode.Should().Be("invalid");
+        readiness.BuilderCodeHash.Should().BeNull();
+    }
+
+    [Fact]
+    public void BuilderEvidenceExporter_RedactsReusableOrderMaterial_AndCorrelatesArcSignal()
+    {
+        var builderCode = Bytes32('b');
+        var signer = CreateSigner(builderCode);
+        var signed = signer.CreatePostOrderRequest(CreateOrderRequest(), "client-order-1");
+        var rawSignature = signed.Order.Signature;
+
+        var evidence = PolymarketBuilderAttribution.CreateEvidence(
+            new PolymarketBuilderEvidenceRequest(
+                signed,
+                "client-order-1",
+                "dual_leg_arbitrage",
+                "market-1",
+                Bytes32('c'),
+                "0.42",
+                "10",
+                DateTimeOffset.Parse("2026-05-12T00:00:00Z"),
+                "exchange-1",
+                "run-1",
+                "audit-1"));
+        var json = JsonSerializer.Serialize(evidence);
+
+        evidence.Correlation.ClientOrderId.Should().Be("client-order-1");
+        evidence.Correlation.ArcSignalId.Should().Be(Bytes32('c'));
+        evidence.Correlation.OrderId.Should().Be("exchange-1");
+        evidence.BuilderCodeHash.Should().Be(evidence.OrderEnvelope.BuilderCodeHash);
+        evidence.SignedOrderHash.Should().StartWith("0x");
+        evidence.OrderEnvelope.SignatureHash.Should().StartWith("0x");
+        json.Should().NotContain(builderCode);
+        json.Should().NotContain(rawSignature);
+        json.Should().NotContain("0000000000000000000000000000000000000000000000000000000000000001");
+    }
+
+    [Fact]
     public void PolymarketRateLimitOptions_AreConfigured_WithDisabled()
     {
         // Act
@@ -546,6 +654,34 @@ public sealed class PolymarketClientContractTests : IClassFixture<MockServerFixt
 
         return string.Equals(signatureValues[0], expectedSignature, StringComparison.Ordinal);
     }
+
+    private static PolymarketOrderSigner CreateSigner(string? builderCode = null)
+    {
+        return new PolymarketOrderSigner(Microsoft.Extensions.Options.Options.Create(new PolymarketClobOptions
+        {
+            ApiKey = "test-api-key",
+            PrivateKey = "0x0000000000000000000000000000000000000000000000000000000000000001",
+            ChainId = 137,
+            BuilderCode = builderCode
+        }));
+    }
+
+    private static OrderRequest CreateOrderRequest(string? builderCode = null)
+    {
+        return new OrderRequest
+        {
+            TokenId = "1",
+            Price = "0.42",
+            Size = "10",
+            Side = "BUY",
+            TimeInForce = "GTC",
+            Salt = "123456",
+            Timestamp = "1777374000000",
+            Builder = builderCode
+        };
+    }
+
+    private static string Bytes32(char fill) => $"0x{new string(fill, 64)}";
 
     private static bool HasSingleOrderNumericSalt(string? body, string expectedSalt) =>
         HasNumericSalt(body, expectedSalt, static root => root.GetProperty("order").GetProperty("salt"));

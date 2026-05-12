@@ -814,6 +814,7 @@ accountCommand.Add(accountSyncCommand);
 var arcCommand = new Command("arc", "Arc settlement and proof commands");
 var arcSignalCommand = new Command("signal", "Arc signal proof publication commands");
 var arcAccessCommand = new Command("access", "Arc subscription and entitlement commands");
+var arcBuilderCommand = new Command("builder", "Polymarket builder attribution commands");
 
 var arcSignalProofFileOption = CreateOption<FileInfo?>("--proof-file", "Canonical Arc signal proof JSON file; omit to resolve --source/--id from local data");
 var arcSignalSourceOption = CreateRequiredOption<string>("--source", "Source type: opportunity or decision");
@@ -830,6 +831,23 @@ var arcAccessPlanIdOption = CreateRequiredOption<int>("--plan-id", "Subscription
 var arcAccessTxHashOption = CreateRequiredOption<string>("--tx-hash", "StrategySubscribed transaction hash");
 var arcAccessExpiresAtOption = CreateRequiredOption<DateTimeOffset>("--expires-at", "Subscription expiry time in UTC");
 var arcAccessBlockOption = CreateOption<long?>("--block", "Source block number");
+var arcBuilderDemoOption = CreateOptionWithDefault("--demo", false, "Use deterministic demo signer settings instead of configured Polymarket credentials");
+var arcBuilderClientOrderIdOption = CreateRequiredOption<string>("--client-order-id", "Client order ID to correlate with Arc signal evidence");
+var arcBuilderStrategyIdOption = CreateOption<string?>("--strategy-id", "Strategy ID");
+var arcBuilderMarketIdOption = CreateRequiredOption<string>("--market-id", "Polymarket market or condition ID");
+var arcBuilderArcSignalIdOption = CreateRequiredOption<string>("--arc-signal-id", "Arc signal ID");
+var arcBuilderTokenIdOption = CreateRequiredOption<string>("--token-id", "Polymarket token ID");
+var arcBuilderSideOption = CreateOptionWithDefault("--side", "BUY", "Order side: BUY or SELL");
+var arcBuilderPriceOption = CreateRequiredOption<string>("--price", "Limit price");
+var arcBuilderSizeOption = CreateRequiredOption<string>("--size", "Order size");
+var arcBuilderTimeInForceOption = CreateOptionWithDefault("--time-in-force", "GTC", "Order time in force");
+var arcBuilderBuilderCodeOption = CreateOption<string?>("--builder-code", "Optional bytes32 builder code override");
+var arcBuilderCreatedAtOption = CreateOption<DateTimeOffset?>("--created-at", "Evidence creation timestamp");
+var arcBuilderExchangeOrderIdOption = CreateOption<string?>("--exchange-order-id", "Optional exchange order ID");
+var arcBuilderRunSessionIdOption = CreateOption<string?>("--run-session-id", "Optional strategy run session ID");
+var arcBuilderCommandAuditIdOption = CreateOption<string?>("--command-audit-id", "Optional command audit ID");
+var arcBuilderOutputOption = CreateOption<FileInfo?>("--output", "Output path for full builder attribution evidence JSON");
+var arcBuilderEnvelopeOutputOption = CreateOption<FileInfo?>("--envelope-output", "Output path for redacted order-envelope JSON");
 
 var arcSignalPublishCommand = new Command("publish", "Publish a reviewed signal proof to Arc settlement");
 arcSignalPublishCommand.Add(arcSignalProofFileOption);
@@ -965,8 +983,75 @@ SetAction(arcAccessSyncCommand, async pr =>
 arcAccessCommand.Add(arcAccessPlansCommand);
 arcAccessCommand.Add(arcAccessStatusCommand);
 arcAccessCommand.Add(arcAccessSyncCommand);
+
+var arcBuilderEvidenceCommand = new Command("evidence", "Export redacted signed-order builder attribution evidence");
+arcBuilderEvidenceCommand.Add(arcBuilderDemoOption);
+arcBuilderEvidenceCommand.Add(arcBuilderClientOrderIdOption);
+arcBuilderEvidenceCommand.Add(arcBuilderStrategyIdOption);
+arcBuilderEvidenceCommand.Add(arcBuilderMarketIdOption);
+arcBuilderEvidenceCommand.Add(arcBuilderArcSignalIdOption);
+arcBuilderEvidenceCommand.Add(arcBuilderTokenIdOption);
+arcBuilderEvidenceCommand.Add(arcBuilderSideOption);
+arcBuilderEvidenceCommand.Add(arcBuilderPriceOption);
+arcBuilderEvidenceCommand.Add(arcBuilderSizeOption);
+arcBuilderEvidenceCommand.Add(arcBuilderTimeInForceOption);
+arcBuilderEvidenceCommand.Add(arcBuilderBuilderCodeOption);
+arcBuilderEvidenceCommand.Add(arcBuilderCreatedAtOption);
+arcBuilderEvidenceCommand.Add(arcBuilderExchangeOrderIdOption);
+arcBuilderEvidenceCommand.Add(arcBuilderRunSessionIdOption);
+arcBuilderEvidenceCommand.Add(arcBuilderCommandAuditIdOption);
+arcBuilderEvidenceCommand.Add(arcBuilderOutputOption);
+arcBuilderEvidenceCommand.Add(arcBuilderEnvelopeOutputOption);
+SetAction(arcBuilderEvidenceCommand, async pr =>
+{
+    var options = CreateGlobalOptions(pr);
+    var resolvedConfigPath = ResolveConfigPathFromParse(pr);
+    var demo = pr.GetValue(arcBuilderDemoOption);
+    var clientOrderId = pr.GetRequiredValue(arcBuilderClientOrderIdOption);
+    var strategyId = pr.GetValue(arcBuilderStrategyIdOption);
+    var marketId = pr.GetRequiredValue(arcBuilderMarketIdOption);
+    var arcSignalId = pr.GetRequiredValue(arcBuilderArcSignalIdOption);
+    var tokenId = pr.GetRequiredValue(arcBuilderTokenIdOption);
+    var side = pr.GetValue(arcBuilderSideOption) ?? "BUY";
+    var price = pr.GetRequiredValue(arcBuilderPriceOption);
+    var size = pr.GetRequiredValue(arcBuilderSizeOption);
+    var timeInForce = pr.GetValue(arcBuilderTimeInForceOption) ?? "GTC";
+    var builderCode = pr.GetValue(arcBuilderBuilderCodeOption);
+    var createdAtUtc = pr.GetValue(arcBuilderCreatedAtOption);
+    var exchangeOrderId = pr.GetValue(arcBuilderExchangeOrderIdOption);
+    var runSessionId = pr.GetValue(arcBuilderRunSessionIdOption);
+    var commandAuditId = pr.GetValue(arcBuilderCommandAuditIdOption);
+    var output = pr.GetValue(arcBuilderOutputOption);
+    var envelopeOutput = pr.GetValue(arcBuilderEnvelopeOutputOption);
+    return await CommandAuditService.ExecuteWithHostAsync(
+            resolvedConfigPath,
+            host => ArcBuilderCommands.ExportEvidenceAsync(
+                CreateContext(host, options),
+                demo,
+                clientOrderId,
+                strategyId,
+                marketId,
+                arcSignalId,
+                tokenId,
+                side,
+                price,
+                size,
+                timeInForce,
+                builderCode,
+                createdAtUtc,
+                exchangeOrderId,
+                runSessionId,
+                commandAuditId,
+                output,
+                envelopeOutput),
+            suppressConsoleLogs: options.JsonOutput)
+        .ConfigureAwait(false);
+});
+
+arcBuilderCommand.Add(arcBuilderEvidenceCommand);
 arcCommand.Add(arcSignalCommand);
 arcCommand.Add(arcAccessCommand);
+arcCommand.Add(arcBuilderCommand);
 
 // ============================================================================
 // 注册所有命令

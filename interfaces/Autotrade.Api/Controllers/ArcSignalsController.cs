@@ -136,7 +136,9 @@ public sealed class ArcSignalsController(
             record.ValidUntilUtc,
             record.Status.ToString(),
             record.CreatedAtUtc,
-            record.PublishedAtUtc);
+            record.PublishedAtUtc,
+            record.ProvenanceHash,
+            record.EvidenceUri);
 
     private static ArcSignalDetailResponse ToDetail(
         ArcSignalPublicationRecord record,
@@ -165,6 +167,8 @@ public sealed class ArcSignalsController(
             record.PublishedAtUtc,
             record.Actor,
             record.Reason,
+            record.ProvenanceHash,
+            record.EvidenceUri,
             signalDecision,
             reasoningDecision);
 }
@@ -181,7 +185,9 @@ public sealed record ArcSignalSummaryResponse(
     DateTimeOffset ValidUntilUtc,
     string Status,
     DateTimeOffset CreatedAtUtc,
-    DateTimeOffset? PublishedAtUtc);
+    DateTimeOffset? PublishedAtUtc,
+    string? ProvenanceHash,
+    string? EvidenceUri);
 
 public sealed record ArcSignalDetailResponse(
     string SignalId,
@@ -206,5 +212,7 @@ public sealed record ArcSignalDetailResponse(
     DateTimeOffset? PublishedAtUtc,
     string Actor,
     string Reason,
+    string? ProvenanceHash,
+    string? EvidenceUri,
     ArcAccessDecision SignalDecision,
     ArcAccessDecision ReasoningDecision);

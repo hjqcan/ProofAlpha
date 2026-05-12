@@ -113,7 +113,7 @@ public interface IReadinessReportService
 
 public static class FirstRunReadinessContract
 {
-    public const string ContractVersion = "2026-05-04.module-inventory.v1";
+    public const string ContractVersion = "2026-05-12.builder-attribution.v1";
     public const string Product = "Autotrade first-run readiness";
 
     public static FirstRunWizardContract Create()
@@ -242,6 +242,14 @@ public static class FirstRunReadinessContract
                 "Exchange authentication material is available to the server process without exposing values.",
                 "Required Live authentication settings are present in user secrets or environment variables.",
                 "Configure exchange authentication outside the repository and never expose values to the browser.",
+                "Server configuration"),
+            Optional(
+                "polymarket.builder_attribution.ready",
+                "Builder attribution configured",
+                ReadinessCheckCategory.Credentials,
+                "Polymarket builder metadata is configured for attributed order-flow evidence.",
+                "A non-zero bytes32 builder code is configured, or attribution is explicitly disabled for the current run.",
+                "Set Polymarket:Clob:BuilderCode to a bytes32 hex builder code before claiming builder-attributed order flow.",
                 "Server configuration")
         ];
     }

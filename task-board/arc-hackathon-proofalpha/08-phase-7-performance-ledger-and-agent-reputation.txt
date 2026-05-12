@@ -3,7 +3,7 @@ Phase 7: Performance Ledger and Agent Reputation
 
 Status
 ------
-[TODO]
+[DONE]
 
 
 Intent
@@ -43,7 +43,7 @@ Outcome Statuses
 
 Tasks
 -----
-[TODO] AH-P7-T001 Implement outcome intent record.
+[DONE] AH-P7-T001 Implement outcome intent record.
 
 Fields:
 
@@ -62,7 +62,7 @@ Fields:
 - createdAtUtc
 - recordedAtUtc
 
-[TODO] AH-P7-T002 Implement outcome builder.
+[DONE] AH-P7-T002 Implement outcome builder.
 
 Sources:
 
@@ -79,7 +79,7 @@ Rules:
 - risk rejection is still an outcome
 - expired signal is still an outcome
 
-[TODO] AH-P7-T003 Implement `IArcPerformanceRecorder`.
+[DONE] AH-P7-T003 Implement `IArcPerformanceRecorder`.
 
 Behavior:
 
@@ -89,7 +89,7 @@ Behavior:
 - store tx hash
 - map duplicate/correction behavior explicitly
 
-[TODO] AH-P7-T004 Implement reputation calculator.
+[DONE] AH-P7-T004 Implement reputation calculator.
 
 Metrics:
 
@@ -104,13 +104,13 @@ Metrics:
 - risk rejection rate
 - confidence coverage: outcomes / signals
 
-[TODO] AH-P7-T005 Add API endpoints.
+[DONE] AH-P7-T005 Add API endpoints.
 
 - `GET /api/arc/performance/agent`
 - `GET /api/arc/performance/strategies/{strategyId}`
 - `GET /api/arc/performance/signals/{signalId}/outcome`
 
-[TODO] AH-P7-T006 Add tests.
+[DONE] AH-P7-T006 Add tests.
 
 - losing outcome included in reputation
 - expired signal included
@@ -133,5 +133,30 @@ Evidence
 --------
 - `artifacts/arc-hackathon/demo-run/performance-outcome.json`
 - `artifacts/arc-hackathon/demo-run/agent-reputation.json`
-- tx hash for `OutcomeRecorded`
-
+- `OutcomeRecorded` tx hash:
+  `0xf7d705c87eecaf219679c7f7e28df805c0988174048950722ce0d553a82f1eac`
+- Outcome block number: `2`
+- Source signal tx hash:
+  `0x1ee470dbf1da6fe37598a596857655d7c6a97d41290d606c3a59d986a222d31c`
+- Agent reputation artifact includes 5 signals, 4 terminal outcomes, 1
+  pending signal, 1 win, 1 loss, 1 expired signal, 1 risk rejection, and
+  confidence coverage `0.8`.
+- `dotnet build Autotrade.sln --no-restore -v minimal` passed with 0 warnings
+  and 0 errors.
+- `dotnet test Autotrade.sln --no-build -v minimal` passed 588 tests.
+- `npm --prefix interfaces\ArcContracts test` passed 4 tests.
+- `npm --prefix interfaces\WebApp run build` passed, including i18n check,
+  TypeScript, and Vite production build.
+- Rendered WebApp fallback check passed with Playwright:
+  `node .codex-run\phase7-webapp-check.mjs`.
+  - Desktop screenshot:
+    `D:\workspace\ProofAlpha\interfaces\WebApp\dist\phase7-performance-desktop.png`
+  - Mobile screenshot:
+    `D:\workspace\ProofAlpha\interfaces\WebApp\dist\phase7-performance-mobile.png`
+- Browser plugin bootstrap timed out during validation; Playwright fallback was
+  used for the same Arc proof flow, desktop/mobile overflow checks, and command
+  interaction proof.
+- Phase 7 artifact redaction scan had no hits for private key, API secret,
+  signature, known dev key, or private material markers.
+- `git diff --check` passed; output only reported LF/CRLF normalization
+  warnings.

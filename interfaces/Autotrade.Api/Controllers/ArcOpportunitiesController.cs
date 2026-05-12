@@ -28,8 +28,13 @@ public sealed class ArcOpportunitiesController(
             return BadRequest("status must be a valid OpportunityStatus value.");
         }
 
+        if (parsedStatus is not null && parsedStatus is not OpportunityStatus.Published)
+        {
+            return BadRequest("Only Published opportunity summaries are public.");
+        }
+
         var records = await opportunities
-            .ListOpportunitiesAsync(parsedStatus, limit, cancellationToken)
+            .ListOpportunitiesAsync(OpportunityStatus.Published, limit, cancellationToken)
             .ConfigureAwait(false);
 
         return Ok(records.Select(ToSummary).ToArray());
@@ -44,6 +49,11 @@ public sealed class ArcOpportunitiesController(
         var opportunity = await opportunities.GetOpportunityAsync(opportunityId, cancellationToken)
             .ConfigureAwait(false);
         if (opportunity is null)
+        {
+            return NotFound();
+        }
+
+        if (opportunity.Status is OpportunityStatus.Candidate or OpportunityStatus.NeedsReview)
         {
             return NotFound();
         }

@@ -346,6 +346,272 @@ export interface ControlRoomCommandResponse {
   snapshot: ControlRoomSnapshot
 }
 
+export type ArcPerformanceOutcomeStatus =
+  | 'ExecutedWin'
+  | 'ExecutedLoss'
+  | 'ExecutedFlat'
+  | 'RejectedRisk'
+  | 'RejectedCompliance'
+  | 'Expired'
+  | 'SkippedNoAccess'
+  | 'FailedExecution'
+  | 'CancelledOperator'
+
+export type ArcPerformanceRecordStatus =
+  | 'Pending'
+  | 'SkippedDisabled'
+  | 'Submitted'
+  | 'Confirmed'
+  | 'Failed'
+  | 'Duplicate'
+
+export type ArcEntitlementPermission =
+  | 'ViewSignals'
+  | 'ViewReasoning'
+  | 'ExportSignal'
+  | 'RequestPaperAutoTrade'
+  | 'RequestLiveAutoTrade'
+  | 'PublishSignal'
+  | 'RecordSettlement'
+
+export type ArcStrategyAccessStatusCode =
+  | 'Disabled'
+  | 'Active'
+  | 'Expired'
+  | 'MissingWallet'
+  | 'InvalidWallet'
+  | 'MissingStrategy'
+  | 'NotFound'
+
+export interface ArcSubscriptionPlan {
+  planId: number
+  strategyKey: string
+  planName: string
+  tier: string
+  priceUsdc: number
+  durationSeconds: number
+  permissions: ArcEntitlementPermission[]
+  maxMarkets: number | null
+  autoTradingAllowed: boolean
+  liveTradingAllowed: boolean
+  createdAtUtc: string
+}
+
+export interface ArcStrategyAccessStatus {
+  walletAddress: string
+  strategyKey: string
+  statusCode: ArcStrategyAccessStatusCode
+  hasAccess: boolean
+  reason: string
+  permissions: ArcEntitlementPermission[]
+  checkedAtUtc: string
+  tier: string | null
+  expiresAtUtc: string | null
+  sourceTransactionHash: string | null
+  syncedAtUtc: string | null
+  canViewSignals: boolean
+}
+
+export interface ArcAccessDecision {
+  allowed: boolean
+  reasonCode: string
+  reason: string
+  requiredPermission: ArcEntitlementPermission
+  strategyKey: string
+  walletAddress: string | null
+  resourceKind: string
+  resourceId: string
+  tier: string | null
+  expiresAtUtc: string | null
+  evidenceTransactionHash: string | null
+}
+
+export interface ArcOpportunitySummary {
+  opportunityId: string
+  marketId: string
+  outcome: string
+  edge: number
+  status: string
+  validUntilUtc: string
+  createdAtUtc: string
+  updatedAtUtc: string
+}
+
+export interface ArcOpportunityEvidenceItem {
+  id: string
+  researchRunId: string
+  sourceKind: string
+  sourceName: string
+  url: string
+  title: string
+  summary: string
+  publishedAtUtc: string | null
+  observedAtUtc: string
+  contentHash: string
+  sourceQuality: number
+}
+
+export interface ArcOpportunityDetail {
+  opportunityId: string
+  researchRunId: string
+  marketId: string
+  outcome: string
+  fairProbability: number
+  confidence: number
+  edge: number
+  status: string
+  validUntilUtc: string
+  compiledPolicyJson: string
+  reason: string | null
+  scoreJson: string | null
+  evidence: ArcOpportunityEvidenceItem[]
+  signalDecision: ArcAccessDecision
+  reasoningDecision: ArcAccessDecision
+  createdAtUtc: string
+  updatedAtUtc: string
+}
+
+export interface ArcSignalSummary {
+  signalId: string
+  sourceKind: string
+  sourceId: string
+  strategyId: string
+  marketId: string
+  venue: string
+  expectedEdgeBps: number
+  maxNotionalUsdc: number
+  validUntilUtc: string
+  status: string
+  createdAtUtc: string
+  publishedAtUtc: string | null
+  provenanceHash: string | null
+  evidenceUri: string | null
+}
+
+export interface ArcSignalDetail extends ArcSignalSummary {
+  agentId: string
+  reasoningHash: string | null
+  riskEnvelopeHash: string | null
+  signalHash: string
+  sourcePolicyHash: string | null
+  transactionHash: string | null
+  explorerUrl: string | null
+  errorCode: string | null
+  actor: string
+  reason: string
+  signalDecision: ArcAccessDecision
+  reasoningDecision: ArcAccessDecision
+}
+
+export interface ArcAgentReputation {
+  scope: string
+  strategyId: string | null
+  totalSignals: number
+  terminalSignals: number
+  pendingSignals: number
+  executedSignals: number
+  expiredSignals: number
+  rejectedSignals: number
+  skippedSignals: number
+  failedSignals: number
+  cancelledSignals: number
+  winCount: number
+  lossCount: number
+  flatCount: number
+  averageRealizedPnlBps: number | null
+  averageSlippageBps: number | null
+  riskRejectionRate: number
+  confidenceCoverage: number
+  calculatedAtUtc: string
+}
+
+export interface ArcPerformanceOutcomeRecord {
+  outcomeId: string
+  signalId: string
+  executionId: string
+  strategyId: string
+  marketId: string
+  status: ArcPerformanceOutcomeStatus
+  realizedPnlBps: number | null
+  slippageBps: number | null
+  fillRate: number | null
+  reasonCode: string | null
+  outcomeHash: string
+  transactionHash: string | null
+  explorerUrl: string | null
+  recordStatus: ArcPerformanceRecordStatus
+  errorCode: string | null
+  createdAtUtc: string
+  recordedAtUtc: string
+}
+
+export interface ArcPaperAutoTradeResponse {
+  status: string
+  message: string
+  accessDecision: ArcAccessDecision
+  command: ControlRoomCommandResponse | null
+}
+
+export interface ArcRevenueSettlementSummary {
+  generatedAtUtc: string
+  strategyKey: string
+  source: 'simulated' | 'testnet'
+  subscriptionRevenueUsdc: number
+  builderAttributedFlowUsdc: number
+  simulatedBuilderShareUsdc: number
+  simulatedTreasuryShareUsdc: number
+  settlementTransactionHash: string | null
+}
+
+export interface ArcSubscriberPortalSummary {
+  plan: ArcSubscriptionPlan | null
+  access: ArcStrategyAccessStatus | null
+  latestSignal: ArcSignalDetail | null
+  performance: ArcAgentReputation | null
+  revenue: ArcRevenueSettlementSummary
+}
+
+export type ArcProvenanceSourceModule = 'OpportunityDiscovery' | 'SelfImprove' | 'ManualFixture'
+
+export type ArcProvenanceValidationStatus =
+  | 'Approved'
+  | 'Published'
+  | 'StaticValidated'
+  | 'UnitTested'
+  | 'ReplayValidated'
+  | 'ShadowRunning'
+  | 'PaperRunning'
+  | 'LiveCanary'
+  | 'Promoted'
+
+export interface ArcProvenanceEvidenceReference {
+  evidenceId: string
+  title: string
+  summary: string
+  contentHash: string
+  sourceUri: string | null
+  observedAtUtc: string | null
+}
+
+export interface ArcSubscriberProvenanceExplanation {
+  provenanceHash: string
+  sourceModule: ArcProvenanceSourceModule
+  sourceId: string
+  agentId: string
+  marketId: string
+  strategyId: string
+  validationStatus: ArcProvenanceValidationStatus
+  evidence: ArcProvenanceEvidenceReference[]
+  evidenceSummaryHash: string
+  llmOutputHash: string
+  compiledPolicyHash: string
+  generatedPackageHash: string | null
+  riskEnvelopeHash: string
+  evidenceUri: string | null
+  privacyNote: string
+  createdAtUtc: string
+}
+
 export interface CancelOpenOrdersRequest {
   actor?: string
   reasonCode?: string

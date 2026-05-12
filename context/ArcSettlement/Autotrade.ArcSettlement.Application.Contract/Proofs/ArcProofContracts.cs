@@ -48,7 +48,9 @@ public sealed record ArcStrategySignalProofDocument(
     decimal ExpectedEdgeBps,
     decimal MaxNotionalUsdc,
     DateTimeOffset ValidUntilUtc,
-    string? GeneratedStrategyPackageHash = null);
+    string? GeneratedStrategyPackageHash = null,
+    string? ProvenanceHash = null,
+    string? EvidenceUri = null);
 
 public sealed record ArcStrategyOutcomeProofDocument(
     string DocumentVersion,

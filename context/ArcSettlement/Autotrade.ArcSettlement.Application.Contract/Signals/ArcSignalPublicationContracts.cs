@@ -65,7 +65,9 @@ public sealed record ArcSignalPublicationRecord(
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset? PublishedAtUtc,
     string Actor,
-    string Reason);
+    string Reason,
+    string? ProvenanceHash = null,
+    string? EvidenceUri = null);
 
 public sealed record ArcSignalPublicationResult(
     ArcSignalPublicationRecord Record,

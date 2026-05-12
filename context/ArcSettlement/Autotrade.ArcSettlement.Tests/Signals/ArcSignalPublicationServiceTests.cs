@@ -24,6 +24,8 @@ public sealed class ArcSignalPublicationServiceTests
         Assert.False(result.AlreadyExisted);
         Assert.Equal(ArcSignalPublicationStatus.SkippedDisabled, result.Record.Status);
         Assert.Equal("ARC_DISABLED", result.Record.ErrorCode);
+        Assert.Equal(Hash("provenance"), result.Record.ProvenanceHash);
+        Assert.Equal("artifacts/arc-hackathon/demo-run/provenance/opportunity-phase8-1.json", result.Record.EvidenceUri);
         Assert.Equal(0, publisher.CallCount);
         Assert.Single(await store.ListAsync(20));
     }
@@ -202,7 +204,10 @@ public sealed class ArcSignalPublicationServiceTests
             Hash("risk"),
             42m,
             100m,
-            validUntilUtc ?? Now.AddMinutes(15));
+            validUntilUtc ?? Now.AddMinutes(15),
+            GeneratedStrategyPackageHash: null,
+            ProvenanceHash: Hash("provenance"),
+            EvidenceUri: "artifacts/arc-hackathon/demo-run/provenance/opportunity-phase8-1.json");
 
     private static string Hash(string value)
         => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(

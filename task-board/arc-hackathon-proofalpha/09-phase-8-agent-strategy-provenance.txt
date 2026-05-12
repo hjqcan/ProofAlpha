@@ -3,7 +3,7 @@ Phase 8: Agent Strategy Provenance
 
 Status
 ------
-[TODO]
+[DONE]
 
 
 Intent
@@ -30,7 +30,7 @@ Out of Scope
 
 Tasks
 -----
-[TODO] AH-P8-T001 Define provenance document schema.
+[DONE] AH-P8-T001 Define provenance document schema.
 
 Fields:
 
@@ -48,7 +48,7 @@ Fields:
 - validation status
 - createdAtUtc
 
-[TODO] AH-P8-T002 Add OpportunityDiscovery provenance export.
+[DONE] AH-P8-T002 Add OpportunityDiscovery provenance export.
 
 Only export trade-ready provenance for:
 
@@ -62,7 +62,7 @@ Reject:
 - `Rejected`
 - `Expired`
 
-[TODO] AH-P8-T003 Add SelfImprove generated package anchor.
+[DONE] AH-P8-T003 Add SelfImprove generated package anchor.
 
 Anchor only when:
 
@@ -71,7 +71,7 @@ Anchor only when:
 - risk envelope exists
 - validation summary passes minimum gate
 
-[TODO] AH-P8-T004 Link provenance to signal.
+[DONE] AH-P8-T004 Link provenance to signal.
 
 Signal proof should include:
 
@@ -80,7 +80,7 @@ Signal proof should include:
 - sourceId
 - evidenceUri or artifact path
 
-[TODO] AH-P8-T005 Add subscriber-safe explanation.
+[DONE] AH-P8-T005 Add subscriber-safe explanation.
 
 API/WebApp can show:
 
@@ -90,7 +90,7 @@ API/WebApp can show:
 - why full content may be private/local
 - validation status
 
-[TODO] AH-P8-T006 Add tests.
+[DONE] AH-P8-T006 Add tests.
 
 - unreviewed opportunity rejected
 - expired opportunity rejected
@@ -109,6 +109,32 @@ Acceptance Criteria
 
 Evidence
 --------
-- `artifacts/arc-hackathon/demo-run/provenance/*`
-- API contract tests for provenance detail
-
+- `artifacts/arc-hackathon/demo-run/provenance/opportunity-phase8-1.json`
+- `artifacts/arc-hackathon/demo-run/provenance/published-signal-provenance-link.json`
+- Provenance hash:
+  `0xeef6b4492fa63326f52dbf07392a257d7627cbcdba227357e3d0e93de5e49a2a`
+- Signal link hash:
+  `59126614bb7a71f7621a1c097bdb4429a4bb0d1209a5cc9cdf88f5c0d0bb2db7`
+- API read model:
+  `GET /api/arc/provenance/{provenanceHash}` returns
+  `ArcSubscriberProvenanceExplanation` without raw prompt, credential, or
+  signature material.
+- Signal proof and signal publication records include optional
+  `provenanceHash` and `evidenceUri` links.
+- WebApp Arc proof view loads subscriber-safe provenance by hash and shows
+  source module, validation status, evidence summaries, privacy note, and
+  hashes.
+- Rendered WebApp provenance smoke passed with Playwright:
+  `node .codex-run\phase8-webapp-check.mjs`.
+  - Desktop screenshot:
+    `D:\workspace\ProofAlpha\artifacts\arc-hackathon\screenshots\phase8-provenance-desktop.png`
+  - Mobile screenshot:
+    `D:\workspace\ProofAlpha\artifacts\arc-hackathon\screenshots\phase8-provenance-mobile.png`
+- `dotnet build Autotrade.sln --no-restore -v minimal` passed with 0 warnings
+  and 0 errors.
+- `dotnet test Autotrade.sln --no-build -v minimal` passed 600 tests.
+- `npm --prefix interfaces\ArcContracts test` passed 4 tests.
+- `npm --prefix interfaces\WebApp run build` passed, including i18n check,
+  TypeScript, and Vite production build.
+- Phase 8 artifact/screenshot redaction scan had no hits for private key, API
+  secret, signature, known dev key, or private material markers.

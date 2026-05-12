@@ -5,6 +5,16 @@ import type {
   ControlRoomMarketsResponse,
   ControlRoomOrderBook,
   ControlRoomSnapshot,
+  ArcAgentReputation,
+  ArcOpportunityDetail,
+  ArcOpportunitySummary,
+  ArcPaperAutoTradeResponse,
+  ArcPerformanceOutcomeRecord,
+  ArcSignalDetail,
+  ArcSignalSummary,
+  ArcStrategyAccessStatus,
+  ArcSubscriptionPlan,
+  ArcSubscriberProvenanceExplanation,
   CancelOpenOrdersRequest,
   IncidentActionCatalog,
   IncidentPackage,
@@ -25,6 +35,126 @@ import type {
 
 export function getControlRoomSnapshot(signal?: AbortSignal): Promise<ControlRoomSnapshot> {
   return apiRequest<ControlRoomSnapshot>('/api/control-room/snapshot', undefined, signal)
+}
+
+export function getArcAgentReputation(signal?: AbortSignal): Promise<ArcAgentReputation> {
+  return apiRequest<ArcAgentReputation>('/api/arc/performance/agent', undefined, signal)
+}
+
+export function getArcSubscriptionPlans(signal?: AbortSignal): Promise<ArcSubscriptionPlan[]> {
+  return apiRequest<ArcSubscriptionPlan[]>('/api/arc/access/plans', undefined, signal)
+}
+
+export function getArcStrategyAccessStatus(
+  walletAddress: string,
+  strategyKey: string,
+  signal?: AbortSignal
+): Promise<ArcStrategyAccessStatus> {
+  return apiRequest<ArcStrategyAccessStatus>(
+    `/api/arc/access/${encodeURIComponent(walletAddress)}/${encodeURIComponent(strategyKey)}`,
+    undefined,
+    signal
+  )
+}
+
+export function getArcOpportunities(
+  limit = 20,
+  signal?: AbortSignal
+): Promise<ArcOpportunitySummary[]> {
+  return apiRequest<ArcOpportunitySummary[]>(`/api/arc/opportunities?limit=${limit}`, undefined, signal)
+}
+
+export function getArcOpportunityDetail(
+  opportunityId: string,
+  walletAddress: string,
+  signal?: AbortSignal
+): Promise<ArcOpportunityDetail> {
+  const params = new URLSearchParams()
+  if (walletAddress.trim()) {
+    params.set('walletAddress', walletAddress.trim())
+  }
+
+  const suffix = params.size > 0 ? `?${params.toString()}` : ''
+  return apiRequest<ArcOpportunityDetail>(
+    `/api/arc/opportunities/${encodeURIComponent(opportunityId)}${suffix}`,
+    undefined,
+    signal
+  )
+}
+
+export function getArcSignals(limit = 20, signal?: AbortSignal): Promise<ArcSignalSummary[]> {
+  return apiRequest<ArcSignalSummary[]>(`/api/arc/signals?limit=${limit}`, undefined, signal)
+}
+
+export function getArcSignalDetail(
+  signalId: string,
+  walletAddress: string,
+  signal?: AbortSignal
+): Promise<ArcSignalDetail> {
+  const params = new URLSearchParams()
+  if (walletAddress.trim()) {
+    params.set('walletAddress', walletAddress.trim())
+  }
+
+  const suffix = params.size > 0 ? `?${params.toString()}` : ''
+  return apiRequest<ArcSignalDetail>(
+    `/api/arc/signals/${encodeURIComponent(signalId)}${suffix}`,
+    undefined,
+    signal
+  )
+}
+
+export function requestArcPaperAutoTrade(
+  strategyId: string,
+  walletAddress: string,
+  signal?: AbortSignal
+): Promise<ArcPaperAutoTradeResponse> {
+  return apiRequest<ArcPaperAutoTradeResponse>(
+    `/api/control-room/strategies/${encodeURIComponent(strategyId)}/arc-paper-autotrade`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        walletAddress,
+        actor: 'subscriber-portal-ui',
+        reason: 'Subscriber portal paper auto-trade request',
+        confirmationText: 'I understand this is paper trading only'
+      })
+    },
+    signal
+  )
+}
+
+export function getArcStrategyReputation(
+  strategyId: string,
+  signal?: AbortSignal
+): Promise<ArcAgentReputation> {
+  return apiRequest<ArcAgentReputation>(
+    `/api/arc/performance/strategies/${encodeURIComponent(strategyId)}`,
+    undefined,
+    signal
+  )
+}
+
+export function getArcPerformanceOutcome(
+  signalId: string,
+  signal?: AbortSignal
+): Promise<ArcPerformanceOutcomeRecord> {
+  return apiRequest<ArcPerformanceOutcomeRecord>(
+    `/api/arc/performance/signals/${encodeURIComponent(signalId)}/outcome`,
+    undefined,
+    signal
+  )
+}
+
+export function getArcProvenance(
+  provenanceHash: string,
+  signal?: AbortSignal
+): Promise<ArcSubscriberProvenanceExplanation> {
+  return apiRequest<ArcSubscriberProvenanceExplanation>(
+    `/api/arc/provenance/${encodeURIComponent(provenanceHash)}`,
+    undefined,
+    signal
+  )
 }
 
 export function getReadinessReport(signal?: AbortSignal): Promise<ReadinessReport> {

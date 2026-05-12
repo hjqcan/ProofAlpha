@@ -21,7 +21,8 @@ public sealed class FirstRunReadinessContractTests
         "execution.mode.paper_default",
         "execution.live_armed",
         "risk.limits.configured",
-        "credentials.exchange.present"
+        "credentials.exchange.present",
+        "polymarket.builder_attribution.ready"
     ];
 
     [Fact]

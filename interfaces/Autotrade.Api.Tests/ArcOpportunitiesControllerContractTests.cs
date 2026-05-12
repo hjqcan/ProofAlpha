@@ -27,19 +27,46 @@ public sealed class ArcOpportunitiesControllerContractTests
         };
         var controller = CreateController(query);
 
-        var result = await controller.List(status: "Approved", limit: 10, CancellationToken.None);
+        var result = await controller.List(status: null, limit: 10, CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var response = Assert.IsAssignableFrom<IReadOnlyList<ArcOpportunitySummaryResponse>>(ok.Value);
         Assert.Single(response);
         Assert.Equal(OpportunityId, response[0].OpportunityId);
-        Assert.Equal(OpportunityStatus.Approved, query.LastStatus);
+        Assert.Equal(OpportunityStatus.Published, query.LastStatus);
         Assert.Equal(10, query.LastLimit);
 
         var json = JsonSerializer.Serialize(ok.Value, new JsonSerializerOptions(JsonSerializerDefaults.Web));
         Assert.DoesNotContain("reason", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("compiledPolicy", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("evidence", json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ListRejectsNonPublishedSummaryRequest()
+    {
+        var controller = CreateController(new FakeOpportunityQueryService());
+
+        var result = await controller.List(status: "Approved", limit: 10, CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task GetTreatsCandidateOpportunityAsInternalEvenWithAccess()
+    {
+        var query = new FakeOpportunityQueryService
+        {
+            Opportunity = CreateOpportunity(OpportunityStatus.Candidate)
+        };
+        var access = new FakeArcAccessDecisionService(
+            CreateDecision(allowed: true, ArcEntitlementPermission.ViewSignals, "ACCESS_ALLOWED"));
+        var controller = CreateController(query, access);
+
+        var result = await controller.Get(OpportunityId, walletAddress: Wallet, CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result.Result);
+        Assert.Empty(access.Requests);
     }
 
     [Fact]
@@ -128,7 +155,8 @@ public sealed class ArcOpportunitiesControllerContractTests
                     }
                 }));
 
-    private static MarketOpportunityDto CreateOpportunity()
+    private static MarketOpportunityDto CreateOpportunity(
+        OpportunityStatus status = OpportunityStatus.Approved)
         => new(
             OpportunityId,
             ResearchRunId,
@@ -137,7 +165,7 @@ public sealed class ArcOpportunitiesControllerContractTests
             FairProbability: 0.58m,
             Confidence: 0.71m,
             Edge: 0.045m,
-            OpportunityStatus.Approved,
+            status,
             DateTimeOffset.Parse("2026-05-12T11:00:00Z"),
             "Evidence-backed mispricing.",
             JsonSerializer.Serialize(new[] { EvidenceId }),

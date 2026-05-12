@@ -3,7 +3,7 @@ Phase 5: API Entitlement Gates and Auto-Trading Permissions
 
 Status
 ------
-[TODO]
+[DONE]
 
 
 Intent
@@ -59,7 +59,7 @@ Permission Model
 
 Tasks
 -----
-[TODO] AH-P5-T001 Define subscriber identity model.
+[DONE] AH-P5-T001 Define subscriber identity model.
 
 MVP:
 
@@ -73,7 +73,7 @@ Stretch:
 - signed wallet challenge
 - short-lived subscriber session
 
-[TODO] AH-P5-T002 Add access decision service.
+[DONE] AH-P5-T002 Add access decision service.
 
 Interface:
 
@@ -96,20 +96,20 @@ Decision must include:
 - expiresAtUtc
 - evidenceTransactionHash
 
-[TODO] AH-P5-T003 Gate signal detail.
+[DONE] AH-P5-T003 Gate signal detail.
 
 - Summary endpoint can show public signal metadata.
 - Full detail requires `ViewSignals`.
 - Reasoning/evidence summary requires `ViewReasoning`.
 - Blocked responses return clear upgrade/subscription reason.
 
-[TODO] AH-P5-T004 Gate OpportunityDiscovery detail.
+[DONE] AH-P5-T004 Gate OpportunityDiscovery detail.
 
 - Published opportunity summary can be public.
 - Full compiled policy and execution plan require access.
 - Candidate/NeedsReview opportunity remains internal regardless of access.
 
-[TODO] AH-P5-T005 Add auto-trading permission command.
+[DONE] AH-P5-T005 Add auto-trading permission command.
 
 Command shape:
 
@@ -125,7 +125,7 @@ Behavior:
 - starts/resumes strategy through existing Strategy command path
 - audits accepted and blocked attempts
 
-[TODO] AH-P5-T006 Add Live safety block.
+[DONE] AH-P5-T006 Add Live safety block.
 
 For hackathon:
 
@@ -140,7 +140,7 @@ For hackathon:
   - Live arming current
   - explicit confirmation text
 
-[TODO] AH-P5-T007 Add tests.
+[DONE] AH-P5-T007 Add tests.
 
 - unsubscribed wallet blocked from full signal
 - subscribed wallet allowed
@@ -162,7 +162,20 @@ Acceptance Criteria
 
 Evidence
 --------
+- Signal summaries are public metadata only; signal detail is gated by
+  `ViewSignals`, and reasoning/evidence hashes are gated by `ViewReasoning`.
+- Opportunity summaries are restricted to `Published`; `Candidate` and
+  `NeedsReview` details remain internal regardless of entitlement.
+- Paper auto-trade permission uses the existing control-room strategy state
+  command path and blocks `LiveServices` mode for the hackathon safety boundary.
 - `artifacts/arc-hackathon/demo-run/access-denied.json`
 - `artifacts/arc-hackathon/demo-run/access-allowed.json`
 - `artifacts/arc-hackathon/demo-run/autotrade-permission.json`
-
+- `dotnet test context\ArcSettlement\Autotrade.ArcSettlement.Tests\Autotrade.ArcSettlement.Tests.csproj --no-restore -v minimal`
+  - 37 passed
+- `dotnet test interfaces\Autotrade.Api.Tests\Autotrade.Api.Tests.csproj --no-restore -v minimal`
+  - 129 passed
+- `dotnet build Autotrade.sln --no-restore -v minimal`
+  - 0 warnings, 0 errors
+- `dotnet test Autotrade.sln --no-build -v minimal`
+  - 557 passed

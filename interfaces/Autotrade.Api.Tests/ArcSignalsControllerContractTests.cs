@@ -25,6 +25,7 @@ public sealed class ArcSignalsControllerContractTests
         var records = Assert.IsAssignableFrom<IReadOnlyList<ArcSignalSummaryResponse>>(ok.Value);
         Assert.Single(records);
         Assert.Equal("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", records[0].SignalId);
+        Assert.Equal(Hash("provenance"), records[0].ProvenanceHash);
         Assert.Equal(10, service.LastQuery?.Limit);
 
         var json = JsonSerializer.Serialize(ok.Value, new JsonSerializerOptions(JsonSerializerDefaults.Web));
@@ -95,6 +96,8 @@ public sealed class ArcSignalsControllerContractTests
         Assert.Equal(record.SignalId, response.SignalId);
         Assert.Equal(record.ReasoningHash, response.ReasoningHash);
         Assert.Equal(record.RiskEnvelopeHash, response.RiskEnvelopeHash);
+        Assert.Equal(record.ProvenanceHash, response.ProvenanceHash);
+        Assert.Equal(record.EvidenceUri, response.EvidenceUri);
         Assert.Equal("arc-signal", access.Requests[0].ResourceKind);
         Assert.Equal(SignalId, access.Requests[0].ResourceId);
         Assert.Equal(ArcEntitlementPermission.ViewReasoning, access.Requests[1].RequiredPermission);
@@ -266,7 +269,9 @@ public sealed class ArcSignalsControllerContractTests
             CreatedAtUtc: DateTimeOffset.Parse("2026-05-11T17:53:52Z"),
             PublishedAtUtc: DateTimeOffset.Parse("2026-05-11T17:54:00Z"),
             Actor: "operator-1",
-            Reason: "publish phase 3 demo");
+            Reason: "publish phase 3 demo",
+            ProvenanceHash: Hash("provenance"),
+            EvidenceUri: "artifacts/arc-hackathon/demo-run/provenance/opportunity-phase8-1.json");
 
     private static ArcStrategySignalProofDocument CreateProof()
         => new(

@@ -6,7 +6,8 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public readonly status: number,
-    public readonly traceId?: string
+    public readonly traceId?: string,
+    public readonly payload?: unknown
   ) {
     super(message)
     this.name = 'ApiError'
@@ -30,22 +31,23 @@ export async function apiRequest<T>(
 
   if (!response.ok) {
     const problem = await readProblemDetails(response)
-    throw new ApiError(problem.message, response.status, problem.traceId)
+    throw new ApiError(problem.message, response.status, problem.traceId, problem.payload)
   }
 
   return (await response.json()) as T
 }
 
-async function readProblemDetails(response: Response): Promise<{ message: string; traceId?: string }> {
+async function readProblemDetails(response: Response): Promise<{ message: string; traceId?: string; payload?: unknown }> {
   const fallback = `API request failed with HTTP ${response.status}`
   const contentType = response.headers.get('content-type') ?? ''
   if (!contentType.includes('application/json')) {
     return { message: fallback }
   }
 
-  const payload = (await response.json()) as { detail?: string; title?: string; traceId?: string }
+  const payload = (await response.json()) as { detail?: string; title?: string; traceId?: string; message?: string }
   return {
-    message: payload.detail ?? payload.title ?? fallback,
-    traceId: payload.traceId
+    message: payload.detail ?? payload.message ?? payload.title ?? fallback,
+    traceId: payload.traceId,
+    payload
   }
 }

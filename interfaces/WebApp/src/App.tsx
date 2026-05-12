@@ -23,6 +23,16 @@ import {
 } from 'lucide-react'
 import {
   getControlRoomSnapshot,
+  getArcAgentReputation,
+  getArcOpportunities,
+  getArcOpportunityDetail,
+  getArcPerformanceOutcome,
+  getArcSignals,
+  getArcSignalDetail,
+  getArcStrategyAccessStatus,
+  getArcStrategyReputation,
+  getArcSubscriptionPlans,
+  getArcProvenance,
   getMarketDetail,
   getMarkets,
   getOrderBook,
@@ -37,13 +47,14 @@ import {
   getUnhedgedExposures,
   cancelOpenOrders,
   buildIncidentPackagePath,
+  requestArcPaperAutoTrade,
   setKillSwitch,
   setStrategyState,
   rollbackStrategyParameters,
   updateStrategyParameters
 } from '@/api/controlRoom'
 import type { ControlCommandIntent, StrategyParameterMutationIntent } from '@/api/controlRoom'
-import { apiBaseUrl } from '@/api/http'
+import { ApiError, apiBaseUrl } from '@/api/http'
 import { messages } from '@/i18n/messages'
 import type { Locale } from '@/i18n/messages'
 import type {
@@ -60,6 +71,19 @@ import type {
   ControlRoomStrategy,
   ControlRoomMarketToken,
   ControlRoomCommandResponse,
+  ArcAccessDecision,
+  ArcAgentReputation,
+  ArcEntitlementPermission,
+  ArcOpportunityDetail,
+  ArcOpportunitySummary,
+  ArcPaperAutoTradeResponse,
+  ArcPerformanceOutcomeRecord,
+  ArcRevenueSettlementSummary,
+  ArcSignalDetail,
+  ArcSignalSummary,
+  ArcStrategyAccessStatus,
+  ArcSubscriptionPlan,
+  ArcSubscriberProvenanceExplanation,
   IncidentActionCatalog,
   IncidentActionDescriptor,
   PaperPromotionChecklist,
@@ -80,7 +104,7 @@ import type {
 } from '@/types/controlRoom'
 
 type TargetStrategyState = 'Running' | 'Paused' | 'Stopped'
-type ActiveView = 'markets' | 'trade' | 'ops' | 'activity' | 'reports'
+type ActiveView = 'markets' | 'trade' | 'ops' | 'activity' | 'performance' | 'reports'
 type CommandSafetyLevel = 'offline' | 'readonly' | 'degraded' | 'paper' | 'live'
 type CommandResultTone = 'good' | 'watch' | 'danger'
 type IncidentCancelScope = 'all' | 'strategy'
@@ -98,7 +122,7 @@ interface CommandResult {
 }
 
 const supportedLocales: Locale[] = ['zh-CN', 'en-US']
-const supportedViews: ActiveView[] = ['markets', 'trade', 'ops', 'activity', 'reports']
+const supportedViews: ActiveView[] = ['markets', 'trade', 'ops', 'activity', 'performance', 'reports']
 const MARKET_PAGE_SIZE = 48
 const STRATEGY_DECISION_LIMIT = 12
 const readinessStatusSummary: ReadinessCheckStatus[] = ['Ready', 'Degraded', 'Unhealthy', 'Blocked', 'Skipped']
@@ -141,6 +165,20 @@ function readInitialStrategyId() {
 function readInitialRunSessionId() {
   const sessionId = new URLSearchParams(window.location.search).get('runSessionId')?.trim()
   return sessionId ? sessionId : ''
+}
+
+function readInitialProvenanceHash() {
+  const provenanceHash = new URLSearchParams(window.location.search).get('provenance')?.trim()
+  return provenanceHash ? provenanceHash : ''
+}
+
+function readInitialSubscriberWallet() {
+  const wallet = new URLSearchParams(window.location.search).get('wallet')?.trim()
+  if (wallet) {
+    return wallet
+  }
+
+  return window.localStorage.getItem('autotrade.arcSubscriberWallet')?.trim() ?? ''
 }
 
 function writeWorkspaceLocation(view: ActiveView, strategyId: string | null) {
@@ -198,6 +236,11 @@ function ControlRoom({
   const [riskDrilldown, setRiskDrilldown] = useState<RiskEventDrilldown | null>(null)
   const [exposureDrilldown, setExposureDrilldown] = useState<UnhedgedExposureDrilldownResponse | null>(null)
   const [incidentActions, setIncidentActions] = useState<IncidentActionCatalog | null>(null)
+  const [agentReputation, setAgentReputation] = useState<ArcAgentReputation | null>(null)
+  const [strategyReputation, setStrategyReputation] = useState<ArcAgentReputation | null>(null)
+  const [provenanceHashInput, setProvenanceHashInput] = useState(readInitialProvenanceHash)
+  const [loadedProvenanceHash, setLoadedProvenanceHash] = useState(readInitialProvenanceHash)
+  const [provenanceExplanation, setProvenanceExplanation] = useState<ArcSubscriberProvenanceExplanation | null>(null)
   const [incidentCancelScope, setIncidentCancelScope] = useState<IncidentCancelScope>('all')
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('all')
@@ -214,6 +257,8 @@ function ControlRoom({
   const [reportError, setReportError] = useState<string | null>(null)
   const [riskDrilldownError, setRiskDrilldownError] = useState<string | null>(null)
   const [incidentActionError, setIncidentActionError] = useState<string | null>(null)
+  const [performanceError, setPerformanceError] = useState<string | null>(null)
+  const [provenanceError, setProvenanceError] = useState<string | null>(null)
   const [orderBookError, setOrderBookError] = useState<string | null>(null)
   const [strategyDecisionError, setStrategyDecisionError] = useState<string | null>(null)
   const [strategyParameterError, setStrategyParameterError] = useState<string | null>(null)
@@ -227,6 +272,8 @@ function ControlRoom({
   const [isReportLoading, setIsReportLoading] = useState(false)
   const [isRiskDrilldownLoading, setIsRiskDrilldownLoading] = useState(false)
   const [isIncidentActionLoading, setIsIncidentActionLoading] = useState(false)
+  const [isPerformanceLoading, setIsPerformanceLoading] = useState(false)
+  const [isProvenanceLoading, setIsProvenanceLoading] = useState(false)
   const [busyCommand, setBusyCommand] = useState<string | null>(null)
   const loadedMarketCountRef = useRef(0)
   const loadMoreMarkerRef = useRef<HTMLDivElement | null>(null)
@@ -429,6 +476,66 @@ function ControlRoom({
     []
   )
 
+  const loadPerformance = useCallback(
+    async (signal?: AbortSignal) => {
+      setIsPerformanceLoading(true)
+      try {
+        const strategyRequest = selectedStrategyId
+          ? getArcStrategyReputation(selectedStrategyId, signal)
+          : Promise.resolve(null)
+        const [nextAgentReputation, nextStrategyReputation] = await Promise.all([
+          getArcAgentReputation(signal),
+          strategyRequest
+        ])
+
+        setAgentReputation(nextAgentReputation)
+        setStrategyReputation(nextStrategyReputation)
+        setPerformanceError(null)
+      } catch (requestError) {
+        if (requestError instanceof DOMException && requestError.name === 'AbortError') {
+          return
+        }
+
+        setPerformanceError(requestError instanceof Error ? requestError.message : 'Arc performance request failed.')
+      } finally {
+        if (!signal?.aborted) {
+          setIsPerformanceLoading(false)
+        }
+      }
+    },
+    [selectedStrategyId]
+  )
+
+  const loadProvenance = useCallback(
+    async (provenanceHash: string, signal?: AbortSignal) => {
+      const normalizedHash = provenanceHash.trim()
+      if (!normalizedHash) {
+        setProvenanceExplanation(null)
+        setProvenanceError(null)
+        return
+      }
+
+      setIsProvenanceLoading(true)
+      try {
+        const nextProvenance = await getArcProvenance(normalizedHash, signal)
+        setProvenanceExplanation(nextProvenance)
+        setProvenanceError(null)
+      } catch (requestError) {
+        if (requestError instanceof DOMException && requestError.name === 'AbortError') {
+          return
+        }
+
+        setProvenanceExplanation(null)
+        setProvenanceError(requestError instanceof Error ? requestError.message : 'Arc provenance request failed.')
+      } finally {
+        if (!signal?.aborted) {
+          setIsProvenanceLoading(false)
+        }
+      }
+    },
+    []
+  )
+
   const loadMoreMarkets = useCallback(
     async () => {
       if (!marketResponse || isLoadingMoreMarkets || (marketResponse.isComplete && marketResponse.markets.length >= marketResponse.totalCount)) {
@@ -551,6 +658,32 @@ function ControlRoom({
     void loadIncidentActions(controller.signal)
     return () => controller.abort()
   }, [activeView, loadIncidentActions, snapshot?.timestampUtc])
+
+  useEffect(() => {
+    if (activeView !== 'performance') {
+      return
+    }
+
+    const controller = new AbortController()
+    void loadPerformance(controller.signal)
+    return () => controller.abort()
+  }, [activeView, loadPerformance])
+
+  useEffect(() => {
+    if (activeView !== 'performance') {
+      return
+    }
+
+    if (!loadedProvenanceHash.trim()) {
+      setProvenanceExplanation(null)
+      setProvenanceError(null)
+      return
+    }
+
+    const controller = new AbortController()
+    void loadProvenance(loadedProvenanceHash, controller.signal)
+    return () => controller.abort()
+  }, [activeView, loadProvenance, loadedProvenanceHash])
 
   useEffect(() => {
     if (activeView !== 'markets' || !hasMoreMarkets || isLoadingMoreMarkets || typeof IntersectionObserver === 'undefined') {
@@ -1114,6 +1247,31 @@ function ControlRoom({
           </section>
         )}
 
+        {activeView === 'performance' && (
+          <section className="view-grid performance-grid">
+            <PerformanceLedgerWorkspace
+              agentReputation={agentReputation}
+              strategyReputation={strategyReputation}
+              selectedStrategyId={selectedStrategyId}
+              provenanceHash={provenanceHashInput}
+              provenance={provenanceExplanation}
+              isLoading={isPerformanceLoading}
+              isProvenanceLoading={isProvenanceLoading}
+              error={performanceError}
+              provenanceError={provenanceError}
+              onProvenanceHashChange={setProvenanceHashInput}
+              onLoadProvenance={() => {
+                const nextProvenanceHash = provenanceHashInput.trim()
+                setLoadedProvenanceHash(nextProvenanceHash)
+                if (nextProvenanceHash === loadedProvenanceHash) {
+                  void loadProvenance(nextProvenanceHash)
+                }
+              }}
+              onRefresh={() => void loadPerformance()}
+            />
+          </section>
+        )}
+
         {activeView === 'reports' && (
           <section className="view-grid report-grid">
             <RunReportWorkspace
@@ -1171,6 +1329,12 @@ const ViewTabs = memo(function ViewTabs({
       icon: <Activity size={17} aria-hidden="true" />,
       label: intl.formatMessage({ id: 'view.activity' }),
       detail: intl.formatMessage({ id: 'view.activity.detail' })
+    },
+    {
+      view: 'performance',
+      icon: <Gauge size={17} aria-hidden="true" />,
+      label: 'Arc proof',
+      detail: 'Reputation ledger'
     },
     {
       view: 'reports',
@@ -3386,7 +3550,7 @@ function StrategyButton({
 
 function MetricPair({ label, value }: { label: string; value: string | number }) {
   return (
-    <div>
+    <div className="metric-pair">
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
@@ -3413,6 +3577,183 @@ function MetricPill({ label, value, tone }: { label: string; value: string; tone
       <strong>{value}</strong>
     </span>
   )
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === 'AbortError'
+}
+
+function toErrorMessage(error: unknown, fallback: string) {
+  return sanitizeCommandMessage(error instanceof Error ? error.message : fallback)
+}
+
+function extractArcAccessDecision(error: unknown) {
+  if (!(error instanceof ApiError)) {
+    return null
+  }
+
+  if (isArcAccessDecision(error.payload)) {
+    return error.payload
+  }
+
+  if (isArcPaperAutoTradeResponse(error.payload)) {
+    return error.payload.accessDecision
+  }
+
+  return null
+}
+
+function extractArcPaperAutoTradeResponse(error: unknown) {
+  return error instanceof ApiError && isArcPaperAutoTradeResponse(error.payload)
+    ? error.payload
+    : null
+}
+
+function isArcAccessDecision(payload: unknown): payload is ArcAccessDecision {
+  if (!payload || typeof payload !== 'object') {
+    return false
+  }
+
+  const candidate = payload as Partial<ArcAccessDecision>
+  return typeof candidate.allowed === 'boolean'
+    && typeof candidate.reasonCode === 'string'
+    && typeof candidate.reason === 'string'
+    && typeof candidate.requiredPermission === 'string'
+    && typeof candidate.strategyKey === 'string'
+    && typeof candidate.resourceKind === 'string'
+    && typeof candidate.resourceId === 'string'
+}
+
+function isArcPaperAutoTradeResponse(payload: unknown): payload is ArcPaperAutoTradeResponse {
+  if (!payload || typeof payload !== 'object') {
+    return false
+  }
+
+  const candidate = payload as Partial<ArcPaperAutoTradeResponse>
+  return typeof candidate.status === 'string'
+    && typeof candidate.message === 'string'
+    && isArcAccessDecision(candidate.accessDecision)
+}
+
+function createClientAutoTradeResponse(
+  strategyKey: string,
+  walletAddress: string,
+  status: string,
+  message: string
+): ArcPaperAutoTradeResponse {
+  return {
+    status,
+    message,
+    command: null,
+    accessDecision: {
+      allowed: false,
+      reasonCode: status,
+      reason: message,
+      requiredPermission: 'RequestPaperAutoTrade',
+      strategyKey,
+      walletAddress: walletAddress.trim() || null,
+      resourceKind: 'subscriber-portal',
+      resourceId: strategyKey || 'unknown',
+      tier: null,
+      expiresAtUtc: null,
+      evidenceTransactionHash: null
+    }
+  }
+}
+
+function resolveAccessStatusTone(status: ArcStrategyAccessStatus | null) {
+  if (!status) {
+    return 'unknown'
+  }
+
+  if (status.hasAccess) {
+    return 'active'
+  }
+
+  return status.statusCode === 'Expired' ? 'expired' : 'blocked'
+}
+
+function hasPermission(status: ArcStrategyAccessStatus | null, permission: ArcEntitlementPermission) {
+  return Boolean(status?.hasAccess && status.permissions.includes(permission))
+}
+
+function resolvePaperAutoTradeDisabledReason(
+  status: ArcStrategyAccessStatus | null,
+  selectedStrategyId: string,
+  isLoading: boolean
+) {
+  if (isLoading) {
+    return 'Request is pending'
+  }
+
+  if (!selectedStrategyId.trim()) {
+    return 'No strategy selected'
+  }
+
+  if (!status) {
+    return 'Access status has not been checked'
+  }
+
+  if (!status.hasAccess) {
+    return status.reason
+  }
+
+  if (!status.permissions.includes('RequestPaperAutoTrade')) {
+    return 'RequestPaperAutoTrade permission is missing'
+  }
+
+  return null
+}
+
+function formatPermissionList(permissions: ArcEntitlementPermission[]) {
+  return permissions.length === 0 ? '-' : permissions.join(', ')
+}
+
+function formatUsdc(value: number | null | undefined) {
+  return value === null || value === undefined ? '-' : `$${formatCurrency(value)} USDC`
+}
+
+function formatPlanDuration(durationSeconds: number) {
+  if (durationSeconds <= 0) {
+    return '-'
+  }
+
+  const days = durationSeconds / 86400
+  return days >= 1 ? `${days.toFixed(days % 1 === 0 ? 0 : 1)} days` : `${(durationSeconds / 3600).toFixed(1)} hours`
+}
+
+function compactJson(value: string | null | undefined) {
+  if (!value?.trim()) {
+    return '-'
+  }
+
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2)
+  } catch {
+    return value
+  }
+}
+
+function buildRevenueSettlementSummary(
+  plan: ArcSubscriptionPlan | null,
+  accessStatus: ArcStrategyAccessStatus | null,
+  signal: ArcSignalDetail | ArcSignalSummary | null
+): ArcRevenueSettlementSummary {
+  const subscriptionRevenueUsdc = accessStatus?.hasAccess && plan ? plan.priceUsdc : 0
+  const builderAttributedFlowUsdc = signal ? Number(signal.maxNotionalUsdc) : 0
+  const simulatedBuilderShareUsdc = builderAttributedFlowUsdc * 0.7
+  const simulatedTreasuryShareUsdc = builderAttributedFlowUsdc - simulatedBuilderShareUsdc
+
+  return {
+    generatedAtUtc: new Date().toISOString(),
+    strategyKey: accessStatus?.strategyKey ?? plan?.strategyKey ?? signal?.strategyId ?? '-',
+    source: accessStatus?.sourceTransactionHash ? 'testnet' : 'simulated',
+    subscriptionRevenueUsdc,
+    builderAttributedFlowUsdc,
+    simulatedBuilderShareUsdc,
+    simulatedTreasuryShareUsdc,
+    settlementTransactionHash: accessStatus?.sourceTransactionHash ?? null
+  }
 }
 
 function compareReadinessChecks(left: ReadinessCheckResult, right: ReadinessCheckResult) {
@@ -3585,6 +3926,1111 @@ const DecisionList = memo(function DecisionList({ decisions }: { decisions: Cont
     </section>
   )
 })
+
+const PerformanceLedgerWorkspace = memo(function PerformanceLedgerWorkspace({
+  agentReputation,
+  strategyReputation,
+  selectedStrategyId,
+  provenanceHash,
+  provenance,
+  isLoading,
+  isProvenanceLoading,
+  error,
+  provenanceError,
+  onProvenanceHashChange,
+  onLoadProvenance,
+  onRefresh
+}: {
+  agentReputation: ArcAgentReputation | null
+  strategyReputation: ArcAgentReputation | null
+  selectedStrategyId: string | null
+  provenanceHash: string
+  provenance: ArcSubscriberProvenanceExplanation | null
+  isLoading: boolean
+  isProvenanceLoading: boolean
+  error: string | null
+  provenanceError: string | null
+  onProvenanceHashChange: (value: string) => void
+  onLoadProvenance: () => void
+  onRefresh: () => void
+}) {
+  const [walletAddress, setWalletAddressState] = useState(readInitialSubscriberWallet)
+  const [plans, setPlans] = useState<ArcSubscriptionPlan[]>([])
+  const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null)
+  const [accessStatus, setAccessStatus] = useState<ArcStrategyAccessStatus | null>(null)
+  const [opportunities, setOpportunities] = useState<ArcOpportunitySummary[]>([])
+  const [selectedOpportunityId, setSelectedOpportunityId] = useState<string | null>(null)
+  const [opportunityDetail, setOpportunityDetail] = useState<ArcOpportunityDetail | null>(null)
+  const [opportunityDecision, setOpportunityDecision] = useState<ArcAccessDecision | null>(null)
+  const [signals, setSignals] = useState<ArcSignalSummary[]>([])
+  const [selectedSignalId, setSelectedSignalId] = useState<string | null>(null)
+  const [signalDetail, setSignalDetail] = useState<ArcSignalDetail | null>(null)
+  const [signalDecision, setSignalDecision] = useState<ArcAccessDecision | null>(null)
+  const [performanceOutcome, setPerformanceOutcome] = useState<ArcPerformanceOutcomeRecord | null>(null)
+  const [autoTradeResponse, setAutoTradeResponse] = useState<ArcPaperAutoTradeResponse | null>(null)
+  const [portalError, setPortalError] = useState<string | null>(null)
+  const [accessError, setAccessError] = useState<string | null>(null)
+  const [opportunityError, setOpportunityError] = useState<string | null>(null)
+  const [signalError, setSignalError] = useState<string | null>(null)
+  const [performanceOutcomeError, setPerformanceOutcomeError] = useState<string | null>(null)
+  const [isPortalLoading, setIsPortalLoading] = useState(false)
+  const [isAccessLoading, setIsAccessLoading] = useState(false)
+  const [isOpportunityLoading, setIsOpportunityLoading] = useState(false)
+  const [isSignalLoading, setIsSignalLoading] = useState(false)
+  const [isPerformanceOutcomeLoading, setIsPerformanceOutcomeLoading] = useState(false)
+  const [isAutoTradeLoading, setIsAutoTradeLoading] = useState(false)
+
+  const selectedPlan = useMemo(
+    () => plans.find((plan) => plan.planId === selectedPlanId) ?? null,
+    [plans, selectedPlanId]
+  )
+  const subscriberStrategyKey = selectedPlan?.strategyKey ?? selectedStrategyId ?? plans[0]?.strategyKey ?? ''
+  const targetAutoTradeStrategyId = selectedStrategyId ?? subscriberStrategyKey
+  const revenueSummary = useMemo(
+    () => buildRevenueSettlementSummary(selectedPlan, accessStatus, signalDetail ?? signals[0] ?? null),
+    [accessStatus, selectedPlan, signalDetail, signals]
+  )
+
+  const setWalletAddress = useCallback((value: string) => {
+    setWalletAddressState(value)
+    window.localStorage.setItem('autotrade.arcSubscriberWallet', value)
+  }, [])
+
+  const loadSubscriberCatalog = useCallback(async (signal?: AbortSignal) => {
+    setIsPortalLoading(true)
+    try {
+      const [plansResult, opportunitiesResult, signalsResult] = await Promise.allSettled([
+        getArcSubscriptionPlans(signal),
+        getArcOpportunities(12, signal),
+        getArcSignals(12, signal)
+      ])
+      const failures: string[] = []
+
+      if (plansResult.status === 'fulfilled') {
+        setPlans(plansResult.value)
+      } else if (!isAbortError(plansResult.reason)) {
+        failures.push(toErrorMessage(plansResult.reason, 'Subscription plans request failed.'))
+      }
+
+      if (opportunitiesResult.status === 'fulfilled') {
+        setOpportunities(opportunitiesResult.value)
+        setSelectedOpportunityId((current) =>
+          current && opportunitiesResult.value.some((item) => item.opportunityId === current)
+            ? current
+            : opportunitiesResult.value[0]?.opportunityId ?? null)
+      } else if (!isAbortError(opportunitiesResult.reason)) {
+        failures.push(toErrorMessage(opportunitiesResult.reason, 'Opportunity request failed.'))
+      }
+
+      if (signalsResult.status === 'fulfilled') {
+        setSignals(signalsResult.value)
+        setSelectedSignalId((current) =>
+          current && signalsResult.value.some((item) => item.signalId === current)
+            ? current
+            : signalsResult.value[0]?.signalId ?? null)
+      } else if (!isAbortError(signalsResult.reason)) {
+        failures.push(toErrorMessage(signalsResult.reason, 'Signal request failed.'))
+      }
+
+      setPortalError(failures.length > 0 ? failures.join(' ') : null)
+    } finally {
+      if (!signal?.aborted) {
+        setIsPortalLoading(false)
+      }
+    }
+  }, [])
+
+  const loadAccessStatus = useCallback(async (signal?: AbortSignal) => {
+    if (!walletAddress.trim() || !subscriberStrategyKey.trim()) {
+      setAccessStatus(null)
+      setAccessError(null)
+      return
+    }
+
+    setIsAccessLoading(true)
+    try {
+      const nextStatus = await getArcStrategyAccessStatus(walletAddress.trim(), subscriberStrategyKey.trim(), signal)
+      setAccessStatus(nextStatus)
+      setAccessError(null)
+    } catch (requestError) {
+      if (isAbortError(requestError)) {
+        return
+      }
+
+      setAccessStatus(null)
+      setAccessError(toErrorMessage(requestError, 'Access status request failed.'))
+    } finally {
+      if (!signal?.aborted) {
+        setIsAccessLoading(false)
+      }
+    }
+  }, [subscriberStrategyKey, walletAddress])
+
+  const loadSelectedOpportunity = useCallback(async (opportunityId: string | null, signal?: AbortSignal) => {
+    if (!opportunityId) {
+      setOpportunityDetail(null)
+      setOpportunityDecision(null)
+      setOpportunityError(null)
+      return
+    }
+
+    setIsOpportunityLoading(true)
+    try {
+      const nextDetail = await getArcOpportunityDetail(opportunityId, walletAddress, signal)
+      setOpportunityDetail(nextDetail)
+      setOpportunityDecision(null)
+      setOpportunityError(null)
+    } catch (requestError) {
+      if (isAbortError(requestError)) {
+        return
+      }
+
+      const accessDecision = extractArcAccessDecision(requestError)
+      setOpportunityDetail(null)
+      setOpportunityDecision(accessDecision)
+      setOpportunityError(accessDecision ? null : toErrorMessage(requestError, 'Opportunity detail request failed.'))
+    } finally {
+      if (!signal?.aborted) {
+        setIsOpportunityLoading(false)
+      }
+    }
+  }, [walletAddress])
+
+  const loadSelectedSignal = useCallback(async (signalId: string | null, signal?: AbortSignal) => {
+    if (!signalId) {
+      setSignalDetail(null)
+      setSignalDecision(null)
+      setSignalError(null)
+      return
+    }
+
+    setIsSignalLoading(true)
+    try {
+      const nextDetail = await getArcSignalDetail(signalId, walletAddress, signal)
+      setSignalDetail(nextDetail)
+      setSignalDecision(null)
+      setSignalError(null)
+      if (nextDetail.provenanceHash && !provenanceHash.trim()) {
+        onProvenanceHashChange(nextDetail.provenanceHash)
+      }
+    } catch (requestError) {
+      if (isAbortError(requestError)) {
+        return
+      }
+
+      const accessDecision = extractArcAccessDecision(requestError)
+      setSignalDetail(null)
+      setSignalDecision(accessDecision)
+      setSignalError(accessDecision ? null : toErrorMessage(requestError, 'Signal detail request failed.'))
+    } finally {
+      if (!signal?.aborted) {
+        setIsSignalLoading(false)
+      }
+    }
+  }, [onProvenanceHashChange, provenanceHash, walletAddress])
+
+  const loadPerformanceOutcome = useCallback(async (signalId: string | null, signal?: AbortSignal) => {
+    if (!signalId) {
+      setPerformanceOutcome(null)
+      setPerformanceOutcomeError(null)
+      return
+    }
+
+    setIsPerformanceOutcomeLoading(true)
+    try {
+      const nextOutcome = await getArcPerformanceOutcome(signalId, signal)
+      setPerformanceOutcome(nextOutcome)
+      setPerformanceOutcomeError(null)
+    } catch (requestError) {
+      if (isAbortError(requestError)) {
+        return
+      }
+
+      setPerformanceOutcome(null)
+      setPerformanceOutcomeError(toErrorMessage(requestError, 'Performance outcome request failed.'))
+    } finally {
+      if (!signal?.aborted) {
+        setIsPerformanceOutcomeLoading(false)
+      }
+    }
+  }, [])
+
+  const requestPaperAutoTrade = useCallback(async () => {
+    if (!walletAddress.trim()) {
+      setAutoTradeResponse(createClientAutoTradeResponse(
+        subscriberStrategyKey,
+        walletAddress,
+        'MissingWallet',
+        'Enter a subscriber wallet before requesting paper automation.'))
+      return
+    }
+
+    if (!targetAutoTradeStrategyId.trim()) {
+      setAutoTradeResponse(createClientAutoTradeResponse(
+        subscriberStrategyKey,
+        walletAddress,
+        'MissingStrategy',
+        'Select a strategy before requesting paper automation.'))
+      return
+    }
+
+    setIsAutoTradeLoading(true)
+    try {
+      const response = await requestArcPaperAutoTrade(targetAutoTradeStrategyId, walletAddress.trim())
+      setAutoTradeResponse(response)
+    } catch (requestError) {
+      const response = extractArcPaperAutoTradeResponse(requestError)
+      setAutoTradeResponse(response ?? createClientAutoTradeResponse(
+        subscriberStrategyKey,
+        walletAddress,
+        'RequestFailed',
+        toErrorMessage(requestError, 'Paper auto-trade request failed.')))
+    } finally {
+      setIsAutoTradeLoading(false)
+    }
+  }, [subscriberStrategyKey, targetAutoTradeStrategyId, walletAddress])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    void loadSubscriberCatalog(controller.signal)
+    return () => controller.abort()
+  }, [loadSubscriberCatalog])
+
+  useEffect(() => {
+    if (plans.length === 0) {
+      return
+    }
+
+    setSelectedPlanId((current) => {
+      if (current && plans.some((plan) => plan.planId === current)) {
+        return current
+      }
+
+      return plans.find((plan) => plan.strategyKey === selectedStrategyId)?.planId ?? plans[0].planId
+    })
+  }, [plans, selectedStrategyId])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    void loadAccessStatus(controller.signal)
+    return () => controller.abort()
+  }, [loadAccessStatus])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    void loadSelectedOpportunity(selectedOpportunityId, controller.signal)
+    return () => controller.abort()
+  }, [loadSelectedOpportunity, selectedOpportunityId])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    void loadSelectedSignal(selectedSignalId, controller.signal)
+    return () => controller.abort()
+  }, [loadSelectedSignal, selectedSignalId])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    void loadPerformanceOutcome(selectedSignalId, controller.signal)
+    return () => controller.abort()
+  }, [loadPerformanceOutcome, selectedSignalId])
+
+  return (
+    <section className="surface performance-workspace subscriber-workspace" aria-label="Arc subscriber portal">
+      <div className="performance-hero subscriber-hero">
+        <div className="performance-title">
+          <p className="eyebrow">Arc settlement</p>
+          <h2>Subscriber portal</h2>
+          <span>Unlock paid signals, inspect proofs, request paper automation, and review settlement evidence.</span>
+        </div>
+        <div className="performance-actions">
+          <MetricPill
+            label="Coverage"
+            value={agentReputation ? formatRateValue(agentReputation.confidenceCoverage) : '-'}
+            tone={agentReputation && agentReputation.confidenceCoverage >= 0.8 ? 'good' : 'watch'}
+          />
+          <button className="command-button" type="button" disabled={isLoading} onClick={onRefresh}>
+            <RefreshCw size={16} aria-hidden="true" />
+            {isLoading || isPortalLoading ? 'Loading' : 'Refresh'}
+          </button>
+        </div>
+      </div>
+
+      {error && <div className="error-strip report-error">{error}</div>}
+      {portalError && <div className="error-strip report-error">{portalError}</div>}
+
+      <div className="subscriber-grid">
+        <SubscriberIdentityPanel
+          walletAddress={walletAddress}
+          plans={plans}
+          selectedPlan={selectedPlan}
+          selectedPlanId={selectedPlanId}
+          subscriberStrategyKey={subscriberStrategyKey}
+          accessStatus={accessStatus}
+          isLoading={isAccessLoading || isPortalLoading}
+          error={accessError}
+          onWalletChange={setWalletAddress}
+          onPlanChange={setSelectedPlanId}
+          onRefreshAccess={() => void loadAccessStatus()}
+        />
+        <SubscriptionPanel
+          plan={selectedPlan}
+          accessStatus={accessStatus}
+          isLoading={isAccessLoading || isPortalLoading}
+        />
+      </div>
+
+      <div className="subscriber-detail-grid">
+        <OpportunityGatePanel
+          opportunities={opportunities}
+          selectedOpportunityId={selectedOpportunityId}
+          detail={opportunityDetail}
+          accessDecision={opportunityDecision}
+          isLoading={isOpportunityLoading || isPortalLoading}
+          error={opportunityError}
+          onSelect={setSelectedOpportunityId}
+          onRefresh={() => void loadSelectedOpportunity(selectedOpportunityId)}
+        />
+        <SignalProofPanel
+          signals={signals}
+          selectedSignalId={selectedSignalId}
+          detail={signalDetail}
+          accessDecision={signalDecision}
+          isLoading={isSignalLoading || isPortalLoading}
+          error={signalError}
+          onSelect={setSelectedSignalId}
+          onRefresh={() => void loadSelectedSignal(selectedSignalId)}
+          onUseProvenance={(hash) => {
+            onProvenanceHashChange(hash)
+          }}
+        />
+      </div>
+
+      <AutoTradePanel
+        selectedStrategyId={targetAutoTradeStrategyId}
+        accessStatus={accessStatus}
+        response={autoTradeResponse}
+        isLoading={isAutoTradeLoading}
+        onRequest={requestPaperAutoTrade}
+      />
+
+      <div className="performance-scope-grid">
+        <ReputationPanel
+          title="Agent reputation"
+          subtitle="All published Arc signals"
+          reputation={agentReputation}
+          isLoading={isLoading}
+          emptyText="No agent outcomes have been recorded."
+        />
+        <ReputationPanel
+          title="Strategy reputation"
+          subtitle={selectedStrategyId ?? 'Strategy scope'}
+          reputation={strategyReputation}
+          isLoading={isLoading}
+          emptyText={selectedStrategyId ? 'No strategy outcomes have been recorded.' : 'Strategy scope not selected.'}
+        />
+      </div>
+
+      <LastOutcomePanel
+        outcome={performanceOutcome}
+        isLoading={isPerformanceOutcomeLoading}
+        error={performanceOutcomeError}
+        onRefresh={() => void loadPerformanceOutcome(selectedSignalId)}
+      />
+
+      <RevenueSettlementPanel summary={revenueSummary} />
+
+      <ProvenancePanel
+        provenanceHash={provenanceHash}
+        provenance={provenance}
+        isLoading={isProvenanceLoading}
+        error={provenanceError}
+        onProvenanceHashChange={onProvenanceHashChange}
+        onLoad={onLoadProvenance}
+      />
+    </section>
+  )
+})
+
+const SubscriberIdentityPanel = memo(function SubscriberIdentityPanel({
+  walletAddress,
+  plans,
+  selectedPlan,
+  selectedPlanId,
+  subscriberStrategyKey,
+  accessStatus,
+  isLoading,
+  error,
+  onWalletChange,
+  onPlanChange,
+  onRefreshAccess
+}: {
+  walletAddress: string
+  plans: ArcSubscriptionPlan[]
+  selectedPlan: ArcSubscriptionPlan | null
+  selectedPlanId: number | null
+  subscriberStrategyKey: string
+  accessStatus: ArcStrategyAccessStatus | null
+  isLoading: boolean
+  error: string | null
+  onWalletChange: (value: string) => void
+  onPlanChange: (planId: number | null) => void
+  onRefreshAccess: () => void
+}) {
+  return (
+    <article className="subscriber-panel">
+      <div className="section-head compact">
+        <div>
+          <p className="eyebrow">Subscriber identity</p>
+          <h3>Wallet and tier</h3>
+        </div>
+        <ShieldCheck size={19} aria-hidden="true" />
+      </div>
+
+      <div className="subscriber-form-grid">
+        <label>
+          <span>Wallet</span>
+          <input
+            value={walletAddress}
+            placeholder="0x..."
+            spellCheck={false}
+            onChange={(event) => onWalletChange(event.target.value)}
+          />
+        </label>
+        <label>
+          <span>Plan</span>
+          <select
+            value={selectedPlanId ?? ''}
+            onChange={(event) => onPlanChange(event.target.value ? Number(event.target.value) : null)}
+          >
+            {plans.length === 0 ? (
+              <option value="">No configured plans</option>
+            ) : plans.map((plan) => (
+              <option value={plan.planId} key={plan.planId}>
+                {plan.planName} / {plan.strategyKey}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button className="command-button" type="button" disabled={isLoading} onClick={onRefreshAccess}>
+          <RefreshCw size={16} aria-hidden="true" />
+          {isLoading ? 'Checking' : 'Refresh access'}
+        </button>
+      </div>
+
+      {error && <div className="error-strip report-error">{error}</div>}
+
+      <div className="subscriber-status-strip">
+        <span className={`access-status ${resolveAccessStatusTone(accessStatus)}`}>
+          {accessStatus?.statusCode ?? 'Not checked'}
+        </span>
+        <span>{accessStatus?.reason ?? 'Enter a wallet to read entitlement status.'}</span>
+      </div>
+
+      <div className="subscriber-facts">
+        <MetricPair label="Strategy key" value={subscriberStrategyKey || '-'} />
+        <MetricPair label="Tier" value={accessStatus?.tier ?? selectedPlan?.tier ?? '-'} />
+        <MetricPair label="Permissions" value={formatPermissionList(accessStatus?.permissions ?? selectedPlan?.permissions ?? [])} />
+        <MetricPair label="Expires" value={formatNullableDate(accessStatus?.expiresAtUtc)} />
+      </div>
+    </article>
+  )
+})
+
+const SubscriptionPanel = memo(function SubscriptionPanel({
+  plan,
+  accessStatus,
+  isLoading
+}: {
+  plan: ArcSubscriptionPlan | null
+  accessStatus: ArcStrategyAccessStatus | null
+  isLoading: boolean
+}) {
+  return (
+    <article className="subscriber-panel">
+      <div className="section-head compact">
+        <div>
+          <p className="eyebrow">Subscription</p>
+          <h3>{plan?.planName ?? 'Plan status'}</h3>
+        </div>
+        <DatabaseZap size={19} aria-hidden="true" />
+      </div>
+
+      {!plan ? (
+        <div className="empty-panel">{isLoading ? 'Loading plans.' : 'No Arc subscription plan is configured.'}</div>
+      ) : (
+        <>
+          <div className="subscriber-facts">
+            <MetricPair label="Price" value={formatUsdc(plan.priceUsdc)} />
+            <MetricPair label="Duration" value={formatPlanDuration(plan.durationSeconds)} />
+            <MetricPair label="Max markets" value={plan.maxMarkets ?? 'Unlimited'} />
+            <MetricPair label="Status" value={accessStatus?.hasAccess ? 'Unlocked' : accessStatus?.statusCode ?? 'Unknown'} />
+          </div>
+          <div className="permission-list">
+            {plan.permissions.map((permission) => (
+              <span key={permission}>{permission}</span>
+            ))}
+          </div>
+          <CopyableHash label="Subscription tx" value={accessStatus?.sourceTransactionHash ?? null} />
+          {!accessStatus?.hasAccess && (
+            <p className="subscriber-note">
+              {accessStatus?.reason ?? 'This wallet has not unlocked the selected plan.'}
+            </p>
+          )}
+        </>
+      )}
+    </article>
+  )
+})
+
+const OpportunityGatePanel = memo(function OpportunityGatePanel({
+  opportunities,
+  selectedOpportunityId,
+  detail,
+  accessDecision,
+  isLoading,
+  error,
+  onSelect,
+  onRefresh
+}: {
+  opportunities: ArcOpportunitySummary[]
+  selectedOpportunityId: string | null
+  detail: ArcOpportunityDetail | null
+  accessDecision: ArcAccessDecision | null
+  isLoading: boolean
+  error: string | null
+  onSelect: (opportunityId: string | null) => void
+  onRefresh: () => void
+}) {
+  const selectedSummary = opportunities.find((item) => item.opportunityId === selectedOpportunityId) ?? null
+
+  return (
+    <article className="subscriber-panel gated-panel">
+      <div className="section-head compact">
+        <div>
+          <p className="eyebrow">Gated opportunity</p>
+          <h3>Published opportunity detail</h3>
+        </div>
+        <FileText size={19} aria-hidden="true" />
+      </div>
+
+      <div className="subscriber-toolbar">
+        <select
+          value={selectedOpportunityId ?? ''}
+          onChange={(event) => onSelect(event.target.value || null)}
+        >
+          {opportunities.length === 0 ? (
+            <option value="">No published opportunities</option>
+          ) : opportunities.map((item) => (
+            <option value={item.opportunityId} key={item.opportunityId}>
+              {compactId(item.opportunityId)} / {item.marketId}
+            </option>
+          ))}
+        </select>
+        <button className="command-button" type="button" disabled={isLoading || !selectedOpportunityId} onClick={onRefresh}>
+          <Search size={16} aria-hidden="true" />
+          {isLoading ? 'Loading' : 'Inspect'}
+        </button>
+      </div>
+
+      {error && <div className="error-strip report-error">{error}</div>}
+      {selectedSummary && (
+        <div className="subscriber-facts">
+          <MetricPair label="Market" value={selectedSummary.marketId} />
+          <MetricPair label="Outcome" value={selectedSummary.outcome} />
+          <MetricPair label="Edge" value={formatBps(selectedSummary.edge * 10_000)} />
+          <MetricPair label="Valid until" value={formatDate(selectedSummary.validUntilUtc)} />
+        </div>
+      )}
+
+      {accessDecision && <AccessDecisionNotice decision={accessDecision} />}
+
+      {!detail && !accessDecision ? (
+        <div className="empty-panel">{isLoading ? 'Reading API-gated opportunity detail.' : 'Select an opportunity to inspect.'}</div>
+      ) : detail ? (
+        <div className="unlocked-detail">
+          <div className="subscriber-facts">
+            <MetricPair label="Fair probability" value={formatRateValue(detail.fairProbability)} />
+            <MetricPair label="Confidence" value={formatRateValue(detail.confidence)} />
+            <MetricPair label="Reasoning gate" value={detail.reasoningDecision.allowed ? 'Unlocked' : detail.reasoningDecision.reasonCode} />
+            <MetricPair label="Evidence count" value={detail.evidence.length} />
+          </div>
+          <div className="detail-copy-block">
+            <span>Reasoning</span>
+            <p>{detail.reason ?? detail.reasoningDecision.reason}</p>
+          </div>
+          <div className="detail-copy-block">
+            <span>Execution policy</span>
+            <pre>{compactJson(detail.compiledPolicyJson)}</pre>
+          </div>
+          <div className="evidence-list compact">
+            {detail.evidence.map((item) => (
+              <div className="provenance-evidence-row" key={item.id}>
+                <div>
+                  <span>{item.sourceName}</span>
+                  <strong>{item.title}</strong>
+                  <p>{item.summary}</p>
+                </div>
+                <small>{compactId(item.contentHash)}</small>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="locked-detail">
+          <strong>Full reasoning and execution policy are hidden by the API.</strong>
+          <span>Required permission: {accessDecision?.requiredPermission ?? 'ViewSignals'}</span>
+        </div>
+      )}
+    </article>
+  )
+})
+
+const SignalProofPanel = memo(function SignalProofPanel({
+  signals,
+  selectedSignalId,
+  detail,
+  accessDecision,
+  isLoading,
+  error,
+  onSelect,
+  onRefresh,
+  onUseProvenance
+}: {
+  signals: ArcSignalSummary[]
+  selectedSignalId: string | null
+  detail: ArcSignalDetail | null
+  accessDecision: ArcAccessDecision | null
+  isLoading: boolean
+  error: string | null
+  onSelect: (signalId: string | null) => void
+  onRefresh: () => void
+  onUseProvenance: (hash: string) => void
+}) {
+  const selectedSummary = signals.find((item) => item.signalId === selectedSignalId) ?? null
+
+  return (
+    <article className="subscriber-panel gated-panel">
+      <div className="section-head compact">
+        <div>
+          <p className="eyebrow">Signal proof</p>
+          <h3>Published signal detail</h3>
+        </div>
+        <ClipboardCheck size={19} aria-hidden="true" />
+      </div>
+
+      <div className="subscriber-toolbar">
+        <select value={selectedSignalId ?? ''} onChange={(event) => onSelect(event.target.value || null)}>
+          {signals.length === 0 ? (
+            <option value="">No published signals</option>
+          ) : signals.map((item) => (
+            <option value={item.signalId} key={item.signalId}>
+              {compactId(item.signalId)} / {item.strategyId}
+            </option>
+          ))}
+        </select>
+        <button className="command-button" type="button" disabled={isLoading || !selectedSignalId} onClick={onRefresh}>
+          <Search size={16} aria-hidden="true" />
+          {isLoading ? 'Loading' : 'Inspect'}
+        </button>
+      </div>
+
+      {error && <div className="error-strip report-error">{error}</div>}
+      {selectedSummary && (
+        <div className="subscriber-facts">
+          <MetricPair label="Strategy" value={selectedSummary.strategyId} />
+          <MetricPair label="Edge" value={formatBps(selectedSummary.expectedEdgeBps)} />
+          <MetricPair label="Notional" value={formatUsdc(selectedSummary.maxNotionalUsdc)} />
+          <MetricPair label="Status" value={selectedSummary.status} />
+        </div>
+      )}
+
+      {accessDecision && <AccessDecisionNotice decision={accessDecision} />}
+
+      {!detail && !accessDecision ? (
+        <div className="empty-panel">{isLoading ? 'Reading API-gated signal detail.' : 'Select a signal to inspect.'}</div>
+      ) : detail ? (
+        <div className="unlocked-detail">
+          <div className="subscriber-facts">
+            <MetricPair label="Reasoning gate" value={detail.reasoningDecision.allowed ? 'Unlocked' : detail.reasoningDecision.reasonCode} />
+            <MetricPair label="Venue" value={detail.venue} />
+            <MetricPair label="Valid until" value={formatDate(detail.validUntilUtc)} />
+            <MetricPair label="Published" value={formatNullableDate(detail.publishedAtUtc)} />
+          </div>
+          <CopyableHash label="Signal tx" value={detail.transactionHash} href={detail.explorerUrl} />
+          <CopyableHash label="Signal hash" value={detail.signalHash} />
+          <CopyableHash label="Reasoning hash" value={detail.reasoningHash} />
+          <CopyableHash label="Risk envelope" value={detail.riskEnvelopeHash} />
+          <CopyableHash label="Provenance" value={detail.provenanceHash} />
+          {detail.provenanceHash && (
+            <button className="command-button inline-action" type="button" onClick={() => onUseProvenance(detail.provenanceHash ?? '')}>
+              <ChevronRight size={16} aria-hidden="true" />
+              Use provenance hash
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="locked-detail">
+          <strong>Full signal proof is hidden by the API.</strong>
+          <span>Required permission: {accessDecision?.requiredPermission ?? 'ViewSignals'}</span>
+        </div>
+      )}
+    </article>
+  )
+})
+
+const AutoTradePanel = memo(function AutoTradePanel({
+  selectedStrategyId,
+  accessStatus,
+  response,
+  isLoading,
+  onRequest
+}: {
+  selectedStrategyId: string
+  accessStatus: ArcStrategyAccessStatus | null
+  response: ArcPaperAutoTradeResponse | null
+  isLoading: boolean
+  onRequest: () => void
+}) {
+  const disabledReason = resolvePaperAutoTradeDisabledReason(accessStatus, selectedStrategyId, isLoading)
+  const decision = response?.accessDecision ?? null
+
+  return (
+    <article className="subscriber-panel automation-panel">
+      <div className="section-head compact">
+        <div>
+          <p className="eyebrow">Automation permission</p>
+          <h3>Paper auto-trade request</h3>
+        </div>
+        <Zap size={19} aria-hidden="true" />
+      </div>
+
+      <div className="automation-grid">
+        <div className="subscriber-facts">
+          <MetricPair label="Target strategy" value={selectedStrategyId || '-'} />
+          <MetricPair label="Paper permission" value={hasPermission(accessStatus, 'RequestPaperAutoTrade') ? 'Available' : 'Blocked'} />
+          <MetricPair label="Live trading" value="Disabled in subscriber portal" />
+          <MetricPair label="Blocked reason" value={disabledReason ?? 'None'} />
+        </div>
+        <button className="command-button" type="button" disabled={Boolean(disabledReason)} onClick={onRequest}>
+          <Play size={16} aria-hidden="true" />
+          {isLoading ? 'Requesting' : 'Request paper auto-trade'}
+        </button>
+      </div>
+
+      {response && (
+        <div className={`automation-result ${response.status === 'Accepted' ? 'good' : 'watch'}`}>
+          <strong>{response.status}</strong>
+          <span>{response.message}</span>
+          <CopyableHash label="Access audit tx" value={decision?.evidenceTransactionHash ?? null} />
+        </div>
+      )}
+    </article>
+  )
+})
+
+const LastOutcomePanel = memo(function LastOutcomePanel({
+  outcome,
+  isLoading,
+  error,
+  onRefresh
+}: {
+  outcome: ArcPerformanceOutcomeRecord | null
+  isLoading: boolean
+  error: string | null
+  onRefresh: () => void
+}) {
+  return (
+    <article className="subscriber-panel outcome-panel">
+      <div className="section-head compact">
+        <div>
+          <p className="eyebrow">Performance outcome</p>
+          <h3>Last signal outcome proof</h3>
+        </div>
+        <Gauge size={19} aria-hidden="true" />
+      </div>
+
+      {error && <div className="error-strip report-error">{error}</div>}
+      {!outcome ? (
+        <div className="empty-panel">{isLoading ? 'Loading latest outcome proof.' : 'No terminal outcome recorded for the selected signal.'}</div>
+      ) : (
+        <>
+          <div className="subscriber-facts">
+            <MetricPair label="Status" value={outcome.status} />
+            <MetricPair label="Record" value={outcome.recordStatus} />
+            <MetricPair label="PnL" value={formatBps(outcome.realizedPnlBps)} />
+            <MetricPair label="Slippage" value={formatBps(outcome.slippageBps)} />
+            <MetricPair label="Fill rate" value={formatRateValue(outcome.fillRate)} />
+            <MetricPair label="Recorded" value={formatDate(outcome.recordedAtUtc)} />
+          </div>
+          <CopyableHash label="Outcome tx" value={outcome.transactionHash} href={outcome.explorerUrl} />
+          <CopyableHash label="Outcome hash" value={outcome.outcomeHash} />
+        </>
+      )}
+
+      <div className="panel-action-row">
+        <button className="command-button" type="button" disabled={isLoading} onClick={onRefresh}>
+          <RefreshCw size={16} aria-hidden="true" />
+          {isLoading ? 'Loading' : 'Refresh outcome'}
+        </button>
+      </div>
+    </article>
+  )
+})
+
+const RevenueSettlementPanel = memo(function RevenueSettlementPanel({
+  summary
+}: {
+  summary: ArcRevenueSettlementSummary
+}) {
+  return (
+    <article className="subscriber-panel settlement-panel">
+      <div className="section-head compact">
+        <div>
+          <p className="eyebrow">Revenue settlement</p>
+          <h3>Builder attribution</h3>
+        </div>
+        <TrendingUp size={19} aria-hidden="true" />
+      </div>
+
+      <div className="subscriber-facts">
+        <MetricPair label="Source" value={summary.source} />
+        <MetricPair label="Subscription revenue" value={formatUsdc(summary.subscriptionRevenueUsdc)} />
+        <MetricPair label="Builder flow" value={formatUsdc(summary.builderAttributedFlowUsdc)} />
+        <MetricPair label="Builder split" value={formatUsdc(summary.simulatedBuilderShareUsdc)} />
+        <MetricPair label="Treasury split" value={formatUsdc(summary.simulatedTreasuryShareUsdc)} />
+        <MetricPair label="Generated" value={formatDate(summary.generatedAtUtc)} />
+      </div>
+      <CopyableHash label="Settlement tx" value={summary.settlementTransactionHash} />
+      <p className="subscriber-note">Settlement values are explicitly {summary.source}; no mainnet revenue claim is implied.</p>
+    </article>
+  )
+})
+
+function AccessDecisionNotice({ decision }: { decision: ArcAccessDecision }) {
+  return (
+    <div className={`access-decision ${decision.allowed ? 'allowed' : 'denied'}`}>
+      <strong>{decision.allowed ? 'Access granted' : 'Access denied'} / {decision.reasonCode}</strong>
+      <span>{decision.reason}</span>
+      <small>
+        API gate required {decision.requiredPermission} for {decision.resourceKind}:{compactNullableId(decision.resourceId)}
+      </small>
+    </div>
+  )
+}
+
+function CopyableHash({
+  label,
+  value,
+  href
+}: {
+  label: string
+  value: string | null | undefined
+  href?: string | null
+}) {
+  const normalized = value?.trim() ?? ''
+  return (
+    <div className="copyable-hash">
+      <span>{label}</span>
+      {href && normalized ? (
+        <a href={href} target="_blank" rel="noreferrer">{compactId(normalized)}</a>
+      ) : (
+        <strong title={normalized || undefined}>{normalized ? compactId(normalized) : '-'}</strong>
+      )}
+      <button
+        type="button"
+        className="copy-button"
+        disabled={!normalized}
+        title={normalized ? `Copy ${label}` : `${label} unavailable`}
+        onClick={() => {
+          if (normalized) {
+            void navigator.clipboard.writeText(normalized)
+          }
+        }}
+      >
+        <ClipboardCheck size={14} aria-hidden="true" />
+      </button>
+    </div>
+  )
+}
+
+const ProvenancePanel = memo(function ProvenancePanel({
+  provenanceHash,
+  provenance,
+  isLoading,
+  error,
+  onProvenanceHashChange,
+  onLoad
+}: {
+  provenanceHash: string
+  provenance: ArcSubscriberProvenanceExplanation | null
+  isLoading: boolean
+  error: string | null
+  onProvenanceHashChange: (value: string) => void
+  onLoad: () => void
+}) {
+  return (
+    <article className="provenance-panel">
+      <div className="section-head compact">
+        <div>
+          <p className="eyebrow">Signal provenance</p>
+          <h3>Source evidence</h3>
+        </div>
+        <ClipboardCheck size={19} aria-hidden="true" />
+      </div>
+
+      <div className="provenance-loader">
+        <label htmlFor="arc-provenance-hash">Provenance hash</label>
+        <div className="provenance-loader-row">
+          <input
+            id="arc-provenance-hash"
+            value={provenanceHash}
+            placeholder="0x..."
+            onChange={(event) => onProvenanceHashChange(event.target.value)}
+          />
+          <button className="command-button" type="button" disabled={isLoading} onClick={onLoad}>
+            <Search size={16} aria-hidden="true" />
+            {isLoading ? 'Loading' : 'Load'}
+          </button>
+        </div>
+      </div>
+
+      {error && <div className="error-strip report-error">{error}</div>}
+
+      {!provenance ? (
+        <div className="empty-panel">No provenance document loaded.</div>
+      ) : (
+        <div className="provenance-body">
+          <div className="provenance-facts">
+            <MetricPair label="Source" value={provenance.sourceModule} />
+            <MetricPair label="Validation" value={provenance.validationStatus} />
+            <MetricPair label="Strategy" value={provenance.strategyId} />
+            <MetricPair label="Market" value={provenance.marketId} />
+            <MetricPair label="Source id" value={provenance.sourceId} />
+            <MetricPair label="Created" value={formatDate(provenance.createdAtUtc)} />
+          </div>
+
+          <div className="provenance-hashes">
+            <MetricPair label="Provenance" value={compactNullableId(provenance.provenanceHash)} />
+            <MetricPair label="Evidence" value={compactNullableId(provenance.evidenceSummaryHash)} />
+            <MetricPair label="LLM output" value={compactNullableId(provenance.llmOutputHash)} />
+            <MetricPair label="Policy" value={compactNullableId(provenance.compiledPolicyHash)} />
+            <MetricPair label="Risk" value={compactNullableId(provenance.riskEnvelopeHash)} />
+            <MetricPair label="Package" value={compactNullableId(provenance.generatedPackageHash)} />
+          </div>
+
+          <div className="provenance-evidence-list">
+            {provenance.evidence.map((item) => (
+              <div className="provenance-evidence-row" key={item.evidenceId}>
+                <div>
+                  <span>{item.title}</span>
+                  <strong>{item.summary}</strong>
+                </div>
+                <small>{compactNullableId(item.contentHash)}</small>
+              </div>
+            ))}
+          </div>
+
+          <p className="provenance-note">{provenance.privacyNote}</p>
+        </div>
+      )}
+    </article>
+  )
+})
+
+function ReputationPanel({
+  title,
+  subtitle,
+  reputation,
+  isLoading,
+  emptyText
+}: {
+  title: string
+  subtitle: string
+  reputation: ArcAgentReputation | null
+  isLoading: boolean
+  emptyText: string
+}) {
+  if (!reputation) {
+    return (
+      <article className="performance-panel">
+        <div className="section-head compact">
+          <div>
+            <p className="eyebrow">{subtitle}</p>
+            <h3>{title}</h3>
+          </div>
+          <Gauge size={19} aria-hidden="true" />
+        </div>
+        <div className="empty-panel">{isLoading ? 'Loading Arc reputation.' : emptyText}</div>
+      </article>
+    )
+  }
+
+  return (
+    <article className="performance-panel">
+      <div className="section-head compact">
+        <div>
+          <p className="eyebrow">{subtitle}</p>
+          <h3>{title}</h3>
+        </div>
+        <span className="calculated-at">{formatDate(reputation.calculatedAtUtc)}</span>
+      </div>
+
+      <div className="performance-summary-grid">
+        <PerformanceReadout label="Signals" value={reputation.totalSignals} detail="published" />
+        <PerformanceReadout label="Terminal" value={reputation.terminalSignals} detail={formatRateValue(reputation.confidenceCoverage)} />
+        <PerformanceReadout label="Pending" value={reputation.pendingSignals} detail="not terminal" />
+        <PerformanceReadout label="Executed" value={reputation.executedSignals} detail={`${reputation.winCount}/${reputation.lossCount}/${reputation.flatCount}`} />
+        <PerformanceReadout label="Avg PnL" value={formatBps(reputation.averageRealizedPnlBps)} detail="realized" />
+        <PerformanceReadout label="Avg slip" value={formatBps(reputation.averageSlippageBps)} detail="execution" />
+        <PerformanceReadout label="Risk reject" value={formatRateValue(reputation.riskRejectionRate)} detail={`${reputation.rejectedSignals} rejected`} />
+        <PerformanceReadout label="Expired" value={reputation.expiredSignals} detail="terminal" />
+      </div>
+
+      <div className="outcome-mix">
+        <OutcomeMixBar label="Wins" count={reputation.winCount} total={reputation.totalSignals} tone="good" />
+        <OutcomeMixBar label="Losses" count={reputation.lossCount} total={reputation.totalSignals} tone="danger" />
+        <OutcomeMixBar label="Rejected" count={reputation.rejectedSignals} total={reputation.totalSignals} tone="watch" />
+        <OutcomeMixBar label="Expired" count={reputation.expiredSignals} total={reputation.totalSignals} tone="muted" />
+        <OutcomeMixBar label="Pending" count={reputation.pendingSignals} total={reputation.totalSignals} tone="neutral" />
+      </div>
+    </article>
+  )
+}
+
+function PerformanceReadout({ label, value, detail }: { label: string; value: string | number; detail: string }) {
+  return (
+    <div className="performance-readout">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{detail}</small>
+    </div>
+  )
+}
+
+function OutcomeMixBar({
+  label,
+  count,
+  total,
+  tone
+}: {
+  label: string
+  count: number
+  total: number
+  tone: 'good' | 'danger' | 'watch' | 'muted' | 'neutral'
+}) {
+  const width = total <= 0 ? 0 : Math.max(2, Math.min(100, (count / total) * 100))
+  return (
+    <div className="outcome-mix-row">
+      <div>
+        <span>{label}</span>
+        <strong>{count}</strong>
+      </div>
+      <div className="outcome-track" aria-hidden="true">
+        <span className={`outcome-fill ${tone}`} style={{ width: `${width}%` }} />
+      </div>
+    </div>
+  )
+}
 
 const RunReportWorkspace = memo(function RunReportWorkspace({
   sessionId,
@@ -4336,6 +5782,22 @@ function formatSignedPercent(value: number | null | undefined) {
   }
 
   return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`
+}
+
+function formatRateValue(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return '-'
+  }
+
+  return `${(value * 100).toFixed(1)}%`
+}
+
+function formatBps(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return '-'
+  }
+
+  return `${value >= 0 ? '+' : ''}${value.toFixed(0)} bps`
 }
 
 function formatDurationMs(value: number | null | undefined) {

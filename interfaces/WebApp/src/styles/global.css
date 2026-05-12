@@ -421,7 +421,7 @@ button.is-pending:disabled {
 
 .view-tabs {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 1px;
   margin-top: 12px;
   border: 1px solid var(--line);
@@ -496,6 +496,7 @@ button.is-pending:disabled {
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.82fr) minmax(0, 1fr);
 }
 
+.performance-grid,
 .report-grid {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -2566,6 +2567,583 @@ td {
   color: var(--muted);
 }
 
+.metric-pair {
+  min-width: 0;
+  padding: 12px 14px;
+}
+
+.metric-pair > span,
+.metric-pair > strong {
+  display: block;
+  min-width: 0;
+}
+
+.metric-pair > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.metric-pair > strong {
+  margin-top: 5px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.performance-workspace {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.performance-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  padding: 18px;
+  border-bottom: 1px solid var(--line);
+  background:
+    linear-gradient(135deg, rgba(124, 167, 255, 0.1), transparent 36%),
+    linear-gradient(90deg, rgba(216, 255, 61, 0.07), transparent 54%),
+    var(--panel);
+}
+
+.performance-title h2 {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.05;
+}
+
+.performance-title span {
+  display: block;
+  margin-top: 9px;
+  color: var(--muted);
+}
+
+.performance-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.subscriber-grid,
+.subscriber-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 13px;
+  padding: 13px 13px 0;
+}
+
+.subscriber-detail-grid {
+  align-items: start;
+}
+
+.subscriber-panel {
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.subscriber-form-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.15fr) minmax(220px, 0.95fr) auto;
+  gap: 10px;
+  align-items: end;
+  padding: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.subscriber-form-grid label,
+.subscriber-toolbar {
+  min-width: 0;
+}
+
+.subscriber-form-grid label span,
+.subscriber-toolbar label,
+.detail-copy-block span,
+.copyable-hash span {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.subscriber-form-grid input,
+.subscriber-form-grid select,
+.subscriber-toolbar select {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 0 10px;
+  color: var(--text);
+  background: var(--panel-2);
+  font-family: "Cascadia Code", Consolas, monospace;
+}
+
+.subscriber-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.subscriber-status-strip {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 14px 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.access-status {
+  flex: 0 0 auto;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: var(--muted);
+  background: rgba(81, 98, 92, 0.22);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.access-status.active {
+  border-color: rgba(133, 236, 176, 0.44);
+  color: var(--good);
+}
+
+.access-status.expired,
+.access-status.blocked {
+  border-color: rgba(226, 123, 123, 0.44);
+  color: var(--danger);
+}
+
+.subscriber-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border-top: 1px solid var(--line);
+}
+
+.subscriber-facts > div {
+  min-width: 0;
+  background: var(--panel-2);
+}
+
+.permission-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.permission-list span {
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 5px 8px;
+  color: var(--muted);
+  background: rgba(118, 215, 208, 0.08);
+  font-size: 12px;
+}
+
+.subscriber-note {
+  margin: 0;
+  padding: 12px 14px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.access-decision {
+  display: grid;
+  gap: 5px;
+  margin: 0 14px 14px;
+  border: 1px solid rgba(226, 123, 123, 0.38);
+  border-radius: var(--radius);
+  padding: 12px;
+  color: var(--muted);
+  background: rgba(226, 123, 123, 0.08);
+}
+
+.access-decision.allowed {
+  border-color: rgba(133, 236, 176, 0.38);
+  background: rgba(133, 236, 176, 0.07);
+}
+
+.access-decision strong {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.access-decision small {
+  color: var(--dim);
+  overflow-wrap: anywhere;
+}
+
+.locked-detail {
+  display: grid;
+  gap: 7px;
+  margin: 0 14px 14px;
+  border: 1px dashed var(--line-strong);
+  padding: 14px;
+  color: var(--muted);
+  background: rgba(81, 98, 92, 0.18);
+}
+
+.locked-detail strong {
+  color: var(--text);
+}
+
+.unlocked-detail {
+  display: grid;
+  gap: 12px;
+  padding: 0 14px 14px;
+}
+
+.detail-copy-block {
+  min-width: 0;
+  border: 1px solid var(--line);
+  padding: 12px;
+  background: var(--panel-2);
+}
+
+.detail-copy-block p,
+.detail-copy-block pre,
+.provenance-evidence-row p {
+  margin: 0;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+
+.detail-copy-block pre {
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
+}
+
+.evidence-list.compact {
+  display: grid;
+  gap: 1px;
+  background: var(--line);
+}
+
+.copyable-hash {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.28fr) minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  min-width: 0;
+  padding: 11px 14px;
+  border-top: 1px solid var(--line);
+}
+
+.copyable-hash span {
+  margin: 0;
+}
+
+.copyable-hash strong,
+.copyable-hash a {
+  min-width: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
+}
+
+.copy-button {
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  color: var(--text);
+  background: var(--panel-2);
+}
+
+.copy-button:disabled {
+  cursor: not-allowed;
+  color: var(--dim);
+  opacity: 0.52;
+}
+
+.inline-action {
+  justify-self: start;
+}
+
+.automation-panel,
+.outcome-panel,
+.settlement-panel {
+  margin: 13px 13px 0;
+}
+
+.automation-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 13px;
+  align-items: center;
+  padding: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.automation-grid .subscriber-facts {
+  border-top: 0;
+}
+
+.automation-result {
+  display: grid;
+  gap: 7px;
+  margin: 0 14px 14px;
+  border: 1px solid rgba(216, 255, 61, 0.35);
+  border-radius: var(--radius);
+  padding: 12px;
+  color: var(--muted);
+  background: rgba(216, 255, 61, 0.08);
+}
+
+.automation-result.good {
+  border-color: rgba(133, 236, 176, 0.38);
+  background: rgba(133, 236, 176, 0.07);
+}
+
+.automation-result .copyable-hash {
+  margin: 4px -12px -12px;
+}
+
+.panel-action-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 14px;
+  border-top: 1px solid var(--line);
+}
+
+.performance-scope-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 13px;
+  padding: 13px;
+}
+
+.performance-panel {
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.calculated-at {
+  color: var(--muted);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
+}
+
+.performance-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--line);
+}
+
+.performance-readout {
+  min-width: 0;
+  padding: 13px;
+  background: var(--panel-2);
+}
+
+.performance-readout span,
+.performance-readout small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.performance-readout strong {
+  display: block;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 18px;
+}
+
+.performance-readout small {
+  margin-top: 5px;
+  color: var(--dim);
+}
+
+.outcome-mix {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.outcome-mix-row {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.outcome-mix-row > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.outcome-mix-row strong {
+  color: var(--text);
+  font-family: "Cascadia Code", Consolas, monospace;
+}
+
+.outcome-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(81, 98, 92, 0.35);
+}
+
+.outcome-fill {
+  display: block;
+  height: 100%;
+  min-width: 0;
+  border-radius: inherit;
+}
+
+.outcome-fill.good {
+  background: var(--good);
+}
+
+.outcome-fill.danger {
+  background: var(--danger);
+}
+
+.outcome-fill.watch {
+  background: var(--copper);
+}
+
+.outcome-fill.muted {
+  background: var(--dim);
+}
+
+.outcome-fill.neutral {
+  background: var(--cyan);
+}
+
+.provenance-panel {
+  min-width: 0;
+  margin: 0 13px 13px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.provenance-loader {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.provenance-loader label {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.provenance-loader-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.provenance-loader input {
+  min-width: 0;
+  min-height: 38px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 0 10px;
+  color: var(--text);
+  background: var(--panel-2);
+  font-family: "Cascadia Code", Consolas, monospace;
+}
+
+.provenance-body {
+  display: grid;
+  gap: 1px;
+  background: var(--line);
+}
+
+.provenance-facts,
+.provenance-hashes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--line);
+}
+
+.provenance-facts > div,
+.provenance-hashes > div {
+  min-width: 0;
+  background: var(--panel-2);
+}
+
+.provenance-evidence-list {
+  display: grid;
+  gap: 1px;
+  background: var(--line);
+}
+
+.provenance-evidence-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(112px, 0.22fr);
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--panel);
+}
+
+.provenance-evidence-row span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.provenance-evidence-row strong {
+  display: block;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+.provenance-evidence-row small {
+  color: var(--dim);
+  overflow-wrap: anywhere;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 11px;
+}
+
+.provenance-note {
+  margin: 0;
+  padding: 12px 14px;
+  color: var(--muted);
+  background: var(--panel);
+  line-height: 1.4;
+}
+
 .report-workspace {
   min-width: 0;
   overflow: hidden;
@@ -2850,6 +3428,12 @@ td {
   .readiness-check,
   .strategy-workspace,
   .risk-drilldown-grid,
+  .performance-hero,
+  .subscriber-grid,
+  .subscriber-detail-grid,
+  .subscriber-form-grid,
+  .automation-grid,
+  .performance-scope-grid,
   .report-hero,
   .report-gate,
   .report-section-grid,
@@ -2878,9 +3462,13 @@ td {
 
   .strategy-state-grid,
   .parameter-grid,
-  .incident-actions-summary,
-  .risk-drilldown-summary,
-  .kill-link,
+    .incident-actions-summary,
+    .risk-drilldown-summary,
+    .kill-link,
+    .subscriber-facts,
+    .performance-summary-grid,
+    .provenance-facts,
+    .provenance-hashes,
   .report-summary-grid,
   .attribution-grid,
   .export-grid {
@@ -2955,6 +3543,17 @@ td {
   .incident-actions-summary,
   .risk-drilldown-summary,
   .kill-link,
+  .subscriber-toolbar,
+  .subscriber-facts,
+  .copyable-hash,
+  .automation-grid,
+  .performance-actions,
+  .performance-summary-grid,
+  .provenance-loader-row,
+  .provenance-facts,
+  .provenance-hashes,
+  .provenance-evidence-row,
+  .outcome-mix-row,
   .report-loader-row,
   .report-summary-grid,
   .attribution-grid,
@@ -2978,6 +3577,15 @@ td {
 
   .incident-action-control .command-button,
   .incident-action-control .danger-button {
+    width: 100%;
+  }
+
+  .performance-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .performance-actions .command-button {
     width: 100%;
   }
 }

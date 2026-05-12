@@ -4,6 +4,8 @@ using Autotrade.Application.Security;
 using Autotrade.Hosting;
 using Autotrade.MarketData.Application.WebSocket.Clob;
 using Autotrade.Polymarket.Abstractions;
+using Autotrade.Polymarket.BuilderAttribution;
+using Autotrade.Polymarket.Options;
 using Autotrade.Trading.Application.Contract.Execution;
 using Microsoft.Extensions.Options;
 
@@ -39,7 +41,8 @@ public sealed class ApiReadinessProbeCollector(
             ["background_jobs.heartbeats.fresh"] = ProbeBackgroundJobs(now),
             ["account_sync.configured"] = ProbeAccountSync(now),
             ["compliance.geo_kyc.confirmed"] = ProbeCompliance(now),
-            ["credentials.exchange.present"] = ProbeExchangeAuthentication(now)
+            ["credentials.exchange.present"] = ProbeExchangeAuthentication(now),
+            ["polymarket.builder_attribution.ready"] = ProbeBuilderAttribution(now)
         };
 
         probes["database.connection"] = await ProbeDatabaseConnectionAsync(now, cancellationToken)
@@ -382,6 +385,48 @@ public sealed class ApiReadinessProbeCollector(
                 now,
                 "Provide exchange authentication through user secrets or environment variables.",
                 credentials.Evidence);
+    }
+
+    private ReadinessCheckProbe ProbeBuilderAttribution(DateTimeOffset now)
+    {
+        var readiness = PolymarketBuilderAttribution.EvaluateReadiness(
+            new PolymarketClobOptions { BuilderCode = configuration["Polymarket:Clob:BuilderCode"] },
+            configuration["Execution:Mode"]);
+        var evidence = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["configured"] = readiness.BuilderCodeConfigured.ToString(),
+            ["formatValid"] = readiness.FormatValid.ToString(),
+            ["mode"] = readiness.Mode
+        };
+
+        if (!string.IsNullOrWhiteSpace(readiness.BuilderCodeHash))
+        {
+            evidence["builderCodeHash"] = readiness.BuilderCodeHash;
+        }
+
+        return readiness.Mode switch
+        {
+            "invalid" => new ReadinessCheckProbe(
+                ReadinessCheckStatus.Unhealthy,
+                "Polymarket builder attribution",
+                readiness.Summary,
+                now,
+                "Configure Polymarket:Clob:BuilderCode as a bytes32 hex string or leave it unset.",
+                evidence),
+            "disabled" => new ReadinessCheckProbe(
+                ReadinessCheckStatus.Skipped,
+                "Polymarket builder attribution",
+                readiness.Summary,
+                now,
+                "Set Polymarket:Clob:BuilderCode to produce builder-attributed order evidence.",
+                evidence),
+            _ => new ReadinessCheckProbe(
+                ReadinessCheckStatus.Ready,
+                "Polymarket builder attribution",
+                readiness.Summary,
+                now,
+                Evidence: evidence)
+        };
     }
 
     private ReadinessCheckProbe ProbeModuleInventory(DateTimeOffset now)

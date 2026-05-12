@@ -42,4 +42,20 @@ public sealed record PromotionGateResultDto(
 public sealed record GeneratedStrategyValidationResult(
     bool Passed,
     IReadOnlyList<string> Errors,
+    string EvidenceJson,
+    IReadOnlyList<GeneratedStrategyGateValidationResult> Gates)
+{
+    public GeneratedStrategyValidationResult(
+        bool passed,
+        IReadOnlyList<string> errors,
+        string evidenceJson)
+        : this(passed, errors, evidenceJson, Array.Empty<GeneratedStrategyGateValidationResult>())
+    {
+    }
+}
+
+public sealed record GeneratedStrategyGateValidationResult(
+    PromotionGateStage Stage,
+    bool Passed,
+    IReadOnlyList<string> Errors,
     string EvidenceJson);

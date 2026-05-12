@@ -179,6 +179,22 @@ public sealed class GeneratedStrategyVersionRepository : IGeneratedStrategyVersi
             .ConfigureAwait(false);
     }
 
+    public async Task<IReadOnlyList<GeneratedStrategyVersion>> GetByProposalIdsAsync(
+        IReadOnlyCollection<Guid> proposalIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (proposalIds.Count == 0)
+        {
+            return Array.Empty<GeneratedStrategyVersion>();
+        }
+
+        return await _context.GeneratedStrategyVersions.AsNoTracking()
+            .Where(x => proposalIds.Contains(x.ProposalId))
+            .OrderBy(x => x.CreatedAtUtc)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public async Task<IReadOnlyList<GeneratedStrategyVersion>> GetRegistrableAsync(CancellationToken cancellationToken = default)
     {
         return await _context.GeneratedStrategyVersions.AsNoTracking()

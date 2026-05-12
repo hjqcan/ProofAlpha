@@ -127,7 +127,7 @@ public sealed class SelfImproveService : ISelfImproveService
 
             await _proposalRepository.AddRangeAsync(entities, cancellationToken).ConfigureAwait(false);
             await PersistParameterPatchesAsync(entities, cancellationToken).ConfigureAwait(false);
-            await PersistGeneratedStrategiesAsync(entities, proposals, episode.ToDto(), cancellationToken)
+            var generatedStrategies = await PersistGeneratedStrategiesAsync(entities, proposals, episode.ToDto(), cancellationToken)
                 .ConfigureAwait(false);
 
             run.MarkAnalyzed(entities.Count, requiresManual);
@@ -137,7 +137,11 @@ public sealed class SelfImproveService : ISelfImproveService
             }
 
             await _runRepository.UpdateAsync(run, cancellationToken).ConfigureAwait(false);
-            return new SelfImproveRunResult(run.ToDto(), episode.ToDto(), entities.Select(x => x.ToDto()).ToList());
+            return new SelfImproveRunResult(
+                run.ToDto(),
+                episode.ToDto(),
+                entities.Select(x => x.ToDto()).ToList(),
+                generatedStrategies.Select(x => x.ToDto()).ToList());
         }
         catch (Exception ex)
         {
@@ -168,11 +172,15 @@ public sealed class SelfImproveService : ISelfImproveService
             ? null
             : await _episodeRepository.GetAsync(run.EpisodeId.Value, cancellationToken).ConfigureAwait(false);
         var proposals = await _proposalRepository.GetByRunIdAsync(run.Id, cancellationToken).ConfigureAwait(false);
+        var generatedStrategies = await _generatedStrategyRepository.GetByProposalIdsAsync(
+            proposals.Select(proposal => proposal.Id).ToArray(),
+            cancellationToken).ConfigureAwait(false);
 
         return new SelfImproveRunResult(
             run.ToDto(),
             episode?.ToDto(),
-            proposals.Select(proposal => proposal.ToDto()).ToList());
+            proposals.Select(proposal => proposal.ToDto()).ToList(),
+            generatedStrategies.Select(version => version.ToDto()).ToList());
     }
 
     public async Task<PatchOutcomeDto> ApplyProposalAsync(
@@ -327,12 +335,13 @@ public sealed class SelfImproveService : ISelfImproveService
         await _parameterPatchRepository.AddRangeAsync(patches, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task PersistGeneratedStrategiesAsync(
+    private async Task<IReadOnlyList<GeneratedStrategyVersion>> PersistGeneratedStrategiesAsync(
         IReadOnlyList<ImprovementProposal> entities,
         IReadOnlyList<ImprovementProposalDocument> documents,
         StrategyEpisodeDto episode,
         CancellationToken cancellationToken)
     {
+        var generatedStrategies = new List<GeneratedStrategyVersion>();
         for (var index = 0; index < entities.Count; index++)
         {
             var entity = entities[index];
@@ -346,24 +355,43 @@ public sealed class SelfImproveService : ISelfImproveService
                 ?? await _llmClient.GenerateStrategyAsync(document, episode, cancellationToken).ConfigureAwait(false);
             var version = await _packageService.CreatePackageAsync(entity.Id, spec, cancellationToken).ConfigureAwait(false);
             var validation = await _packageService.ValidatePackageAsync(version, cancellationToken).ConfigureAwait(false);
-            if (validation.Passed)
+            for (var gateIndex = 0; gateIndex < validation.Gates.Count; gateIndex++)
             {
-                version.AdvanceTo(GeneratedStrategyStage.StaticValidated, validation.EvidenceJson);
+                var gate = validation.Gates[gateIndex];
+                if (gate.Passed)
+                {
+                    var evidenceJson = validation.Passed && gateIndex == validation.Gates.Count - 1
+                        ? validation.EvidenceJson
+                        : gate.EvidenceJson;
+                    version.AdvanceTo(ToGeneratedStrategyStage(gate.Stage), evidenceJson);
+                    continue;
+                }
+
+                version.Quarantine(string.Join("; ", gate.Errors));
+                break;
             }
-            else
+
+            if (validation.Gates.Count == 0 && !validation.Passed)
             {
                 version.Quarantine(string.Join("; ", validation.Errors));
             }
 
             await _generatedStrategyRepository.AddAsync(version, cancellationToken).ConfigureAwait(false);
-            await _gateResultRepository.AddAsync(new PromotionGateResult(
-                version.Id,
-                PromotionGateStage.StaticValidation,
-                validation.Passed,
-                validation.Passed ? "Static validation passed." : "Static validation failed.",
-                validation.EvidenceJson,
-                DateTimeOffset.UtcNow), cancellationToken).ConfigureAwait(false);
+            foreach (var gate in validation.Gates)
+            {
+                await _gateResultRepository.AddAsync(new PromotionGateResult(
+                    version.Id,
+                    gate.Stage,
+                    gate.Passed,
+                    gate.Passed ? $"{gate.Stage} passed." : $"{gate.Stage} failed.",
+                    gate.EvidenceJson,
+                    DateTimeOffset.UtcNow), cancellationToken).ConfigureAwait(false);
+            }
+
+            generatedStrategies.Add(version);
         }
+
+        return generatedStrategies;
     }
 
     private static IReadOnlyList<ParameterPatchSpec> DeserializePatches(string? patchJson)
@@ -389,6 +417,20 @@ public sealed class SelfImproveService : ISelfImproveService
             GeneratedStrategyStage.LiveCanary => PromotionGateStage.LiveCanary,
             GeneratedStrategyStage.Promoted => PromotionGateStage.LiveCanary,
             _ => PromotionGateStage.StaticValidation
+        };
+    }
+
+    private static GeneratedStrategyStage ToGeneratedStrategyStage(PromotionGateStage stage)
+    {
+        return stage switch
+        {
+            PromotionGateStage.StaticValidation => GeneratedStrategyStage.StaticValidated,
+            PromotionGateStage.UnitTest => GeneratedStrategyStage.UnitTested,
+            PromotionGateStage.Replay => GeneratedStrategyStage.ReplayValidated,
+            PromotionGateStage.Shadow => GeneratedStrategyStage.ShadowRunning,
+            PromotionGateStage.Paper => GeneratedStrategyStage.PaperRunning,
+            PromotionGateStage.LiveCanary => GeneratedStrategyStage.LiveCanary,
+            _ => throw new InvalidOperationException($"Unsupported generated strategy gate stage {stage}.")
         };
     }
 }

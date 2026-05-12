@@ -53,6 +53,10 @@ public interface IGeneratedStrategyVersionRepository
 
     Task<IReadOnlyList<GeneratedStrategyVersion>> GetActiveCanariesAsync(CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<GeneratedStrategyVersion>> GetByProposalIdsAsync(
+        IReadOnlyCollection<Guid> proposalIds,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<GeneratedStrategyVersion>> GetRegistrableAsync(CancellationToken cancellationToken = default);
 
     Task UpdateAsync(GeneratedStrategyVersion version, CancellationToken cancellationToken = default);

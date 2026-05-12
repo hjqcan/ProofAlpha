@@ -32,7 +32,17 @@ public sealed record PatchOutcomeDto(
 public sealed record SelfImproveRunResult(
     ImprovementRunDto Run,
     StrategyEpisodeDto? Episode,
-    IReadOnlyList<ImprovementProposalDto> Proposals);
+    IReadOnlyList<ImprovementProposalDto> Proposals,
+    IReadOnlyList<GeneratedStrategyVersionDto> GeneratedStrategies)
+{
+    public SelfImproveRunResult(
+        ImprovementRunDto run,
+        StrategyEpisodeDto? episode,
+        IReadOnlyList<ImprovementProposalDto> proposals)
+        : this(run, episode, proposals, Array.Empty<GeneratedStrategyVersionDto>())
+    {
+    }
+}
 
 public sealed record ApplyProposalRequest(
     Guid ProposalId,

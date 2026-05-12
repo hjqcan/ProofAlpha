@@ -13,9 +13,12 @@ public sealed class PythonStrategyAdapter : ITradingStrategy
     private readonly PythonStrategyManifest _manifest;
     private readonly StrategyContext _context;
     private readonly IPythonStrategyRuntime _runtime;
+    private readonly GeneratedStrategyRiskEnvelope _riskEnvelope;
     private readonly Dictionary<string, object?> _state = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, decimal> _filledQuantityByClientOrderId = new(StringComparer.OrdinalIgnoreCase);
 
     private StrategyState _stateValue = StrategyState.Created;
+    private decimal _filledNotional;
 
     public PythonStrategyAdapter(
         PythonStrategyManifest manifest,
@@ -25,6 +28,7 @@ public sealed class PythonStrategyAdapter : ITradingStrategy
         _manifest = manifest ?? throw new ArgumentNullException(nameof(manifest));
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
+        _riskEnvelope = GeneratedStrategyRiskEnvelope.Parse(manifest.RiskEnvelopeJson);
     }
 
     public string Id => _manifest.StrategyId;
@@ -79,6 +83,14 @@ public sealed class PythonStrategyAdapter : ITradingStrategy
 
     public Task OnOrderUpdateAsync(StrategyOrderUpdate update, CancellationToken cancellationToken = default)
     {
+        var previousFilledQuantity = _filledQuantityByClientOrderId.GetValueOrDefault(update.ClientOrderId);
+        var filledQuantityDelta = Math.Max(0m, update.FilledQuantity - previousFilledQuantity);
+        if (filledQuantityDelta > 0)
+        {
+            _filledNotional += Math.Abs(update.Price * filledQuantityDelta);
+            _filledQuantityByClientOrderId[update.ClientOrderId] = update.FilledQuantity;
+        }
+
         _state["lastOrderUpdate"] = new
         {
             update.ClientOrderId,
@@ -147,6 +159,31 @@ public sealed class PythonStrategyAdapter : ITradingStrategy
             return null;
         }
 
+        var riskEnvelopeViolation = ValidateRiskEnvelope(intents);
+        if (riskEnvelopeViolation is not null)
+        {
+            await _context.ObservationLogger.LogAsync(new StrategyObservation(
+                Id,
+                snapshot.MarketId,
+                phase,
+                "Blocked",
+                "generated_risk_envelope",
+                JsonSerializer.Serialize(new
+                {
+                    riskEnvelopeViolation,
+                    _riskEnvelope.MaxSingleOrderNotional,
+                    _riskEnvelope.MaxCycleNotional,
+                    _riskEnvelope.MaxTotalNotional,
+                    FilledNotional = _filledNotional
+                }, JsonOptions),
+                JsonSerializer.Serialize(response.StatePatch, JsonOptions),
+                null,
+                _manifest.Version,
+                null,
+                DateTimeOffset.UtcNow), cancellationToken).ConfigureAwait(false);
+            return null;
+        }
+
         return new StrategySignal(
             signalType,
             snapshot.MarketId ?? intents[0].MarketId,
@@ -159,6 +196,33 @@ public sealed class PythonStrategyAdapter : ITradingStrategy
                 response.StatePatch,
                 generatedStrategyVersion = _manifest.Version
             }, JsonOptions));
+    }
+
+    private string? ValidateRiskEnvelope(IReadOnlyList<StrategyOrderIntent> intents)
+    {
+        var cycleNotional = 0m;
+        foreach (var intent in intents)
+        {
+            var notional = Math.Abs(intent.Price * intent.Quantity);
+            if (notional > _riskEnvelope.MaxSingleOrderNotional)
+            {
+                return $"Intent notional {notional} exceeds maxSingleOrderNotional {_riskEnvelope.MaxSingleOrderNotional}.";
+            }
+
+            cycleNotional += notional;
+        }
+
+        if (cycleNotional > _riskEnvelope.MaxCycleNotional)
+        {
+            return $"Cycle notional {cycleNotional} exceeds maxCycleNotional {_riskEnvelope.MaxCycleNotional}.";
+        }
+
+        if (_filledNotional + cycleNotional > _riskEnvelope.MaxTotalNotional)
+        {
+            return $"Total notional {_filledNotional + cycleNotional} exceeds maxTotalNotional {_riskEnvelope.MaxTotalNotional}.";
+        }
+
+        return null;
     }
 
     private static StrategyOrderIntent ToIntent(PythonOrderIntent intent)
@@ -234,5 +298,57 @@ public sealed class PythonStrategyAdapterFactory : IPythonStrategyAdapterFactory
     public ITradingStrategy Create(PythonStrategyManifest manifest, StrategyContext context)
     {
         return new PythonStrategyAdapter(manifest, context, _runtime);
+    }
+}
+
+internal sealed record GeneratedStrategyRiskEnvelope(
+    decimal MaxSingleOrderNotional,
+    decimal MaxCycleNotional,
+    decimal MaxTotalNotional)
+{
+    public static GeneratedStrategyRiskEnvelope Parse(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+        return new GeneratedStrategyRiskEnvelope(
+            GetRequiredPositiveDecimal(root, "maxSingleOrderNotional", "max_single_order_notional"),
+            GetRequiredPositiveDecimal(root, "maxCycleNotional", "max_cycle_notional"),
+            GetRequiredPositiveDecimal(root, "maxTotalNotional", "max_total_notional"));
+    }
+
+    private static decimal GetRequiredPositiveDecimal(
+        JsonElement root,
+        string camelCaseName,
+        string snakeCaseName)
+    {
+        if (!TryGetProperty(root, camelCaseName, snakeCaseName, out var value))
+        {
+            throw new InvalidOperationException($"Generated strategy risk envelope must define {camelCaseName}.");
+        }
+
+        decimal parsed;
+        if (value.ValueKind == JsonValueKind.Number && value.TryGetDecimal(out parsed) && parsed > 0)
+        {
+            return parsed;
+        }
+
+        if (value.ValueKind == JsonValueKind.String
+            && decimal.TryParse(value.GetString(), out parsed)
+            && parsed > 0)
+        {
+            return parsed;
+        }
+
+        throw new InvalidOperationException($"Generated strategy risk envelope {camelCaseName} must be a positive decimal.");
+    }
+
+    private static bool TryGetProperty(
+        JsonElement root,
+        string camelCaseName,
+        string snakeCaseName,
+        out JsonElement value)
+    {
+        return root.TryGetProperty(camelCaseName, out value)
+            || root.TryGetProperty(snakeCaseName, out value);
     }
 }

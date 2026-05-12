@@ -143,7 +143,7 @@ Evidence
 - `dotnet test interfaces\Autotrade.Api.Tests\Autotrade.Api.Tests.csproj --no-restore -v minimal`
 - `npm --prefix interfaces\ArcContracts test`
 - `npm --prefix interfaces\WebApp run build`
-- `node .codex-run\phase9-webapp-check.mjs`
+- `node scripts\arc-hackathon-webapp-check.mjs`
 - `dotnet run --no-build --project interfaces\Autotrade.Cli -- --config .codex-run\phase10-revenue-cli.config.json --json arc revenue record --source-kind SubscriptionFee --signal-id 0x7cc384e6393c4b85f9340bec439a81eca1d31778996494429c750946c7bb5cff --gross-usdc 10 --source-tx-hash 0xf5f60a2de3f184f38ed7b66b919d8f5056c0025f8a70ab9baad9d535b7b6c28d --reason "demo subscription settlement" --wallet 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 --strategy-id repricing_lag_arbitrage`
 - `dotnet run --no-build --project interfaces\Autotrade.Cli -- --config .codex-run\phase10-revenue-cli.config.json --json arc revenue list --limit 5`
 

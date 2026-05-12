@@ -181,6 +181,7 @@ Evidence
 - `artifacts/arc-hackathon/demo-run/revenue-settlement.json`
 - `artifacts/arc-hackathon/demo-run/revenue-settlement-cli-journal.json`
 - `artifacts/arc-hackathon/demo-run/logs/*`
+- `scripts/arc-hackathon-webapp-check.mjs`
 - `docs/hackathon/arc-proofalpha-submission.md`
 - `docs/hackathon/arc-proofalpha-demo-script.md`
 - `docs/hackathon/arc-proofalpha-architecture.md`
@@ -198,6 +199,9 @@ Completion Notes
   publication, local EVM subscription, mirrored entitlement checks, redacted
   builder-attributed Paper order evidence, performance outcome, revenue
   settlement, screenshot capture, secret scan, and summary export.
+- `scripts/arc-hackathon-webapp-check.mjs` is the tracked browser smoke and
+  screenshot fixture; it reads the current demo artifacts so signal,
+  performance, and revenue screenshots stay aligned with the final run.
 - The final run recorded `access-denied.hasAccess=false` and
   `access-allowed.hasAccess=true`, with the same signal id linked through
   signal proof, builder attribution, performance outcome, and revenue

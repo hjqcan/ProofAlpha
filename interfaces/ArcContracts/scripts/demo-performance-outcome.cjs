@@ -10,8 +10,12 @@ async function main() {
   fs.mkdirSync(artifactRoot, { recursive: true });
 
   const signalPublication = readJsonIfExists(path.join(artifactRoot, "signal-publication.json"));
-  const signalId = signalPublication?.signalId ?? hre.ethers.id("proofalpha-phase7-signal");
-  const sourceSignalTransactionHash = signalPublication?.transactionHash ?? null;
+  const signalId = process.env.ARC_PERFORMANCE_SIGNAL_ID ||
+    signalPublication?.signalId ||
+    hre.ethers.id("proofalpha-phase7-signal");
+  const sourceSignalTransactionHash = process.env.ARC_PERFORMANCE_SIGNAL_TX_HASH ||
+    signalPublication?.transactionHash ||
+    null;
   const exportedAtUtc = new Date().toISOString();
   const network = await hre.ethers.provider.getNetwork();
   const chainId = Number(network.chainId);

@@ -147,7 +147,7 @@ Evidence
 - `artifacts/arc-hackathon/screenshots/revenue-settlement.png`
 - `artifacts/arc-hackathon/screenshots/subscriber-mobile.png`
 - `npm --prefix .\interfaces\WebApp run build`
-- `node .codex-run\phase9-webapp-check.mjs`
+- `node scripts\arc-hackathon-webapp-check.mjs`
 - `dotnet build Autotrade.sln --no-restore -v minimal`
 - `dotnet test Autotrade.sln --no-build -v minimal`
 - `npm --prefix .\interfaces\ArcContracts test`

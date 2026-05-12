@@ -271,6 +271,17 @@ function Assert-Artifact {
     }
 }
 
+function Assert-DemoInvariant {
+    param(
+        [Parameter(Mandatory = $true)][bool]$Condition,
+        [Parameter(Mandatory = $true)][string]$Message
+    )
+
+    if (-not $Condition) {
+        throw $Message
+    }
+}
+
 function Get-FileEvidence {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
@@ -299,6 +310,7 @@ function Get-FileEvidence {
 function New-SecretScan {
     $scanRoots = @(
         (Resolve-RepoPath "docs"),
+        (Resolve-RepoPath "scripts"),
         (Resolve-RepoPath "interfaces/Autotrade.Api/appsettings.json"),
         (Resolve-RepoPath "interfaces/Autotrade.Cli/appsettings.json"),
         (Resolve-RepoPath "interfaces/WebApp/dist"),
@@ -362,6 +374,9 @@ function New-SecretScan {
                     elseif ($line -match "EnvVar|EnvironmentVariable|OPENAI_API_KEY|[A-Z][A-Z0-9_]*(API_KEY|API_SECRET|PASSPHRASE|PRIVATE_KEY)") {
                         $allowedReason = "environment variable name only; no secret value is present"
                     }
+                    elseif ($relativeForMatch -like "scripts/*" -and $line -match "\[redacted\]|redact|regex\s*=|-match|privateKeyField|apiSecretField|apiKeyField|passphraseField|mnemonicField|hardhatPrivateKey|notForPublicMarker") {
+                        $allowedReason = "script scanner pattern, redacted fixture, or redaction policy text; no secret value is present"
+                    }
                     elseif ($relativeForMatch -like "docs/*" -and $line -match "apiKey|ApiKey|apiSecret|ApiSecret|passphrase|Passphrase|mnemonic|privateKey|PrivateKey|secret|private") {
                         $allowedReason = "documentation policy text or placeholder example"
                     }
@@ -382,7 +397,7 @@ function New-SecretScan {
     $screenshots = @()
     if (Test-Path -LiteralPath $screenshotDir -PathType Container) {
         $screenshots = @(Get-ChildItem -LiteralPath $screenshotDir -Filter "*.png" -File | ForEach-Object {
-            Get-FileEvidence -Path ($_.FullName) -Description "generated WebApp screenshot; fixture data comes from .codex-run/phase9-webapp-check.mjs"
+            Get-FileEvidence -Path ($_.FullName) -Description "generated WebApp screenshot; fixture data comes from scripts/arc-hackathon-webapp-check.mjs"
         })
     }
 
@@ -645,7 +660,11 @@ Invoke-DemoStep `
     -Name "Record performance outcome" `
     -FilePath $npm `
     -Arguments @("--prefix", "interfaces\ArcContracts", "run", "demo:performance") `
-    -Environment @{ ARC_PERFORMANCE_DEMO_ROOT = $tempPerformanceDir } `
+    -Environment @{
+        ARC_PERFORMANCE_DEMO_ROOT = $tempPerformanceDir
+        ARC_PERFORMANCE_SIGNAL_ID = $signalId
+        ARC_PERFORMANCE_SIGNAL_TX_HASH = [string](Read-JsonFile (Join-Path $artifactDir "signal-publication.json")).transactionHash
+    } `
     -TimeoutSeconds 900 | Out-Null
 Assert-Artifact (Join-Path $tempPerformanceDir "performance-outcome.json")
 Assert-Artifact (Join-Path $tempPerformanceDir "agent-reputation.json")
@@ -684,7 +703,7 @@ Invoke-DemoStep `
     -TimeoutSeconds 600 | Out-Null
 
 Invoke-DemoStep -Name "Full dotnet test gate" -FilePath $dotnet -Arguments @("test", "Autotrade.sln", "--no-build", "-v", "minimal") -TimeoutSeconds 900 | Out-Null
-Invoke-DemoStep -Name "WebApp screenshot capture" -FilePath $node -Arguments @(".codex-run\phase9-webapp-check.mjs") -TimeoutSeconds 600 | Out-Null
+Invoke-DemoStep -Name "WebApp screenshot capture" -FilePath $node -Arguments @("scripts\arc-hackathon-webapp-check.mjs") -TimeoutSeconds 600 | Out-Null
 }
 
 $secretScan = New-SecretScan
@@ -697,6 +716,14 @@ $builderEvidence = Read-JsonFile (Join-Path $artifactDir "builder-attribution.js
 $accessDenied = Read-JsonFile (Join-Path $artifactDir "access-denied.json")
 $accessAllowed = Read-JsonFile (Join-Path $artifactDir "access-allowed.json")
 $subscriptionTx = [string]$subscriptionArtifact.transactionHash
+
+Assert-DemoInvariant -Condition ([string]$signalPublication.signalId -eq $signalId) -Message "Signal publication id does not match the demo signal id."
+Assert-DemoInvariant -Condition (-not [bool]$accessDenied.data.hasAccess) -Message "Access denied artifact unexpectedly grants access."
+Assert-DemoInvariant -Condition ([bool]$accessAllowed.data.hasAccess) -Message "Access allowed artifact does not grant access."
+Assert-DemoInvariant -Condition ([string]$builderEvidence.arcSignalId -eq $signalId) -Message "Builder attribution artifact is not linked to the demo signal id."
+Assert-DemoInvariant -Condition ([string]$performanceOutcome.signalId -eq $signalId) -Message "Performance outcome artifact is not linked to the demo signal id."
+Assert-DemoInvariant -Condition ([string]$revenueSettlement.signalId -eq $signalId) -Message "Revenue settlement artifact is not linked to the demo signal id."
+Assert-DemoInvariant -Condition ([string]$secretScan.status -eq "Passed") -Message "Secret scan did not pass."
 
 $evidence = @(
     (Get-FileEvidence -Path (Join-Path $artifactDir "signal-proof.json") -Description "canonical signal proof input")
@@ -731,7 +758,9 @@ $summary.Add("- Subscription tx: ``$subscriptionTx``") | Out-Null
 $summary.Add("- Access denied allowed flag: ``$($accessDenied.data.hasAccess)``") | Out-Null
 $summary.Add("- Access allowed flag: ``$($accessAllowed.data.hasAccess)``") | Out-Null
 $summary.Add("- Builder evidence signal id: ``$($builderEvidence.arcSignalId)``") | Out-Null
+$summary.Add("- Performance outcome signal id: ``$($performanceOutcome.signalId)``") | Out-Null
 $summary.Add("- Performance outcome tx: ``$($performanceOutcome.transactionHash)``") | Out-Null
+$summary.Add("- Revenue settlement signal id: ``$($revenueSettlement.signalId)``") | Out-Null
 $summary.Add("- Revenue settlement tx: ``$($revenueSettlement.transactionHash)``") | Out-Null
 $summary.Add("- Secret scan status: ``$($secretScan.status)``") | Out-Null
 $summary.Add("") | Out-Null

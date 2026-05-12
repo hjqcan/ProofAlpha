@@ -114,6 +114,7 @@ $performanceOutcome = Read-JsonFile (Join-Path $artifactDir "performance-outcome
 $agentReputation = Read-JsonFile (Join-Path $artifactDir "agent-reputation.json")
 $revenueSettlement = Read-JsonFile (Join-Path $artifactDir "revenue-settlement.json")
 $revenueJournal = Read-JsonFile (Join-Path $artifactDir "revenue-settlement-cli-journal.json")
+$localClosedLoop = Read-JsonFile (Join-Path $artifactDir "local-evm-closed-loop.json")
 $secretScanText = Get-Content -Raw -LiteralPath (Join-Path $artifactDir "secret-scan.md")
 $controlRoomControllerPath = Resolve-RepoPath "interfaces/Autotrade.Api/Controllers/ControlRoomController.cs"
 $controlRoomCommandServicePath = Resolve-RepoPath "interfaces/Autotrade.Api/ControlRoom/ControlRoomCommandService.cs"
@@ -258,6 +259,35 @@ Add-Check -Target $checks `
     -Evidence "revenue-settlement.json, revenue-settlement-cli-journal.json" `
     -Details "grossUsdc=$($revenueSettlement.grossUsdc); journalEntries=$($journalEntries.Count); distributed=$($revenueSettlement.distribution.distributed)."
 
+$localClosedLoopDeltas = @($localClosedLoop.revenueSettlement.recipientDeltas)
+$localClosedLoopValid = [string]$localClosedLoop.documentVersion -eq "proofalpha-local-evm-closed-loop.v1" -and
+    [int]$localClosedLoop.chainId -eq 31337 -and
+    [string]$localClosedLoop.plan.tier -eq "PaperAutotrade" -and
+    [string]$localClosedLoop.plan.priceUsdcAtomic -eq "25000000" -and
+    [string]$localClosedLoop.subscription.amountAtomic -eq "25000000" -and
+    [bool]$localClosedLoop.subscription.hasAccess -and
+    [string]$localClosedLoop.balances.subscriberSubscriptionDeltaAtomic -eq "-25000000" -and
+    [string]$localClosedLoop.balances.settlementVaultSubscriptionDeltaAtomic -eq "25000000" -and
+    [string]$localClosedLoop.balances.settlementVaultDistributionDeltaAtomic -eq "-25000000" -and
+    [string]$localClosedLoop.signalPublication.signalId -eq $signalId -and
+    [string]$localClosedLoop.signalPublication.strategyId -eq $strategyId -and
+    [string]$localClosedLoop.performanceOutcome.signalId -eq $signalId -and
+    [string]$localClosedLoop.performanceOutcome.strategyId -eq $strategyId -and
+    [string]$localClosedLoop.performanceOutcome.status -eq "ExecutedLoss" -and
+    [string]$localClosedLoop.revenueSettlement.signalId -eq $signalId -and
+    [string]$localClosedLoop.revenueSettlement.strategyId -eq $strategyId -and
+    [bool]$localClosedLoop.revenueSettlement.distributed -and
+    $localClosedLoopDeltas.Count -eq 3 -and
+    [string]$localClosedLoopDeltas[0].deltaAtomic -eq "17500000" -and
+    [string]$localClosedLoopDeltas[1].deltaAtomic -eq "5000000" -and
+    [string]$localClosedLoopDeltas[2].deltaAtomic -eq "2500000"
+Add-Check -Target $checks `
+    -Id "local-evm-closed-loop" `
+    -Requirement "A single local EVM run must prove the full paid-agent path: deploy, subscribe, publish signal, record outcome, and distribute subscription revenue." `
+    -Status ($(if ($localClosedLoopValid) { "Passed" } else { "Failed" })) `
+    -Evidence "artifacts/arc-hackathon/demo-run/local-evm-closed-loop.json" `
+    -Details "chainId=$($localClosedLoop.chainId); subscriptionDelta=$($localClosedLoop.balances.subscriberSubscriptionDeltaAtomic); vaultSubscriptionDelta=$($localClosedLoop.balances.settlementVaultSubscriptionDeltaAtomic); distributed=$($localClosedLoop.revenueSettlement.distributed)."
+
 Add-Check -Target $checks `
     -Id "secret-scan" `
     -Requirement "Demo artifacts and screenshots must not expose secrets." `
@@ -337,7 +367,8 @@ if (Test-Path -LiteralPath $deploymentDir -PathType Container) {
                     ([string]$deployment.paymentToken).ToLowerInvariant(),
                     $arcTestnetUsdc.ToLowerInvariant(),
                     [System.StringComparison]::Ordinal)
-                $revenueSettlementAddress = [string](@($deployment.contracts | Where-Object { $_.contractName -eq "RevenueSettlement" } | Select-Object -First 1).address)
+                $revenueSettlementContract = $deployment.contracts | Where-Object { $_.contractName -eq "RevenueSettlement" } | Select-Object -First 1
+                $revenueSettlementAddress = if ($null -ne $revenueSettlementContract) { [string]$revenueSettlementContract.address } else { "" }
                 $usesSettlementVault = -not [string]::IsNullOrWhiteSpace($revenueSettlementAddress) -and (
                     [string]::Equals(([string]$deployment.treasury).ToLowerInvariant(), $revenueSettlementAddress.ToLowerInvariant(), [System.StringComparison]::Ordinal) -or
                     [string]::Equals(([string]$deployment.strategyAccessTreasury).ToLowerInvariant(), $revenueSettlementAddress.ToLowerInvariant(), [System.StringComparison]::Ordinal)
@@ -364,7 +395,18 @@ if (Test-Path -LiteralPath $arcClosurePath -PathType Leaf) {
     try {
         $arcClosure = Read-JsonFile $arcClosurePath
         $recipientDeltas = @($arcClosure.revenueSettlement.recipientDeltas)
+        $recipientAddresses = @($recipientDeltas | ForEach-Object { ([string]$_.recipient).ToLowerInvariant() })
+        $uniqueRecipientAddresses = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+        foreach ($recipientAddress in $recipientAddresses) {
+            [void]$uniqueRecipientAddresses.Add($recipientAddress)
+        }
+        $recipientsIndependentlyAuditable = $recipientAddresses.Count -eq 3 -and
+            $uniqueRecipientAddresses.Count -eq 3 -and
+            -not ($recipientAddresses -contains ([string]$arcClosure.subscriber).ToLowerInvariant())
+        $subscriberSubscriptionDelta = [decimal]$arcClosure.balances.subscriberSubscriptionDeltaAtomic
+        $subscriberPaidAtLeastPlanPrice = $subscriberSubscriptionDelta -le -25000000
         $distributionValid = [bool]$arcClosure.revenueSettlement.distributed -and
+            $recipientsIndependentlyAuditable -and
             $recipientDeltas.Count -eq 3 -and
             [string]$recipientDeltas[0].deltaAtomic -eq "17500000" -and
             [string]$recipientDeltas[1].deltaAtomic -eq "5000000" -and
@@ -376,7 +418,7 @@ if (Test-Path -LiteralPath $arcClosurePath -PathType Leaf) {
             [string]$arcClosure.plan.priceUsdcAtomic -eq "25000000" -and
             [string]$arcClosure.subscription.amountAtomic -eq "25000000" -and
             [bool]$arcClosure.subscription.hasAccess -and
-            [string]$arcClosure.balances.subscriberSubscriptionDeltaAtomic -eq "-25000000" -and
+            $subscriberPaidAtLeastPlanPrice -and
             [string]$arcClosure.balances.settlementVaultSubscriptionDeltaAtomic -eq "25000000" -and
             [string]$arcClosure.balances.settlementVaultDistributionDeltaAtomic -eq "-25000000" -and
             $distributionValid -and
@@ -392,7 +434,7 @@ if (Test-Path -LiteralPath $arcClosurePath -PathType Leaf) {
             -not [string]::IsNullOrWhiteSpace([string]$arcClosure.signalPublication.transactionHash) -and
             -not [string]::IsNullOrWhiteSpace([string]$arcClosure.performanceOutcome.transactionHash) -and
             -not [string]::IsNullOrWhiteSpace([string]$arcClosure.revenueSettlement.transactionHash)
-        $arcClosureDetails = "closureArtifact=$(Get-RepoRelativePath $arcClosurePath); closureValid=$arcClosureValid."
+        $arcClosureDetails = "closureArtifact=$(Get-RepoRelativePath $arcClosurePath); closureValid=$arcClosureValid; subscriberSubscriptionDelta=$($arcClosure.balances.subscriberSubscriptionDeltaAtomic); vaultSubscriptionDelta=$($arcClosure.balances.settlementVaultSubscriptionDeltaAtomic)."
     }
     catch {
         $arcClosureDetails = "Arc Testnet closure artifact exists but could not be parsed: $($_.Exception.Message)"

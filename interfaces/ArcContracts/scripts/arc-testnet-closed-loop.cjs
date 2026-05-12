@@ -4,6 +4,8 @@ const hre = require("hardhat");
 
 const ARC_TESTNET_CHAIN_ID = 5042002;
 const ARC_TESTNET_USDC = "0x3600000000000000000000000000000000000000";
+const DEFAULT_STRATEGY_AUTHOR_RECIPIENT = "0x1000000000000000000000000000000000000001";
+const DEFAULT_PLATFORM_RECIPIENT = "0x2000000000000000000000000000000000000002";
 const DEFAULT_ARTIFACT_ROOT = path.resolve(__dirname, "../../..", "artifacts", "arc-hackathon", "demo-run");
 const PLAN_ID = 2;
 const STRATEGY_ID = "repricing_lag_arbitrage";
@@ -287,13 +289,22 @@ function requireAddress(value, name) {
 }
 
 function resolveRevenueRecipients(subscriberAddress, treasury) {
-  const strategyAuthor = process.env.ARC_SETTLEMENT_STRATEGY_AUTHOR || subscriberAddress;
-  const platform = process.env.ARC_SETTLEMENT_PLATFORM || subscriberAddress;
-  return [
+  const strategyAuthor = process.env.ARC_SETTLEMENT_STRATEGY_AUTHOR || DEFAULT_STRATEGY_AUTHOR_RECIPIENT;
+  const platform = process.env.ARC_SETTLEMENT_PLATFORM || DEFAULT_PLATFORM_RECIPIENT;
+  const recipients = [
     requireAddress(treasury, "ARC_SETTLEMENT_TREASURY"),
     requireAddress(strategyAuthor, "ARC_SETTLEMENT_STRATEGY_AUTHOR"),
     requireAddress(platform, "ARC_SETTLEMENT_PLATFORM")
   ];
+  const uniqueRecipients = new Set(recipients.map((recipient) => recipient.toLowerCase()));
+  if (uniqueRecipients.size !== recipients.length) {
+    throw new Error("Revenue settlement recipients must be unique so distribution deltas are independently auditable.");
+  }
+  if (recipients.some((recipient) => recipient.toLowerCase() === subscriberAddress.toLowerCase())) {
+    throw new Error("Revenue settlement recipients must be different from the subscriber/deployer for payment evidence.");
+  }
+
+  return recipients;
 }
 
 function parseEvent(contract, receipt, eventName) {

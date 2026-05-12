@@ -12,6 +12,7 @@
     "demo:subscription": "hardhat run scripts/demo-subscription.cjs --network hardhat",
     "demo:performance": "hardhat run scripts/demo-performance-outcome.cjs --network hardhat",
     "demo:revenue": "hardhat run scripts/demo-revenue-settlement.cjs --network hardhat",
+    "demo:closed-loop": "hardhat run scripts/demo-closed-loop.cjs --network hardhat",
     "testnet:preflight": "node scripts/arc-testnet-preflight.cjs",
     "testnet:wallet-preflight": "node scripts/arc-testnet-wallet-preflight.cjs",
     "testnet:closed-loop": "hardhat run scripts/arc-testnet-closed-loop.cjs --network arcTestnet",

@@ -585,6 +585,7 @@ $tempSignalPath = Join-Path $tempDir "signal-publication.json"
 $tempSubscriptionPath = Join-Path $tempDir "subscription.json"
 $tempPerformanceDir = Join-Path $tempDir "performance"
 $tempRevenuePath = Join-Path $tempDir "revenue-settlement.json"
+$tempClosedLoopPath = Join-Path $tempDir "local-evm-closed-loop.json"
 New-Item -ItemType Directory -Force -Path $tempPerformanceDir | Out-Null
 
 Invoke-DemoStep `
@@ -719,6 +720,15 @@ Assert-Artifact $tempRevenuePath
 Copy-Item -LiteralPath $tempRevenuePath -Destination (Join-Path $artifactDir "revenue-settlement.json") -Force
 
 Invoke-DemoStep `
+    -Name "Run local EVM paid-agent closed loop" `
+    -FilePath $npm `
+    -Arguments @("--prefix", "interfaces\ArcContracts", "run", "demo:closed-loop") `
+    -Environment @{ ARC_LOCAL_CLOSED_LOOP_OUTPUT = $tempClosedLoopPath } `
+    -TimeoutSeconds 900 | Out-Null
+Assert-Artifact $tempClosedLoopPath
+Copy-Item -LiteralPath $tempClosedLoopPath -Destination (Join-Path $artifactDir "local-evm-closed-loop.json") -Force
+
+Invoke-DemoStep `
     -Name "Record revenue settlement CLI journal" `
     -FilePath $dotnet `
     -Arguments @(
@@ -746,6 +756,7 @@ $signalPublication = Read-JsonFile (Join-Path $artifactDir "signal-publication.j
 $subscriptionArtifact = Read-JsonFile (Join-Path $artifactDir "subscription.json")
 $performanceOutcome = Read-JsonFile (Join-Path $artifactDir "performance-outcome.json")
 $revenueSettlement = Read-JsonFile (Join-Path $artifactDir "revenue-settlement.json")
+$localClosedLoop = Read-JsonFile (Join-Path $artifactDir "local-evm-closed-loop.json")
 $builderEvidence = Read-JsonFile (Join-Path $artifactDir "builder-attribution.json")
 $accessDenied = Read-JsonFile (Join-Path $artifactDir "access-denied.json")
 $accessAllowed = Read-JsonFile (Join-Path $artifactDir "access-allowed.json")
@@ -764,6 +775,12 @@ Assert-DemoInvariant -Condition ([string]$performanceOutcome.signalId -eq $signa
 Assert-DemoInvariant -Condition ([string]$performanceOutcome.strategyId -eq $strategyId) -Message "Performance outcome artifact is not linked to the demo strategy id."
 Assert-DemoInvariant -Condition ([string]$revenueSettlement.signalId -eq $signalId) -Message "Revenue settlement artifact is not linked to the demo signal id."
 Assert-DemoInvariant -Condition ([string]$revenueSettlement.strategyId -eq $strategyId) -Message "Revenue settlement artifact is not linked to the demo strategy id."
+Assert-DemoInvariant -Condition ([string]$localClosedLoop.signalPublication.signalId -eq $signalId) -Message "Local closed-loop signal is not linked to the demo signal id."
+Assert-DemoInvariant -Condition ([string]$localClosedLoop.signalPublication.strategyId -eq $strategyId) -Message "Local closed-loop signal is not linked to the demo strategy id."
+Assert-DemoInvariant -Condition ([bool]$localClosedLoop.subscription.hasAccess) -Message "Local closed-loop subscription did not grant access."
+Assert-DemoInvariant -Condition ([string]$localClosedLoop.balances.subscriberSubscriptionDeltaAtomic -eq "-25000000") -Message "Local closed-loop subscriber payment delta is not 25 USDC."
+Assert-DemoInvariant -Condition ([string]$localClosedLoop.balances.settlementVaultSubscriptionDeltaAtomic -eq "25000000") -Message "Local closed-loop settlement vault did not receive 25 USDC."
+Assert-DemoInvariant -Condition ([string]$localClosedLoop.balances.settlementVaultDistributionDeltaAtomic -eq "-25000000") -Message "Local closed-loop settlement vault did not distribute 25 USDC."
 Assert-DemoInvariant -Condition ([bool]$autoTradePermission.allowed) -Message "Paper auto-trade permission artifact is not allowed."
 Assert-DemoInvariant -Condition ([string]$autoTradePermission.evidenceTransactionHash -eq $subscriptionTx) -Message "Paper auto-trade permission is not linked to the subscription transaction."
 Assert-DemoInvariant -Condition ([string]$secretScan.status -eq "Passed") -Message "Secret scan did not pass."
@@ -780,6 +797,7 @@ $evidence = @(
     (Get-FileEvidence -Path (Join-Path $artifactDir "performance-outcome.json") -Description "local EVM OutcomeRecorded artifact")
     (Get-FileEvidence -Path (Join-Path $artifactDir "agent-reputation.json") -Description "performance/reputation aggregate")
     (Get-FileEvidence -Path (Join-Path $artifactDir "revenue-settlement.json") -Description "local EVM SettlementRecorded artifact")
+    (Get-FileEvidence -Path (Join-Path $artifactDir "local-evm-closed-loop.json") -Description "single-process local EVM paid-agent closed loop")
     (Get-FileEvidence -Path (Join-Path $artifactDir "revenue-settlement-cli-journal.json") -Description "API/WebApp revenue read-model journal")
     (Get-FileEvidence -Path $secretScanJsonPath -Description "machine-readable secret scan")
     (Get-FileEvidence -Path $secretScanMarkdownPath -Description "human-readable secret scan")
@@ -807,6 +825,8 @@ $summary.Add("- Performance outcome signal id: ``$($performanceOutcome.signalId)
 $summary.Add("- Performance outcome tx: ``$($performanceOutcome.transactionHash)``") | Out-Null
 $summary.Add("- Revenue settlement signal id: ``$($revenueSettlement.signalId)``") | Out-Null
 $summary.Add("- Revenue settlement tx: ``$($revenueSettlement.transactionHash)``") | Out-Null
+$summary.Add("- Local closed-loop subscription tx: ``$($localClosedLoop.subscription.transactionHash)``") | Out-Null
+$summary.Add("- Local closed-loop settlement tx: ``$($localClosedLoop.revenueSettlement.transactionHash)``") | Out-Null
 $summary.Add("- Secret scan status: ``$($secretScan.status)``") | Out-Null
 $summary.Add("") | Out-Null
 $summary.Add("## Command Gate") | Out-Null

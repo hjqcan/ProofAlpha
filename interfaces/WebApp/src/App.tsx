@@ -27,6 +27,7 @@ import {
   getArcOpportunities,
   getArcOpportunityDetail,
   getArcPerformanceOutcome,
+  getArcRevenueSettlements,
   getArcSignals,
   getArcSignalDetail,
   getArcStrategyAccessStatus,
@@ -78,6 +79,7 @@ import type {
   ArcOpportunitySummary,
   ArcPaperAutoTradeResponse,
   ArcPerformanceOutcomeRecord,
+  ArcRevenueSettlementRecord,
   ArcRevenueSettlementSummary,
   ArcSignalDetail,
   ArcSignalSummary,
@@ -3737,8 +3739,27 @@ function compactJson(value: string | null | undefined) {
 function buildRevenueSettlementSummary(
   plan: ArcSubscriptionPlan | null,
   accessStatus: ArcStrategyAccessStatus | null,
-  signal: ArcSignalDetail | ArcSignalSummary | null
+  signal: ArcSignalDetail | ArcSignalSummary | null,
+  settlement: ArcRevenueSettlementRecord | null
 ): ArcRevenueSettlementSummary {
+  if (settlement) {
+    const agentShareUsdc = settlement.shares
+      .filter((share) => share.recipientKind === 'AgentOwner' || share.recipientKind === 'StrategyAuthor')
+      .reduce((total, share) => total + share.amountUsdc, 0)
+    const platformShareUsdc = settlement.grossUsdc - agentShareUsdc
+
+    return {
+      generatedAtUtc: settlement.recordedAtUtc,
+      strategyKey: settlement.strategyId,
+      source: settlement.simulated || settlement.status === 'SkippedDisabled' ? 'simulated' : 'testnet',
+      subscriptionRevenueUsdc: settlement.sourceKind === 'SubscriptionFee' ? settlement.grossUsdc : 0,
+      builderAttributedFlowUsdc: settlement.sourceKind === 'BuilderAttributedFlow' ? settlement.grossUsdc : 0,
+      simulatedBuilderShareUsdc: agentShareUsdc,
+      simulatedTreasuryShareUsdc: platformShareUsdc,
+      settlementTransactionHash: settlement.transactionHash
+    }
+  }
+
   const subscriptionRevenueUsdc = accessStatus?.hasAccess && plan ? plan.priceUsdc : 0
   const builderAttributedFlowUsdc = signal ? Number(signal.maxNotionalUsdc) : 0
   const simulatedBuilderShareUsdc = builderAttributedFlowUsdc * 0.7
@@ -3967,17 +3988,20 @@ const PerformanceLedgerWorkspace = memo(function PerformanceLedgerWorkspace({
   const [signalDetail, setSignalDetail] = useState<ArcSignalDetail | null>(null)
   const [signalDecision, setSignalDecision] = useState<ArcAccessDecision | null>(null)
   const [performanceOutcome, setPerformanceOutcome] = useState<ArcPerformanceOutcomeRecord | null>(null)
+  const [revenueSettlements, setRevenueSettlements] = useState<ArcRevenueSettlementRecord[]>([])
   const [autoTradeResponse, setAutoTradeResponse] = useState<ArcPaperAutoTradeResponse | null>(null)
   const [portalError, setPortalError] = useState<string | null>(null)
   const [accessError, setAccessError] = useState<string | null>(null)
   const [opportunityError, setOpportunityError] = useState<string | null>(null)
   const [signalError, setSignalError] = useState<string | null>(null)
   const [performanceOutcomeError, setPerformanceOutcomeError] = useState<string | null>(null)
+  const [revenueError, setRevenueError] = useState<string | null>(null)
   const [isPortalLoading, setIsPortalLoading] = useState(false)
   const [isAccessLoading, setIsAccessLoading] = useState(false)
   const [isOpportunityLoading, setIsOpportunityLoading] = useState(false)
   const [isSignalLoading, setIsSignalLoading] = useState(false)
   const [isPerformanceOutcomeLoading, setIsPerformanceOutcomeLoading] = useState(false)
+  const [isRevenueLoading, setIsRevenueLoading] = useState(false)
   const [isAutoTradeLoading, setIsAutoTradeLoading] = useState(false)
 
   const selectedPlan = useMemo(
@@ -3987,8 +4011,12 @@ const PerformanceLedgerWorkspace = memo(function PerformanceLedgerWorkspace({
   const subscriberStrategyKey = selectedPlan?.strategyKey ?? selectedStrategyId ?? plans[0]?.strategyKey ?? ''
   const targetAutoTradeStrategyId = selectedStrategyId ?? subscriberStrategyKey
   const revenueSummary = useMemo(
-    () => buildRevenueSettlementSummary(selectedPlan, accessStatus, signalDetail ?? signals[0] ?? null),
-    [accessStatus, selectedPlan, signalDetail, signals]
+    () => buildRevenueSettlementSummary(
+      selectedPlan,
+      accessStatus,
+      signalDetail ?? signals[0] ?? null,
+      revenueSettlements[0] ?? null),
+    [accessStatus, revenueSettlements, selectedPlan, signalDetail, signals]
   )
 
   const setWalletAddress = useCallback((value: string) => {
@@ -4155,6 +4183,26 @@ const PerformanceLedgerWorkspace = memo(function PerformanceLedgerWorkspace({
     }
   }, [])
 
+  const loadRevenueSettlements = useCallback(async (signal?: AbortSignal) => {
+    setIsRevenueLoading(true)
+    try {
+      const nextSettlements = await getArcRevenueSettlements(10, signal)
+      setRevenueSettlements(nextSettlements)
+      setRevenueError(null)
+    } catch (requestError) {
+      if (isAbortError(requestError)) {
+        return
+      }
+
+      setRevenueSettlements([])
+      setRevenueError(toErrorMessage(requestError, 'Revenue settlement request failed.'))
+    } finally {
+      if (!signal?.aborted) {
+        setIsRevenueLoading(false)
+      }
+    }
+  }, [])
+
   const requestPaperAutoTrade = useCallback(async () => {
     if (!walletAddress.trim()) {
       setAutoTradeResponse(createClientAutoTradeResponse(
@@ -4233,6 +4281,12 @@ const PerformanceLedgerWorkspace = memo(function PerformanceLedgerWorkspace({
     void loadPerformanceOutcome(selectedSignalId, controller.signal)
     return () => controller.abort()
   }, [loadPerformanceOutcome, selectedSignalId])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    void loadRevenueSettlements(controller.signal)
+    return () => controller.abort()
+  }, [loadRevenueSettlements])
 
   return (
     <section className="surface performance-workspace subscriber-workspace" aria-label="Arc subscriber portal">
@@ -4337,7 +4391,13 @@ const PerformanceLedgerWorkspace = memo(function PerformanceLedgerWorkspace({
         onRefresh={() => void loadPerformanceOutcome(selectedSignalId)}
       />
 
-      <RevenueSettlementPanel summary={revenueSummary} />
+      <RevenueSettlementPanel
+        summary={revenueSummary}
+        settlements={revenueSettlements}
+        isLoading={isRevenueLoading}
+        error={revenueError}
+        onRefresh={() => void loadRevenueSettlements()}
+      />
 
       <ProvenancePanel
         provenanceHash={provenanceHash}
@@ -4778,30 +4838,61 @@ const LastOutcomePanel = memo(function LastOutcomePanel({
 })
 
 const RevenueSettlementPanel = memo(function RevenueSettlementPanel({
-  summary
+  summary,
+  settlements,
+  isLoading,
+  error,
+  onRefresh
 }: {
   summary: ArcRevenueSettlementSummary
+  settlements: ArcRevenueSettlementRecord[]
+  isLoading: boolean
+  error: string | null
+  onRefresh: () => void
 }) {
+  const latestSettlement = settlements[0] ?? null
+  const splitRows = latestSettlement?.shares ?? []
+
   return (
     <article className="subscriber-panel settlement-panel">
       <div className="section-head compact">
         <div>
           <p className="eyebrow">Revenue settlement</p>
-          <h3>Builder attribution</h3>
+          <h3>{latestSettlement ? 'Settlement journal' : 'Builder attribution'}</h3>
         </div>
         <TrendingUp size={19} aria-hidden="true" />
       </div>
 
+      {error && <div className="error-strip report-error">{error}</div>}
       <div className="subscriber-facts">
-        <MetricPair label="Source" value={summary.source} />
+        <MetricPair label="Source" value={latestSettlement?.sourceKind ?? summary.source} />
+        <MetricPair label="Status" value={latestSettlement?.status ?? summary.source} />
         <MetricPair label="Subscription revenue" value={formatUsdc(summary.subscriptionRevenueUsdc)} />
         <MetricPair label="Builder flow" value={formatUsdc(summary.builderAttributedFlowUsdc)} />
-        <MetricPair label="Builder split" value={formatUsdc(summary.simulatedBuilderShareUsdc)} />
-        <MetricPair label="Treasury split" value={formatUsdc(summary.simulatedTreasuryShareUsdc)} />
+        <MetricPair label="Agent/provider split" value={formatUsdc(summary.simulatedBuilderShareUsdc)} />
+        <MetricPair label="Platform/treasury split" value={formatUsdc(summary.simulatedTreasuryShareUsdc)} />
         <MetricPair label="Generated" value={formatDate(summary.generatedAtUtc)} />
       </div>
-      <CopyableHash label="Settlement tx" value={summary.settlementTransactionHash} />
+      {latestSettlement && (
+        <div className="settlement-split-list">
+          {splitRows.map((share) => (
+            <div className="settlement-split-row" key={`${share.recipientKind}:${share.walletAddress}`}>
+              <span>{share.recipientKind}</span>
+              <strong>{formatUsdc(share.amountUsdc)}</strong>
+              <small>{share.shareBps} bps / {compactId(share.walletAddress)}</small>
+            </div>
+          ))}
+        </div>
+      )}
+      <CopyableHash label="Settlement tx" value={summary.settlementTransactionHash} href={latestSettlement?.explorerUrl} />
+      <CopyableHash label="Settlement hash" value={latestSettlement?.settlementHash ?? null} />
       <p className="subscriber-note">Settlement values are explicitly {summary.source}; no mainnet revenue claim is implied.</p>
+      <div className="panel-action-row">
+        <button className="command-button" type="button" disabled={isLoading} onClick={onRefresh}>
+          <RefreshCw size={16} aria-hidden="true" />
+          {isLoading ? 'Loading' : 'Refresh settlement'}
+        </button>
+      </div>
     </article>
   )
 })

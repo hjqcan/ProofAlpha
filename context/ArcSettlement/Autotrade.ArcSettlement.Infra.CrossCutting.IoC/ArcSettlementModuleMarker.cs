@@ -5,15 +5,19 @@ using Autotrade.ArcSettlement.Application.Contract.Configuration;
 using Autotrade.ArcSettlement.Application.Contract.Signals;
 using Autotrade.ArcSettlement.Application.Contract.Performance;
 using Autotrade.ArcSettlement.Application.Contract.Provenance;
+using Autotrade.ArcSettlement.Application.Contract.Revenue;
 using Autotrade.ArcSettlement.Application.Performance;
 using Autotrade.ArcSettlement.Application.Proofs;
 using Autotrade.ArcSettlement.Application.Provenance;
+using Autotrade.ArcSettlement.Application.Revenue;
 using Autotrade.ArcSettlement.Application.Signals;
 using Autotrade.ArcSettlement.Infra.Data.Access;
 using Autotrade.ArcSettlement.Infra.Data.Performance;
 using Autotrade.ArcSettlement.Infra.Data.Provenance;
+using Autotrade.ArcSettlement.Infra.Data.Revenue;
 using Autotrade.ArcSettlement.Infra.Data.Signals;
 using Autotrade.ArcSettlement.Infra.Evm.Performance;
+using Autotrade.ArcSettlement.Infra.Evm.Revenue;
 using Autotrade.ArcSettlement.Infra.Evm.Signals;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -58,6 +62,10 @@ public static class ArcSettlementServiceCollectionExtensions
         services.TryAddScoped<IArcHardhatPerformanceLedgerProcessRunner, HardhatPerformanceLedgerProcessRunner>();
         services.TryAddScoped<IArcPerformanceLedgerPublisher, HardhatArcPerformanceLedgerPublisher>();
         services.TryAddScoped<IArcPerformanceRecorder, ArcPerformanceRecorder>();
+        services.TryAddScoped<IArcRevenueSettlementStore, JsonFileArcRevenueSettlementStore>();
+        services.TryAddScoped<IArcHardhatRevenueSettlementProcessRunner, HardhatRevenueSettlementProcessRunner>();
+        services.TryAddScoped<IArcRevenueSettlementPublisher, HardhatArcRevenueSettlementPublisher>();
+        services.TryAddScoped<IArcRevenueSettlementRecorder, ArcRevenueSettlementRecorder>();
 
         return services;
     }

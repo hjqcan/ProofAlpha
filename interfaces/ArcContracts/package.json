@@ -10,6 +10,7 @@
     "publish-signal": "hardhat run scripts/publish-signal.cjs",
     "demo:signal": "hardhat run scripts/demo-signal-publication.cjs --network hardhat",
     "demo:subscription": "hardhat run scripts/demo-subscription.cjs --network hardhat",
+    "demo:revenue": "hardhat run scripts/demo-revenue-settlement.cjs --network hardhat",
     "export-abi": "node scripts/export-abi.cjs"
   },
   "devDependencies": {

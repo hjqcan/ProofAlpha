@@ -2923,6 +2923,41 @@ td {
   margin: 4px -12px -12px;
 }
 
+.settlement-split-list {
+  display: grid;
+  gap: 1px;
+  margin: 0 14px 14px;
+  border: 1px solid var(--line);
+  background: var(--line);
+}
+
+.settlement-split-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  padding: 10px 12px;
+  background: var(--panel);
+}
+
+.settlement-split-row span {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.settlement-split-row strong {
+  color: var(--text);
+}
+
+.settlement-split-row small {
+  grid-column: 1 / -1;
+  min-width: 0;
+  color: var(--dim);
+  overflow-wrap: anywhere;
+  font-family: "Cascadia Code", Consolas, monospace;
+}
+
 .panel-action-row {
   display: flex;
   justify-content: flex-end;

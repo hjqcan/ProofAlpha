@@ -4,19 +4,22 @@ Arc Hackathon: ProofAlpha Paid Agent Trading Gateway
 Status
 ------
 [WIP] Phase 0, Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6,
-Phase 7, Phase 8, and Phase 9 are complete. The paid-agent thesis is frozen,
-the ArcSettlement offline proof model is implemented, signal proofs can be
-published from canonical proof files or native opportunity/strategy-decision
+Phase 7, Phase 8, Phase 9, and Phase 10 are complete. The paid-agent thesis is
+frozen, the ArcSettlement offline proof model is implemented, signal proofs can
+be published from canonical proof files or native opportunity/strategy-decision
 sources, local TestUsdc subscription evidence mirrors into backend entitlement
 status, API/command access gates now enforce subscription permissions,
 redacted Polymarket builder attribution evidence links Arc signal ids to
 client order ids, PerformanceLedger/local reputation/WebApp Arc proof evidence
 now represents wins, losses, rejected outcomes, expired signals, and pending
 signals, subscriber-safe strategy provenance links reviewed source evidence to
-published Arc signals, and the WebApp subscriber portal now shows wallet access,
+published Arc signals, the WebApp subscriber portal now shows wallet access,
 subscription state, API-enforced gated opportunities/signals, paper automation
-permission, reputation, and simulated/testnet settlement evidence. Phase 10 is
-next. This board is independent from the existing product-hardening board and
+permission, reputation, and simulated/testnet settlement evidence, and
+ArcSettlement now records deterministic revenue settlements/splits through a
+local journal plus event-only RevenueSettlement integration surfaced through
+CLI, API, and WebApp. Phase 11 is next. This board is independent from the
+existing product-hardening board and
 must preserve every Paper-first, Live-arming, risk, audit, bounded-context, and
 secret-handling invariant documented in `docs/product/*`.
 

@@ -3,7 +3,7 @@ Phase 10: Revenue Settlement and Splits
 
 Status
 ------
-[TODO]
+[DONE]
 
 
 Intent
@@ -47,7 +47,7 @@ Recipients:
 
 Tasks
 -----
-[TODO] AH-P10-T001 Define revenue settlement document.
+[DONE] AH-P10-T001 Define revenue settlement document.
 
 Fields:
 
@@ -66,7 +66,7 @@ Fields:
 - settlementHash
 - createdAtUtc
 
-[TODO] AH-P10-T002 Implement local settlement journal.
+[DONE] AH-P10-T002 Implement local settlement journal.
 
 Statuses:
 
@@ -76,7 +76,7 @@ Statuses:
 - Failed
 - SkippedDisabled
 
-[TODO] AH-P10-T003 Implement settlement recorder.
+[DONE] AH-P10-T003 Implement settlement recorder.
 
 Interface:
 
@@ -89,7 +89,7 @@ public interface IArcRevenueSettlementRecorder
 }
 ```
 
-[TODO] AH-P10-T004 Add settlement calculation.
+[DONE] AH-P10-T004 Add settlement calculation.
 
 MVP:
 
@@ -98,7 +98,7 @@ MVP:
 - no hidden rounding drift
 - all splits sum to gross
 
-[TODO] AH-P10-T005 Add CLI command.
+[DONE] AH-P10-T005 Add CLI command.
 
 Commands:
 
@@ -107,13 +107,13 @@ autotrade arc revenue record --signal-id <id> --gross-usdc 10 --simulated --reas
 autotrade arc revenue list --limit 20
 ```
 
-[TODO] AH-P10-T006 Add API endpoints.
+[DONE] AH-P10-T006 Add API endpoints.
 
 - `GET /api/arc/revenue`
 - `GET /api/arc/revenue/{settlementId}`
 - `POST /api/arc/revenue/record`
 
-[TODO] AH-P10-T007 Add tests.
+[DONE] AH-P10-T007 Add tests.
 
 - split sums to gross
 - simulated flag required for non-real source
@@ -134,6 +134,33 @@ Acceptance Criteria
 Evidence
 --------
 - `artifacts/arc-hackathon/demo-run/revenue-settlement.json`
-- tx hash for `RevenueRecorded`
-- split calculation test output
+- `transactionHash` in `artifacts/arc-hackathon/demo-run/revenue-settlement.json`
+  proves the local-EVM `SettlementRecorded` event path.
+- `artifacts/arc-hackathon/demo-run/revenue-settlement-cli-journal.json`
+- `artifacts/arc-hackathon/screenshots/revenue-settlement.png`
+- `dotnet build Autotrade.sln --no-restore -v minimal`
+- `dotnet test context\ArcSettlement\Autotrade.ArcSettlement.Tests\Autotrade.ArcSettlement.Tests.csproj --no-build -v minimal`
+- `dotnet test interfaces\Autotrade.Api.Tests\Autotrade.Api.Tests.csproj --no-restore -v minimal`
+- `npm --prefix interfaces\ArcContracts test`
+- `npm --prefix interfaces\WebApp run build`
+- `node .codex-run\phase9-webapp-check.mjs`
+- `dotnet run --no-build --project interfaces\Autotrade.Cli -- --config .codex-run\phase10-revenue-cli.config.json --json arc revenue record --source-kind SubscriptionFee --signal-id 0x7cc384e6393c4b85f9340bec439a81eca1d31778996494429c750946c7bb5cff --gross-usdc 10 --source-tx-hash 0xf5f60a2de3f184f38ed7b66b919d8f5056c0025f8a70ab9baad9d535b7b6c28d --reason "demo subscription settlement" --wallet 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 --strategy-id repricing_lag_arbitrage`
+- `dotnet run --no-build --project interfaces\Autotrade.Cli -- --config .codex-run\phase10-revenue-cli.config.json --json arc revenue list --limit 5`
 
+
+Completion Notes
+----------------
+- ArcSettlement now owns revenue contracts, deterministic split calculation,
+  idempotent record semantics, local JSON journal storage, Hardhat
+  `RevenueSettlement` publisher integration, and API/CLI entry points.
+- Split math converts USDC to integer micro-USDC, rejects sub-micro values, and
+  distributes any remainder deterministically so local split rows always sum to
+  gross revenue.
+- Manual demo settlements must be marked simulated; subscription/builder source
+  records can link to source transaction hashes and signal/execution evidence.
+- `Revenue.Shares` defaults are resolved in application code rather than as a
+  mutable options collection, avoiding ConfigurationBinder duplicate-share
+  accumulation when appsettings also configures split recipients.
+- WebApp reads `/api/arc/revenue`; when a journal exists it shows the latest
+  settlement status, transaction/hash, and recipient split rows, otherwise it
+  retains the Phase 9 simulated/testnet summary.

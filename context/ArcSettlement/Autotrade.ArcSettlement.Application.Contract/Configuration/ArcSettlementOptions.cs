@@ -1,3 +1,4 @@
+using Autotrade.ArcSettlement.Application.Contract.Revenue;
 using Autotrade.ArcSettlement.Domain.Shared;
 
 namespace Autotrade.ArcSettlement.Application.Contract.Configuration;
@@ -22,6 +23,8 @@ public sealed record ArcSettlementOptions
 
     public string ProvenanceStorePath { get; init; } = "artifacts/arc-settlement/provenance.json";
 
+    public string RevenueSettlementStorePath { get; init; } = "artifacts/arc-settlement/revenue-settlements.json";
+
     public ArcSettlementContractsOptions Contracts { get; init; } = new();
 
     public ArcSettlementWalletOptions Wallet { get; init; } = new();
@@ -29,6 +32,8 @@ public sealed record ArcSettlementOptions
     public ArcSettlementEvmPublisherOptions EvmPublisher { get; init; } = new();
 
     public ArcSettlementSignalProofOptions SignalProof { get; init; } = new();
+
+    public ArcRevenueSettlementOptions Revenue { get; init; } = new();
 
     public IReadOnlyList<ArcSettlementSubscriptionPlanOptions> SubscriptionPlans { get; init; } = [];
 }
@@ -72,6 +77,22 @@ public sealed record ArcSettlementSignalProofOptions
     public int DecisionValidForMinutes { get; init; } = 30;
 
     public string DefaultRiskTier { get; init; } = "paper";
+}
+
+public sealed record ArcRevenueSettlementOptions
+{
+    public string TokenAddress { get; init; } = "0x0000000000000000000000000000000000000001";
+
+    public IReadOnlyList<ArcRevenueSplitRecipientOptions> Shares { get; init; } = [];
+}
+
+public sealed record ArcRevenueSplitRecipientOptions
+{
+    public ArcRevenueRecipientKind RecipientKind { get; init; }
+
+    public string WalletAddress { get; init; } = string.Empty;
+
+    public int ShareBps { get; init; }
 }
 
 public sealed record ArcSettlementSubscriptionPlanOptions

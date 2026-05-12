@@ -815,6 +815,7 @@ var arcCommand = new Command("arc", "Arc settlement and proof commands");
 var arcSignalCommand = new Command("signal", "Arc signal proof publication commands");
 var arcAccessCommand = new Command("access", "Arc subscription and entitlement commands");
 var arcBuilderCommand = new Command("builder", "Polymarket builder attribution commands");
+var arcRevenueCommand = new Command("revenue", "Arc revenue settlement commands");
 
 var arcSignalProofFileOption = CreateOption<FileInfo?>("--proof-file", "Canonical Arc signal proof JSON file; omit to resolve --source/--id from local data");
 var arcSignalSourceOption = CreateRequiredOption<string>("--source", "Source type: opportunity or decision");
@@ -831,6 +832,19 @@ var arcAccessPlanIdOption = CreateRequiredOption<int>("--plan-id", "Subscription
 var arcAccessTxHashOption = CreateRequiredOption<string>("--tx-hash", "StrategySubscribed transaction hash");
 var arcAccessExpiresAtOption = CreateRequiredOption<DateTimeOffset>("--expires-at", "Subscription expiry time in UTC");
 var arcAccessBlockOption = CreateOption<long?>("--block", "Source block number");
+var arcRevenueSettlementIdOption = CreateOption<string?>("--settlement-id", "Optional bytes32 settlement id; omitted values are derived deterministically");
+var arcRevenueShowSettlementIdOption = CreateRequiredOption<string>("--settlement-id", "Arc revenue settlement ID");
+var arcRevenueSourceKindOption = CreateOptionWithDefault("--source-kind", "ManualDemoSettlement", "SubscriptionFee, BuilderAttributedFlow, StrategyMarketplaceFee, or ManualDemoSettlement");
+var arcRevenueSignalIdOption = CreateRequiredOption<string>("--signal-id", "Arc signal ID linked to this settlement");
+var arcRevenueExecutionIdOption = CreateOption<string?>("--execution-id", "Optional execution/order/session id linked to this settlement");
+var arcRevenueWalletOption = CreateOptionWithDefault("--wallet", "0x9000000000000000000000000000000000000009", "Subscriber or source wallet address");
+var arcRevenueStrategyIdOption = CreateOptionWithDefault("--strategy-id", "repricing_lag_arbitrage", "Strategy ID linked to this settlement");
+var arcRevenueGrossUsdcOption = CreateRequiredOption<decimal>("--gross-usdc", "Gross revenue amount in USDC");
+var arcRevenueTokenAddressOption = CreateOption<string?>("--token-address", "Optional payment token address; defaults to ArcSettlement:Revenue:TokenAddress");
+var arcRevenueSimulatedOption = CreateOptionWithDefault("--simulated", false, "Mark the settlement as simulated/testnet evidence");
+var arcRevenueSourceTxHashOption = CreateOption<string?>("--source-tx-hash", "Optional source transaction hash");
+var arcRevenueReasonOption = CreateRequiredOption<string>("--reason", "Audit reason for recording revenue");
+var arcRevenueLimitOption = CreateOptionWithDefault("--limit", 20, "Maximum revenue records to return");
 var arcBuilderDemoOption = CreateOptionWithDefault("--demo", false, "Use deterministic demo signer settings instead of configured Polymarket credentials");
 var arcBuilderClientOrderIdOption = CreateRequiredOption<string>("--client-order-id", "Client order ID to correlate with Arc signal evidence");
 var arcBuilderStrategyIdOption = CreateOption<string?>("--strategy-id", "Strategy ID");
@@ -984,6 +998,87 @@ arcAccessCommand.Add(arcAccessPlansCommand);
 arcAccessCommand.Add(arcAccessStatusCommand);
 arcAccessCommand.Add(arcAccessSyncCommand);
 
+var arcRevenueRecordCommand = new Command("record", "Record an Arc revenue settlement event or local skipped journal entry");
+arcRevenueRecordCommand.Add(arcRevenueSettlementIdOption);
+arcRevenueRecordCommand.Add(arcRevenueSourceKindOption);
+arcRevenueRecordCommand.Add(arcRevenueSignalIdOption);
+arcRevenueRecordCommand.Add(arcRevenueExecutionIdOption);
+arcRevenueRecordCommand.Add(arcRevenueWalletOption);
+arcRevenueRecordCommand.Add(arcRevenueStrategyIdOption);
+arcRevenueRecordCommand.Add(arcRevenueGrossUsdcOption);
+arcRevenueRecordCommand.Add(arcRevenueTokenAddressOption);
+arcRevenueRecordCommand.Add(arcRevenueSimulatedOption);
+arcRevenueRecordCommand.Add(arcRevenueSourceTxHashOption);
+arcRevenueRecordCommand.Add(arcRevenueReasonOption);
+SetAction(arcRevenueRecordCommand, async pr =>
+{
+    var options = CreateGlobalOptions(pr);
+    var resolvedConfigPath = ResolveConfigPathFromParse(pr);
+    var settlementId = pr.GetValue(arcRevenueSettlementIdOption);
+    var sourceKind = pr.GetValue(arcRevenueSourceKindOption) ?? "ManualDemoSettlement";
+    var signalId = pr.GetRequiredValue(arcRevenueSignalIdOption);
+    var executionId = pr.GetValue(arcRevenueExecutionIdOption);
+    var wallet = pr.GetValue(arcRevenueWalletOption) ?? "0x9000000000000000000000000000000000000009";
+    var strategyId = pr.GetValue(arcRevenueStrategyIdOption) ?? "repricing_lag_arbitrage";
+    var grossUsdc = pr.GetRequiredValue(arcRevenueGrossUsdcOption);
+    var tokenAddress = pr.GetValue(arcRevenueTokenAddressOption);
+    var simulated = pr.GetValue(arcRevenueSimulatedOption);
+    var sourceTxHash = pr.GetValue(arcRevenueSourceTxHashOption);
+    var reason = pr.GetRequiredValue(arcRevenueReasonOption);
+    return await CommandAuditService.ExecuteWithAuditAsync(
+            "arc revenue record",
+            new { settlementId, sourceKind, signalId, executionId, wallet, strategyId, grossUsdc, simulated, sourceTxHash },
+            resolvedConfigPath,
+            host => ArcRevenueCommands.RecordAsync(
+                CreateContext(host, options),
+                settlementId,
+                sourceKind,
+                signalId,
+                executionId,
+                wallet,
+                strategyId,
+                grossUsdc,
+                tokenAddress,
+                simulated,
+                sourceTxHash,
+                reason))
+        .ConfigureAwait(false);
+});
+
+var arcRevenueListCommand = new Command("list", "List Arc revenue settlement records");
+arcRevenueListCommand.Add(arcRevenueLimitOption);
+SetAction(arcRevenueListCommand, async pr =>
+{
+    var options = CreateGlobalOptions(pr);
+    var resolvedConfigPath = ResolveConfigPathFromParse(pr);
+    var limit = pr.GetValue(arcRevenueLimitOption);
+    return await CommandAuditService.ExecuteWithAuditAsync(
+            "arc revenue list",
+            new { limit },
+            resolvedConfigPath,
+            host => ArcRevenueCommands.ListAsync(CreateContext(host, options), limit))
+        .ConfigureAwait(false);
+});
+
+var arcRevenueShowCommand = new Command("show", "Show one Arc revenue settlement record");
+arcRevenueShowCommand.Add(arcRevenueShowSettlementIdOption);
+SetAction(arcRevenueShowCommand, async pr =>
+{
+    var options = CreateGlobalOptions(pr);
+    var resolvedConfigPath = ResolveConfigPathFromParse(pr);
+    var settlementId = pr.GetRequiredValue(arcRevenueShowSettlementIdOption);
+    return await CommandAuditService.ExecuteWithAuditAsync(
+            "arc revenue show",
+            new { settlementId },
+            resolvedConfigPath,
+            host => ArcRevenueCommands.ShowAsync(CreateContext(host, options), settlementId))
+        .ConfigureAwait(false);
+});
+
+arcRevenueCommand.Add(arcRevenueRecordCommand);
+arcRevenueCommand.Add(arcRevenueListCommand);
+arcRevenueCommand.Add(arcRevenueShowCommand);
+
 var arcBuilderEvidenceCommand = new Command("evidence", "Export redacted signed-order builder attribution evidence");
 arcBuilderEvidenceCommand.Add(arcBuilderDemoOption);
 arcBuilderEvidenceCommand.Add(arcBuilderClientOrderIdOption);
@@ -1051,6 +1146,7 @@ SetAction(arcBuilderEvidenceCommand, async pr =>
 arcBuilderCommand.Add(arcBuilderEvidenceCommand);
 arcCommand.Add(arcSignalCommand);
 arcCommand.Add(arcAccessCommand);
+arcCommand.Add(arcRevenueCommand);
 arcCommand.Add(arcBuilderCommand);
 
 // ============================================================================

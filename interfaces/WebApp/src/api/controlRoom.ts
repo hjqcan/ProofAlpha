@@ -10,6 +10,7 @@ import type {
   ArcOpportunitySummary,
   ArcPaperAutoTradeResponse,
   ArcPerformanceOutcomeRecord,
+  ArcRevenueSettlementRecord,
   ArcSignalDetail,
   ArcSignalSummary,
   ArcStrategyAccessStatus,
@@ -144,6 +145,13 @@ export function getArcPerformanceOutcome(
     undefined,
     signal
   )
+}
+
+export function getArcRevenueSettlements(
+  limit = 20,
+  signal?: AbortSignal
+): Promise<ArcRevenueSettlementRecord[]> {
+  return apiRequest<ArcRevenueSettlementRecord[]>(`/api/arc/revenue?limit=${limit}`, undefined, signal)
 }
 
 export function getArcProvenance(

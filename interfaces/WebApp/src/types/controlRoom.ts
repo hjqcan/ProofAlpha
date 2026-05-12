@@ -563,6 +563,57 @@ export interface ArcRevenueSettlementSummary {
   settlementTransactionHash: string | null
 }
 
+export type ArcRevenueSourceKind =
+  | 'SubscriptionFee'
+  | 'BuilderAttributedFlow'
+  | 'StrategyMarketplaceFee'
+  | 'ManualDemoSettlement'
+
+export type ArcRevenueRecipientKind =
+  | 'AgentOwner'
+  | 'StrategyAuthor'
+  | 'Platform'
+  | 'Referrer'
+  | 'Treasury'
+
+export type ArcRevenueSettlementStatus =
+  | 'Pending'
+  | 'Submitted'
+  | 'Confirmed'
+  | 'Failed'
+  | 'SkippedDisabled'
+
+export interface ArcRevenueSplitAllocation {
+  recipientKind: ArcRevenueRecipientKind
+  walletAddress: string
+  shareBps: number
+  amountMicroUsdc: number
+  amountUsdc: number
+}
+
+export interface ArcRevenueSettlementRecord {
+  settlementId: string
+  sourceKind: ArcRevenueSourceKind
+  signalId: string
+  executionId: string | null
+  walletAddress: string
+  strategyId: string
+  grossUsdc: number
+  grossMicroUsdc: number
+  tokenAddress: string
+  shares: ArcRevenueSplitAllocation[]
+  reason: string
+  simulated: boolean
+  sourceTransactionHash: string | null
+  settlementHash: string
+  transactionHash: string | null
+  explorerUrl: string | null
+  status: ArcRevenueSettlementStatus
+  errorCode: string | null
+  createdAtUtc: string
+  recordedAtUtc: string
+}
+
 export interface ArcSubscriberPortalSummary {
   plan: ArcSubscriptionPlan | null
   access: ArcStrategyAccessStatus | null

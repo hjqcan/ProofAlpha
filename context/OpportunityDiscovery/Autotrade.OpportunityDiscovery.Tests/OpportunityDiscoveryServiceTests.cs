@@ -75,6 +75,34 @@ public sealed class OpportunityDiscoveryServiceTests
     }
 
     [Fact]
+    public async Task ScanAsync_DeduplicatedEvidenceStillUsesPersistedTraceIds()
+    {
+        await using var context = CreateContext();
+        var repositories = CreateRepositories(context);
+        var service = CreateService(
+            repositories,
+            new FakeMarketCatalogReader(
+                Market("market-1", "Will candidate alpha win the 2026 election?"),
+                Market("market-2", "Will candidate beta win the 2026 election?")),
+            [new StaticEvidenceSource()],
+            new PromptDrivenLlmClient());
+        var query = new OpportunityQueryService(repositories.OpportunityRepository, repositories.EvidenceRepository);
+
+        var result = await service.ScanAsync(new OpportunityScanRequest("test", 0m, 0m, 5));
+
+        Assert.Equal(2, result.Opportunities.Count);
+        Assert.Equal(1, result.Run.EvidenceCount);
+        foreach (var opportunity in result.Opportunities)
+        {
+            var citedIds = JsonSerializer.Deserialize<List<Guid>>(opportunity.EvidenceIdsJson)
+                ?? throw new InvalidOperationException("Opportunity evidence ids were not valid JSON.");
+            var evidence = await query.GetEvidenceAsync(opportunity.Id);
+            var citedEvidence = Assert.Single(evidence);
+            Assert.Contains(citedEvidence.Id, citedIds);
+        }
+    }
+
+    [Fact]
     public async Task PublishAsync_RejectsOpportunityThatWasNotApproved()
     {
         await using var context = CreateContext();
@@ -172,15 +200,17 @@ public sealed class OpportunityDiscoveryServiceTests
             new OpportunityReviewRepository(context));
     }
 
-    private static MarketInfoDto Market()
+    private static MarketInfoDto Market(
+        string marketId = "market-1",
+        string name = "Will candidate alpha win the 2026 election?")
     {
         return new MarketInfoDto
         {
-            MarketId = "market-1",
-            ConditionId = "condition-1",
-            Name = "Will candidate alpha win the 2026 election?",
+            MarketId = marketId,
+            ConditionId = $"{marketId}-condition",
+            Name = name,
             Category = "Politics",
-            Slug = "candidate-alpha-2026",
+            Slug = marketId,
             Status = "active",
             ExpiresAtUtc = DateTimeOffset.UtcNow.AddDays(30),
             Volume24h = 1000m,

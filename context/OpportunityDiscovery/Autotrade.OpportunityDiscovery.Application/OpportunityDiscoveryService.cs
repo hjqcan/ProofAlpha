@@ -82,20 +82,34 @@ public sealed class OpportunityDiscoveryService : IOpportunityDiscoveryService
 
         try
         {
-            var allEvidence = new List<EvidenceItem>();
+            var allEvidenceById = new Dictionary<Guid, EvidenceItem>();
             var opportunities = new List<MarketOpportunity>();
             foreach (var market in markets)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var evidence = await CollectEvidenceAsync(run.Id, market, cancellationToken).ConfigureAwait(false);
+                var collectedEvidence = await CollectEvidenceAsync(run.Id, market, cancellationToken).ConfigureAwait(false);
+                if (collectedEvidence.Count == 0)
+                {
+                    continue;
+                }
+
+                await _evidenceRepository.AddRangeDedupAsync(collectedEvidence, cancellationToken).ConfigureAwait(false);
+
+                var evidence = await ResolvePersistedEvidenceForMarketAsync(
+                        run.Id,
+                        collectedEvidence,
+                        cancellationToken)
+                    .ConfigureAwait(false);
                 if (evidence.Count == 0)
                 {
                     continue;
                 }
 
-                allEvidence.AddRange(evidence);
-                await _evidenceRepository.AddRangeDedupAsync(evidence, cancellationToken).ConfigureAwait(false);
+                foreach (var item in evidence)
+                {
+                    allEvidenceById.TryAdd(item.Id, item);
+                }
 
                 var analysis = await AnalyzeMarketAsync(market, evidence, cancellationToken).ConfigureAwait(false);
                 opportunities.AddRange(CompileOpportunities(run.Id, market, evidence, analysis));
@@ -106,7 +120,7 @@ public sealed class OpportunityDiscoveryService : IOpportunityDiscoveryService
                 await _opportunityRepository.AddRangeAsync(opportunities, cancellationToken).ConfigureAwait(false);
             }
 
-            run.MarkSucceeded(allEvidence.Count, opportunities.Count, DateTimeOffset.UtcNow);
+            run.MarkSucceeded(allEvidenceById.Count, opportunities.Count, DateTimeOffset.UtcNow);
             await _runRepository.UpdateAsync(run, cancellationToken).ConfigureAwait(false);
 
             return new OpportunityScanResult(
@@ -235,6 +249,27 @@ public sealed class OpportunityDiscoveryService : IOpportunityDiscoveryService
                 ComputeHash($"{NormalizeUrl(e.Url)}|{e.Title}|{e.Summary}"),
                 e.RawJson,
                 e.SourceQuality))
+            .ToList();
+    }
+
+    private async Task<IReadOnlyList<EvidenceItem>> ResolvePersistedEvidenceForMarketAsync(
+        Guid runId,
+        IReadOnlyList<EvidenceItem> collectedEvidence,
+        CancellationToken cancellationToken)
+    {
+        var contentHashes = collectedEvidence
+            .Select(item => item.ContentHash)
+            .Where(hash => !string.IsNullOrWhiteSpace(hash))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (contentHashes.Count == 0)
+        {
+            return Array.Empty<EvidenceItem>();
+        }
+
+        var persistedEvidence = await _evidenceRepository.GetByRunAsync(runId, cancellationToken).ConfigureAwait(false);
+        return persistedEvidence
+            .Where(item => contentHashes.Contains(item.ContentHash))
+            .Take(_options.MaxEvidencePerMarket)
             .ToList();
     }
 

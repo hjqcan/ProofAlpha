@@ -40,6 +40,16 @@ public sealed class OpportunityDiscoveryServiceTests
         Assert.Equal(1, result.Run.EvidenceCount);
         Assert.Equal(1, result.Run.OpportunityCount);
 
+        var explainService = new OpportunityEvidenceExplainService(repositories.EvidenceSnapshotRepository);
+        var explanation = await explainService.ExplainAsync(opportunity.Id, opportunity.CreatedAtUtc.AddTicks(1));
+        Assert.NotNull(explanation);
+        Assert.False(explanation.CanPassLivePromotion);
+        Assert.Single(explanation.Snapshot.Citations);
+        Assert.Empty(explanation.Snapshot.OfficialConfirmations);
+        Assert.Contains(
+            explanation.BlockingReasons,
+            reason => reason.Contains("non-official", StringComparison.OrdinalIgnoreCase));
+
         await service.ApproveAsync(new OpportunityReviewRequest(opportunity.Id, "test"));
         await service.PublishAsync(new OpportunityReviewRequest(opportunity.Id, "test"));
 
@@ -165,6 +175,8 @@ public sealed class OpportunityDiscoveryServiceTests
             llmClient,
             repositories.RunRepository,
             repositories.EvidenceRepository,
+            repositories.SourceProfileRepository,
+            repositories.EvidenceSnapshotRepository,
             repositories.OpportunityRepository,
             repositories.ReviewRepository,
             Options.Create(new OpportunityDiscoveryOptions
@@ -196,6 +208,9 @@ public sealed class OpportunityDiscoveryServiceTests
         return new RepositorySet(
             new ResearchRunRepository(context),
             new EvidenceItemRepository(context),
+            new SourceProfileRepository(context),
+            new SourceObservationRepository(context),
+            new EvidenceSnapshotRepository(context),
             new MarketOpportunityRepository(context),
             new OpportunityReviewRepository(context));
     }
@@ -238,6 +253,9 @@ public sealed class OpportunityDiscoveryServiceTests
     private sealed record RepositorySet(
         ResearchRunRepository RunRepository,
         EvidenceItemRepository EvidenceRepository,
+        SourceProfileRepository SourceProfileRepository,
+        SourceObservationRepository SourceObservationRepository,
+        EvidenceSnapshotRepository EvidenceSnapshotRepository,
         MarketOpportunityRepository OpportunityRepository,
         OpportunityReviewRepository ReviewRepository);
 

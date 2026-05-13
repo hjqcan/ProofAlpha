@@ -96,6 +96,313 @@ public sealed class EvidenceItemRepository : IEvidenceItemRepository
     }
 }
 
+public sealed class SourceProfileRepository : ISourceProfileRepository
+{
+    private readonly OpportunityDiscoveryContext _context;
+
+    public SourceProfileRepository(OpportunityDiscoveryContext context)
+    {
+        _context = context ?? throw new ArgumentNullException(nameof(context));
+    }
+
+    public async Task AddAsync(SourceProfile profile, CancellationToken cancellationToken = default)
+    {
+        _context.SourceProfiles.Add(profile);
+        await _context.Commit().ConfigureAwait(false);
+    }
+
+    public async Task<SourceProfile?> GetLatestByKeyAsync(string sourceKey, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(sourceKey))
+        {
+            return null;
+        }
+
+        return await _context.SourceProfiles
+            .Where(item => item.SourceKey == sourceKey.Trim().ToLowerInvariant())
+            .OrderByDescending(item => item.Version)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyDictionary<string, SourceProfile>> GetCurrentByKeysAsync(
+        IReadOnlyList<string> sourceKeys,
+        CancellationToken cancellationToken = default)
+    {
+        var keys = sourceKeys
+            .Where(key => !string.IsNullOrWhiteSpace(key))
+            .Select(key => key.Trim().ToLowerInvariant())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (keys.Count == 0)
+        {
+            return new Dictionary<string, SourceProfile>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        var profiles = await _context.SourceProfiles
+            .Where(item => keys.Contains(item.SourceKey))
+            .OrderByDescending(item => item.Version)
+            .AsNoTracking()
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return profiles
+            .GroupBy(item => item.SourceKey, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.OrderByDescending(item => item.Version).First(),
+                StringComparer.OrdinalIgnoreCase);
+    }
+
+    public async Task<IReadOnlyList<SourceProfile>> ListCurrentAsync(CancellationToken cancellationToken = default)
+    {
+        var profiles = await _context.SourceProfiles
+            .OrderBy(item => item.SourceKey)
+            .ThenByDescending(item => item.Version)
+            .AsNoTracking()
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return profiles
+            .GroupBy(item => item.SourceKey, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.OrderByDescending(item => item.Version).First())
+            .OrderBy(item => item.SourceKey)
+            .ToList();
+    }
+}
+
+public sealed class SourceObservationRepository : ISourceObservationRepository
+{
+    private readonly OpportunityDiscoveryContext _context;
+
+    public SourceObservationRepository(OpportunityDiscoveryContext context)
+    {
+        _context = context ?? throw new ArgumentNullException(nameof(context));
+    }
+
+    public async Task AddAsync(SourceObservation observation, CancellationToken cancellationToken = default)
+    {
+        _context.SourceObservations.Add(observation);
+        await _context.Commit().ConfigureAwait(false);
+    }
+}
+
+public sealed class EvidenceSnapshotRepository : IEvidenceSnapshotRepository
+{
+    private readonly OpportunityDiscoveryContext _context;
+
+    public EvidenceSnapshotRepository(OpportunityDiscoveryContext context)
+    {
+        _context = context ?? throw new ArgumentNullException(nameof(context));
+    }
+
+    public async Task AddAsync(EvidenceSnapshotBundle bundle, CancellationToken cancellationToken = default)
+    {
+        await AddRangeAsync([bundle], cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task AddRangeAsync(IReadOnlyList<EvidenceSnapshotBundle> bundles, CancellationToken cancellationToken = default)
+    {
+        if (bundles.Count == 0)
+        {
+            return;
+        }
+
+        _context.EvidenceSnapshots.AddRange(bundles.Select(bundle => bundle.Snapshot));
+        _context.EvidenceCitations.AddRange(bundles.SelectMany(bundle => bundle.Citations));
+        _context.EvidenceConflicts.AddRange(bundles.SelectMany(bundle => bundle.Conflicts));
+        _context.OfficialConfirmations.AddRange(bundles.SelectMany(bundle => bundle.OfficialConfirmations));
+        await _context.Commit().ConfigureAwait(false);
+    }
+
+    public async Task<EvidenceSnapshotBundle?> GetForOpportunityAsOfAsync(
+        Guid opportunityId,
+        DateTimeOffset asOfUtc,
+        CancellationToken cancellationToken = default)
+    {
+        var snapshot = await _context.EvidenceSnapshots
+            .Where(item => item.OpportunityId == opportunityId && item.SnapshotAsOfUtc <= asOfUtc)
+            .OrderByDescending(item => item.SnapshotAsOfUtc)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (snapshot is null)
+        {
+            return null;
+        }
+
+        var citations = await _context.EvidenceCitations
+            .Where(item => item.EvidenceSnapshotId == snapshot.Id)
+            .OrderByDescending(item => item.RelevanceScore)
+            .AsNoTracking()
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var conflicts = await _context.EvidenceConflicts
+            .Where(item => item.EvidenceSnapshotId == snapshot.Id)
+            .OrderByDescending(item => item.Severity)
+            .AsNoTracking()
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var confirmations = await _context.OfficialConfirmations
+            .Where(item => item.EvidenceSnapshotId == snapshot.Id)
+            .OrderByDescending(item => item.Confidence)
+            .AsNoTracking()
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return new EvidenceSnapshotBundle(snapshot, citations, conflicts, confirmations);
+    }
+}
+
+public sealed class OpportunityV2Repository : IOpportunityV2Repository
+{
+    private readonly OpportunityDiscoveryContext _context;
+
+    public OpportunityV2Repository(OpportunityDiscoveryContext context)
+    {
+        _context = context ?? throw new ArgumentNullException(nameof(context));
+    }
+
+    public async Task<OpportunityHypothesis?> GetHypothesisAsync(
+        Guid hypothesisId,
+        CancellationToken cancellationToken = default)
+    {
+        if (hypothesisId == Guid.Empty)
+        {
+            return null;
+        }
+
+        return await _context.OpportunityHypotheses
+            .FirstOrDefaultAsync(item => item.Id == hypothesisId, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task AddHypothesisAsync(OpportunityHypothesis hypothesis, CancellationToken cancellationToken = default)
+    {
+        _context.OpportunityHypotheses.Add(hypothesis);
+        await _context.Commit().ConfigureAwait(false);
+    }
+
+    public async Task UpdateHypothesisAsync(OpportunityHypothesis hypothesis, CancellationToken cancellationToken = default)
+    {
+        _context.OpportunityHypotheses.Update(hypothesis);
+        await _context.Commit().ConfigureAwait(false);
+    }
+
+    public async Task AddTransitionAsync(OpportunityLifecycleTransition transition, CancellationToken cancellationToken = default)
+    {
+        _context.OpportunityLifecycleTransitions.Add(transition);
+        await _context.Commit().ConfigureAwait(false);
+    }
+
+    public async Task UpdateHypothesisWithTransitionAsync(
+        OpportunityHypothesis hypothesis,
+        OpportunityLifecycleTransition transition,
+        CancellationToken cancellationToken = default)
+    {
+        _context.OpportunityHypotheses.Update(hypothesis);
+        _context.OpportunityLifecycleTransitions.Add(transition);
+        await _context.Commit().ConfigureAwait(false);
+    }
+
+    public async Task AddFeatureSnapshotAsync(OpportunityFeatureSnapshot snapshot, CancellationToken cancellationToken = default)
+    {
+        _context.OpportunityFeatureSnapshots.Add(snapshot);
+        await _context.Commit().ConfigureAwait(false);
+    }
+
+    public async Task AddScoreAsync(OpportunityScore score, CancellationToken cancellationToken = default)
+    {
+        _context.OpportunityScores.Add(score);
+        await _context.Commit().ConfigureAwait(false);
+    }
+
+    public async Task AddFeatureSnapshotAndScoreAsync(
+        OpportunityFeatureSnapshot snapshot,
+        OpportunityScore score,
+        CancellationToken cancellationToken = default)
+    {
+        _context.OpportunityFeatureSnapshots.Add(snapshot);
+        _context.OpportunityScores.Add(score);
+        await _context.Commit().ConfigureAwait(false);
+    }
+
+    public async Task AddEvaluationRunAsync(OpportunityEvaluationRun run, CancellationToken cancellationToken = default)
+    {
+        _context.OpportunityEvaluationRuns.Add(run);
+        await _context.Commit().ConfigureAwait(false);
+    }
+
+    public async Task UpdateEvaluationRunAsync(OpportunityEvaluationRun run, CancellationToken cancellationToken = default)
+    {
+        _context.OpportunityEvaluationRuns.Update(run);
+        await _context.Commit().ConfigureAwait(false);
+    }
+
+    public async Task AddPromotionGateAsync(OpportunityPromotionGate gate, CancellationToken cancellationToken = default)
+    {
+        _context.OpportunityPromotionGates.Add(gate);
+        await _context.Commit().ConfigureAwait(false);
+    }
+
+    public async Task AddEvaluationRunAndGateAsync(
+        OpportunityEvaluationRun run,
+        OpportunityPromotionGate gate,
+        CancellationToken cancellationToken = default)
+    {
+        _context.OpportunityEvaluationRuns.Add(run);
+        _context.OpportunityPromotionGates.Add(gate);
+        await _context.Commit().ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<OpportunityPromotionGate>> ListPromotionGatesAsync(
+        Guid hypothesisId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.OpportunityPromotionGates
+            .Where(item => item.HypothesisId == hypothesisId)
+            .OrderByDescending(item => item.EvaluatedAtUtc)
+            .AsNoTracking()
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task AddExecutablePolicyAsync(ExecutableOpportunityPolicy policy, CancellationToken cancellationToken = default)
+    {
+        _context.ExecutableOpportunityPolicies.Add(policy);
+        await _context.Commit().ConfigureAwait(false);
+    }
+
+    public async Task UpdateExecutablePolicyAsync(ExecutableOpportunityPolicy policy, CancellationToken cancellationToken = default)
+    {
+        _context.ExecutableOpportunityPolicies.Update(policy);
+        await _context.Commit().ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<ExecutableOpportunityPolicy>> ListExecutablePoliciesAsync(
+        DateTimeOffset now,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.ExecutableOpportunityPolicies
+            .Where(item => item.Status == ExecutableOpportunityPolicyStatus.Active
+                && item.ValidFromUtc <= now
+                && item.ValidUntilUtc > now)
+            .OrderByDescending(item => item.Edge)
+            .Take(Math.Clamp(limit, 1, 500))
+            .AsNoTracking()
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task AddLiveAllocationAsync(OpportunityLiveAllocation allocation, CancellationToken cancellationToken = default)
+    {
+        _context.OpportunityLiveAllocations.Add(allocation);
+        await _context.Commit().ConfigureAwait(false);
+    }
+}
+
 public sealed class MarketOpportunityRepository : IMarketOpportunityRepository
 {
     private readonly OpportunityDiscoveryContext _context;

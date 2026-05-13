@@ -3,7 +3,32 @@ ODV2-T002: Source Registry and Official Source Packs
 
 Status
 ------
-[TODO]
+[DONE]
+
+
+Progress
+--------
+2026-05-13:
+
+- [DONE] Added durable `SourceProfile`, `SourceObservation`,
+  `EvidenceSnapshot`, `EvidenceCitation`, `EvidenceConflict`, and
+  `OfficialConfirmation` entities.
+- [DONE] Added versioned source-profile registry contracts and services.
+- [DONE] Added default source-pack definitions for Polymarket
+  market/orderbook/trades, crypto price/oracle, macro official data, SEC
+  filings, weather alerts, sports schedule/result, sports injuries, election
+  official results, election polling, RSS, GDELT, OpenAI web search, and manual
+  review.
+- [DONE] Preserved existing `EvidenceItem` scan compatibility and records
+  evidence snapshots for compiled opportunities.
+- [DONE] Added point-in-time evidence snapshot repository reads by opportunity
+  and `asOfUtc`.
+- [DONE] Added evidence explain service that returns citations, conflicts,
+  confirmations, and Live-gate blocking reasons.
+- [DONE] Added Live evidence gate behavior that blocks non-official
+  RSS/GDELT/OpenAI-search-only evidence from passing Live promotion.
+- [DONE] Added EF mappings, indexes, and migration
+  `SourceRegistryAndEvidenceSnapshots`.
 
 
 Goal
@@ -51,3 +76,22 @@ Acceptance
 - Source conflict is visible in explain output.
 - Non-official news alone cannot pass Live promotion.
 - Source profile updates are append-only or versioned.
+
+
+Completion Evidence
+-------------------
+- [DONE] Changed files include source registry contracts, source-pack catalog,
+  Live evidence gate evaluator, source registry service, evidence explain
+  service, OpportunityDiscovery scan snapshot recording, new domain entities,
+  `OpportunityDiscoveryContext`, EF repositories, DI registration, migration
+  files, and OpportunityDiscovery tests.
+- [DONE] Targeted test passed:
+  `dotnet test context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Tests/Autotrade.OpportunityDiscovery.Tests.csproj`
+  with 15 passed.
+- [DONE] Full validation passed:
+  `dotnet build` with 0 warnings and 0 errors.
+- [DONE] Full test passed:
+  `dotnet test --no-build` with all listed test assemblies passing
+  (638 tests total across 10 test assemblies).
+- [DONE] Postgres smoke was not run because `AUTOTRADE_TEST_POSTGRES` was not
+  set in this environment.

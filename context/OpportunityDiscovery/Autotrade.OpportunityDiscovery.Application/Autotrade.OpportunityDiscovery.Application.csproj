@@ -4,6 +4,7 @@
     <ProjectReference Include="..\Autotrade.OpportunityDiscovery.Application.Contract\Autotrade.OpportunityDiscovery.Application.Contract.csproj" />
     <ProjectReference Include="..\Autotrade.OpportunityDiscovery.Domain\Autotrade.OpportunityDiscovery.Domain.csproj" />
     <ProjectReference Include="..\..\MarketData\Autotrade.MarketData.Application.Contract\Autotrade.MarketData.Application.Contract.csproj" />
+    <ProjectReference Include="..\..\Trading\Autotrade.Trading.Application.Contract\Autotrade.Trading.Application.Contract.csproj" />
     <ProjectReference Include="..\..\..\Shared\Autotrade.Llm\Autotrade.Llm.csproj" />
   </ItemGroup>
 

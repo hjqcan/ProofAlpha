@@ -3,7 +3,24 @@ ODV2-T003: OpportunityDiscovery v2 Domain and Point-in-Time Evidence
 
 Status
 ------
-[TODO]
+[DONE]
+
+
+Progress
+--------
+2026-05-13:
+
+- [DONE] Added v2 lifecycle enums and deterministic
+  `OpportunityLifecycleException`.
+- [DONE] Added `OpportunityHypothesis`, `OpportunityFeatureSnapshot`,
+  `OpportunityScore`, `OpportunityEvaluationRun`, `OpportunityPromotionGate`,
+  `ExecutableOpportunityPolicy`, and `OpportunityLiveAllocation`.
+- [DONE] Added `OpportunityLifecycleTransition` records for actor, timestamp,
+  reason, and evidence ids on every transition.
+- [DONE] Added v2 executable policy feed contract and implementation.
+- [DONE] Added EF mappings, indexes, and migration `OpportunityV2Lifecycle`.
+- [DONE] Added tests for invalid transitions, Live gate requirements,
+  transition evidence trace, and executable feed filtering.
 
 
 Goal
@@ -44,3 +61,21 @@ Acceptance
 - Invalid lifecycle transitions throw deterministic domain exceptions.
 - `LivePublished` cannot be reached without passing gate records.
 - Expired or suspended policies are excluded from executable feed.
+
+
+Completion Evidence
+-------------------
+- [DONE] Changed files include v2 lifecycle contracts, v2 mapper/feed,
+  v2 repository interface and EF repository implementation, v2 domain entities,
+  `OpportunityLifecycleException`, `OpportunityDiscoveryContext`, DI
+  registration, migration files, and `OpportunityV2DomainTests`.
+- [DONE] Targeted test passed:
+  `dotnet test context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Tests/Autotrade.OpportunityDiscovery.Tests.csproj`
+  with 18 passed.
+- [DONE] Full validation passed:
+  `dotnet build` with 0 warnings and 0 errors.
+- [DONE] Full test passed:
+  `dotnet test --no-build` with all listed test assemblies passing
+  (641 tests total across 10 test assemblies).
+- [DONE] Postgres smoke was not run because `AUTOTRADE_TEST_POSTGRES` was not
+  set in this environment.

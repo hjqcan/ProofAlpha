@@ -28,6 +28,8 @@ public sealed class OpportunityDiscoveryService : IOpportunityDiscoveryService
     private readonly ILlmJsonClient _llmClient;
     private readonly IResearchRunRepository _runRepository;
     private readonly IEvidenceItemRepository _evidenceRepository;
+    private readonly ISourceProfileRepository _sourceProfileRepository;
+    private readonly IEvidenceSnapshotRepository _evidenceSnapshotRepository;
     private readonly IMarketOpportunityRepository _opportunityRepository;
     private readonly IOpportunityReviewRepository _reviewRepository;
     private readonly OpportunityDiscoveryOptions _options;
@@ -39,6 +41,8 @@ public sealed class OpportunityDiscoveryService : IOpportunityDiscoveryService
         ILlmJsonClient llmClient,
         IResearchRunRepository runRepository,
         IEvidenceItemRepository evidenceRepository,
+        ISourceProfileRepository sourceProfileRepository,
+        IEvidenceSnapshotRepository evidenceSnapshotRepository,
         IMarketOpportunityRepository opportunityRepository,
         IOpportunityReviewRepository reviewRepository,
         IOptions<OpportunityDiscoveryOptions> options,
@@ -49,6 +53,8 @@ public sealed class OpportunityDiscoveryService : IOpportunityDiscoveryService
         _llmClient = llmClient ?? throw new ArgumentNullException(nameof(llmClient));
         _runRepository = runRepository ?? throw new ArgumentNullException(nameof(runRepository));
         _evidenceRepository = evidenceRepository ?? throw new ArgumentNullException(nameof(evidenceRepository));
+        _sourceProfileRepository = sourceProfileRepository ?? throw new ArgumentNullException(nameof(sourceProfileRepository));
+        _evidenceSnapshotRepository = evidenceSnapshotRepository ?? throw new ArgumentNullException(nameof(evidenceSnapshotRepository));
         _opportunityRepository = opportunityRepository ?? throw new ArgumentNullException(nameof(opportunityRepository));
         _reviewRepository = reviewRepository ?? throw new ArgumentNullException(nameof(reviewRepository));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
@@ -84,6 +90,7 @@ public sealed class OpportunityDiscoveryService : IOpportunityDiscoveryService
         {
             var allEvidenceById = new Dictionary<Guid, EvidenceItem>();
             var opportunities = new List<MarketOpportunity>();
+            var evidenceSnapshotBundles = new List<EvidenceSnapshotBundle>();
             foreach (var market in markets)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -112,12 +119,26 @@ public sealed class OpportunityDiscoveryService : IOpportunityDiscoveryService
                 }
 
                 var analysis = await AnalyzeMarketAsync(market, evidence, cancellationToken).ConfigureAwait(false);
-                opportunities.AddRange(CompileOpportunities(run.Id, market, evidence, analysis));
+                var compiledOpportunities = CompileOpportunities(run.Id, market, evidence, analysis);
+                opportunities.AddRange(compiledOpportunities);
+                evidenceSnapshotBundles.AddRange(
+                    await BuildEvidenceSnapshotBundlesAsync(
+                            run.Id,
+                            market,
+                            evidence,
+                            compiledOpportunities,
+                            cancellationToken)
+                        .ConfigureAwait(false));
             }
 
             if (opportunities.Count > 0)
             {
                 await _opportunityRepository.AddRangeAsync(opportunities, cancellationToken).ConfigureAwait(false);
+            }
+
+            if (evidenceSnapshotBundles.Count > 0)
+            {
+                await _evidenceSnapshotRepository.AddRangeAsync(evidenceSnapshotBundles, cancellationToken).ConfigureAwait(false);
             }
 
             run.MarkSucceeded(allEvidenceById.Count, opportunities.Count, DateTimeOffset.UtcNow);
@@ -371,6 +392,158 @@ public sealed class OpportunityDiscoveryService : IOpportunityDiscoveryService
         return valid;
     }
 
+    private async Task<IReadOnlyList<EvidenceSnapshotBundle>> BuildEvidenceSnapshotBundlesAsync(
+        Guid runId,
+        MarketInfoDto market,
+        IReadOnlyList<EvidenceItem> evidence,
+        IReadOnlyList<MarketOpportunity> opportunities,
+        CancellationToken cancellationToken)
+    {
+        if (opportunities.Count == 0)
+        {
+            return Array.Empty<EvidenceSnapshotBundle>();
+        }
+
+        var sourceKeys = evidence
+            .Select(item => SourceProfileKeys.ForEvidence(item.SourceKind, item.SourceName))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var sourceProfiles = await _sourceProfileRepository
+            .GetCurrentByKeysAsync(sourceKeys, cancellationToken)
+            .ConfigureAwait(false);
+
+        var evidenceById = evidence.ToDictionary(item => item.Id);
+        var bundles = new List<EvidenceSnapshotBundle>();
+        foreach (var opportunity in opportunities)
+        {
+            var evidenceIds = DeserializeEvidenceIds(opportunity.EvidenceIdsJson);
+            var citationInputs = evidenceIds
+                .Select(id => evidenceById.TryGetValue(id, out var item) ? item : null)
+                .Where(item => item is not null)
+                .Select(item => CreateCitationInput(item!, market, opportunity, sourceProfiles))
+                .ToList();
+            var liveGateReasons = EvaluateSnapshotLiveGate(citationInputs);
+            var liveGateStatus = liveGateReasons.Count == 0
+                ? EvidenceSnapshotLiveGateStatus.Eligible
+                : EvidenceSnapshotLiveGateStatus.Blocked;
+            var snapshot = new EvidenceSnapshot(
+                opportunity.Id,
+                runId,
+                market.MarketId,
+                opportunity.CreatedAtUtc,
+                liveGateStatus,
+                JsonSerializer.Serialize(liveGateReasons, JsonOptions),
+                JsonSerializer.Serialize(new
+                {
+                    opportunityId = opportunity.Id,
+                    marketId = market.MarketId,
+                    evidenceIds,
+                    citationCount = citationInputs.Count,
+                    sourceKeys = citationInputs
+                        .Select(item => item.SourceKey)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .OrderBy(item => item)
+                        .ToList(),
+                    officialConfirmationCount = citationInputs.Count(item => item.CanProvideLiveConfirmation)
+                }, JsonOptions),
+                opportunity.CreatedAtUtc);
+
+            var citations = citationInputs
+                .Select(item => item.ToCitation(snapshot.Id, opportunity.CreatedAtUtc))
+                .ToList();
+            var confirmations = citationInputs
+                .Where(item => item.CanProvideLiveConfirmation)
+                .Select(item => item.ToOfficialConfirmation(snapshot.Id, market, opportunity))
+                .ToList();
+            bundles.Add(new EvidenceSnapshotBundle(
+                snapshot,
+                citations,
+                Array.Empty<EvidenceConflict>(),
+                confirmations));
+        }
+
+        return bundles;
+    }
+
+    private static CitationInput CreateCitationInput(
+        EvidenceItem evidence,
+        MarketInfoDto market,
+        MarketOpportunity opportunity,
+        IReadOnlyDictionary<string, SourceProfile> sourceProfiles)
+    {
+        var sourceKey = SourceProfileKeys.ForEvidence(evidence.SourceKind, evidence.SourceName);
+        if (sourceProfiles.TryGetValue(sourceKey, out var sourceProfile))
+        {
+            return new CitationInput(
+                evidence.Id,
+                sourceProfile.SourceKey,
+                sourceProfile.SourceKind,
+                sourceProfile.SourceName,
+                sourceProfile.IsOfficial,
+                sourceProfile.AuthorityKind,
+                sourceProfile.CanProvideLiveConfirmation,
+                evidence.Url,
+                evidence.Title,
+                evidence.PublishedAtUtc,
+                evidence.ObservedAtUtc,
+                evidence.ContentHash,
+                Math.Clamp(evidence.SourceQuality, 0m, 1m),
+                JsonSerializer.Serialize(new
+                {
+                    marketId = market.MarketId,
+                    opportunityId = opportunity.Id,
+                    outcome = opportunity.Outcome,
+                    evidence.Title,
+                    evidence.Summary
+                }, JsonOptions));
+        }
+
+        var definition = SourcePackCatalog.Resolve(evidence.SourceKind, evidence.SourceName);
+        var canProvideLiveConfirmation = definition.IsOfficial ||
+            definition.AuthorityKind is SourceAuthorityKind.Official
+                or SourceAuthorityKind.PrimaryExchange
+                or SourceAuthorityKind.Regulator
+                or SourceAuthorityKind.DataOracle;
+        return new CitationInput(
+            evidence.Id,
+            definition.SourceKey,
+            definition.SourceKind,
+            definition.SourceName,
+            definition.IsOfficial,
+            definition.AuthorityKind,
+            canProvideLiveConfirmation,
+            evidence.Url,
+            evidence.Title,
+            evidence.PublishedAtUtc,
+            evidence.ObservedAtUtc,
+            evidence.ContentHash,
+            Math.Clamp(evidence.SourceQuality, 0m, 1m),
+            JsonSerializer.Serialize(new
+            {
+                marketId = market.MarketId,
+                opportunityId = opportunity.Id,
+                outcome = opportunity.Outcome,
+                evidence.Title,
+                evidence.Summary
+            }, JsonOptions));
+    }
+
+    private static IReadOnlyList<string> EvaluateSnapshotLiveGate(IReadOnlyList<CitationInput> citations)
+    {
+        var reasons = new List<string>();
+        if (citations.Count == 0)
+        {
+            reasons.Add("Live promotion requires at least one point-in-time evidence citation.");
+        }
+
+        if (!citations.Any(item => item.CanProvideLiveConfirmation))
+        {
+            reasons.Add("Live promotion requires official API confirmation or strong multi-source confirmation; non-official news/search-only evidence is not sufficient.");
+        }
+
+        return reasons;
+    }
+
     private IReadOnlyList<string> ValidateDocument(
         MarketInfoDto market,
         IReadOnlyList<EvidenceItem> evidence,
@@ -513,8 +686,81 @@ public sealed class OpportunityDiscoveryService : IOpportunityDiscoveryService
     private static string ComputeHash(string value)
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
 
+    private static IReadOnlyList<Guid> DeserializeEvidenceIds(string evidenceIdsJson)
+    {
+        if (string.IsNullOrWhiteSpace(evidenceIdsJson))
+        {
+            return Array.Empty<Guid>();
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<IReadOnlyList<Guid>>(evidenceIdsJson, JsonOptions)
+                ?? Array.Empty<Guid>();
+        }
+        catch (JsonException)
+        {
+            return Array.Empty<Guid>();
+        }
+    }
+
     private static string NormalizeUrl(string value)
     {
         return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim().TrimEnd('/');
+    }
+
+    private sealed record CitationInput(
+        Guid EvidenceItemId,
+        string SourceKey,
+        EvidenceSourceKind SourceKind,
+        string SourceName,
+        bool IsOfficial,
+        SourceAuthorityKind AuthorityKind,
+        bool CanProvideLiveConfirmation,
+        string Url,
+        string Title,
+        DateTimeOffset? PublishedAtUtc,
+        DateTimeOffset ObservedAtUtc,
+        string ContentHash,
+        decimal RelevanceScore,
+        string ClaimJson)
+    {
+        public EvidenceCitation ToCitation(Guid evidenceSnapshotId, DateTimeOffset createdAtUtc)
+            => new(
+                evidenceSnapshotId,
+                EvidenceItemId,
+                SourceKey,
+                SourceKind,
+                SourceName,
+                IsOfficial,
+                AuthorityKind,
+                Url,
+                Title,
+                PublishedAtUtc,
+                ObservedAtUtc,
+                ContentHash,
+                RelevanceScore,
+                ClaimJson,
+                createdAtUtc);
+
+        public OfficialConfirmation ToOfficialConfirmation(
+            Guid evidenceSnapshotId,
+            MarketInfoDto market,
+            MarketOpportunity opportunity)
+            => new(
+                evidenceSnapshotId,
+                SourceKey,
+                EvidenceConfirmationKind.OfficialApi,
+                $"{market.MarketId}:{opportunity.Outcome}",
+                Url,
+                RelevanceScore,
+                ObservedAtUtc,
+                JsonSerializer.Serialize(new
+                {
+                    evidenceItemId = EvidenceItemId,
+                    marketId = market.MarketId,
+                    opportunityId = opportunity.Id,
+                    sourceKey = SourceKey
+                }, JsonOptions));
     }
 }

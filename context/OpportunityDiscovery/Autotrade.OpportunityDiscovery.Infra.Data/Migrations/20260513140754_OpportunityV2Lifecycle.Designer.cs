@@ -3,6 +3,7 @@ using System;
 using Autotrade.OpportunityDiscovery.Infra.Data.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Autotrade.OpportunityDiscovery.Infra.Data.Migrations
 {
     [DbContext(typeof(OpportunityDiscoveryContext))]
-    partial class OpportunityDiscoveryContextModelSnapshot : ModelSnapshot
+    [Migration("20260513140754_OpportunityV2Lifecycle")]
+    partial class OpportunityV2Lifecycle
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -854,9 +857,6 @@ namespace Autotrade.OpportunityDiscovery.Infra.Data.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
-                    b.Property<bool>("CanPromote")
-                        .HasColumnType("boolean");
-
                     b.Property<string>("ComponentsJson")
                         .IsRequired()
                         .HasColumnType("jsonb");
@@ -872,14 +872,6 @@ namespace Autotrade.OpportunityDiscovery.Infra.Data.Migrations
                         .HasPrecision(8, 4)
                         .HasColumnType("numeric(8,4)");
 
-                    b.Property<decimal>("ExecutableCapacity")
-                        .HasPrecision(18, 8)
-                        .HasColumnType("numeric(18,8)");
-
-                    b.Property<decimal>("ExecutableEntryPrice")
-                        .HasPrecision(8, 4)
-                        .HasColumnType("numeric(8,4)");
-
                     b.Property<decimal>("FairProbability")
                         .HasPrecision(8, 4)
                         .HasColumnType("numeric(8,4)");
@@ -887,38 +879,15 @@ namespace Autotrade.OpportunityDiscovery.Infra.Data.Migrations
                     b.Property<Guid>("FeatureSnapshotId")
                         .HasColumnType("uuid");
 
-                    b.Property<decimal>("FeeEstimate")
-                        .HasPrecision(8, 4)
-                        .HasColumnType("numeric(8,4)");
-
                     b.Property<Guid>("HypothesisId")
                         .HasColumnType("uuid");
-
-                    b.Property<decimal>("LlmFairProbability")
-                        .HasPrecision(8, 4)
-                        .HasColumnType("numeric(8,4)");
-
-                    b.Property<decimal>("MarketImpliedProbability")
-                        .HasPrecision(8, 4)
-                        .HasColumnType("numeric(8,4)");
-
-                    b.Property<decimal>("NetEdge")
-                        .HasPrecision(8, 4)
-                        .HasColumnType("numeric(8,4)");
 
                     b.Property<string>("ScoreVersion")
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
-                    b.Property<decimal>("SlippageBuffer")
-                        .HasPrecision(8, 4)
-                        .HasColumnType("numeric(8,4)");
-
                     b.HasKey("Id");
-
-                    b.HasIndex("CanPromote", "NetEdge")
-                        .HasDatabaseName("IX_OpportunityScores_CanPromote_NetEdge");
 
                     b.HasIndex("HypothesisId", "CreatedAtUtc")
                         .HasDatabaseName("IX_OpportunityScores_Hypothesis_Time");

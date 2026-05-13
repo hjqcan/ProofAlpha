@@ -3,7 +3,7 @@ ODV2-T004: Feature Extraction, Scoring, and Calibration
 
 Status
 ------
-[TODO]
+[DONE]
 
 
 Goal
@@ -47,3 +47,53 @@ Acceptance
 - LLM fair probability is a feature input, not final authority.
 - Score breakdown is persisted and explainable.
 - Calibration can compare scored probability against market-implied baseline.
+
+
+Completion Evidence
+-------------------
+Closed on 2026-05-13.
+
+Code paths changed:
+- `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Domain.Shared/Enums/OpportunityDiscoveryEnums.cs`
+  added deterministic v2 `OpportunityType` categories.
+- `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Domain/Entities/OpportunityScore.cs`
+  now persists LLM input probability, market-implied baseline, executable entry
+  price, fee, slippage, net edge, executable capacity, and promotion eligibility.
+- `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Application.Contract/OpportunityV2Contracts.cs`
+  added feature snapshot/score DTOs plus `IOpportunityScoringService` request and
+  result contracts.
+- `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Application/OpportunityScoringService.cs`
+  added deterministic scoring, calibration bucketing, feature JSON, score
+  breakdown JSON, and promotion blocking reasons.
+- `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Application/OpportunityV2Mapper.cs`
+  maps feature snapshots and expanded score records.
+- `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Application/Repositories.cs`
+  and `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Infra.Data/Repositories/OpportunityDiscoveryRepositories.cs`
+  added atomic feature-snapshot plus score persistence.
+- `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Infra.Data/Context/OpportunityDiscoveryContext.cs`
+  maps score calibration fields and `CanPromote`/`NetEdge` index.
+- `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Infra.Data/Migrations/20260513142822_OpportunityScoringCalibration.cs`
+  and designer/model snapshot persist the schema change.
+- `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Infra.CrossCutting.IoC/OpportunityDiscoveryServiceCollectionExtensions.cs`
+  registers the scoring service.
+
+Tests added or updated:
+- `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Tests/OpportunityScoringServiceTests.cs`
+  covers positive net edge promotion, non-positive net edge blocking, zero
+  executable capacity blocking, persisted explainable breakdown, LLM probability
+  as input rather than final authority, and calibration bucket comparison against
+  market-implied probability.
+
+Validation:
+- `dotnet test context\OpportunityDiscovery\Autotrade.OpportunityDiscovery.Tests\Autotrade.OpportunityDiscovery.Tests.csproj`
+  passed: 22 tests.
+- `dotnet tool run dotnet-ef migrations add OpportunityScoringCalibration --project context\OpportunityDiscovery\Autotrade.OpportunityDiscovery.Infra.Data\Autotrade.OpportunityDiscovery.Infra.Data.csproj --startup-project context\OpportunityDiscovery\Autotrade.OpportunityDiscovery.Infra.Data\Autotrade.OpportunityDiscovery.Infra.Data.csproj --context OpportunityDiscoveryContext --output-dir Migrations`
+  succeeded after build.
+- `dotnet build` passed with 0 warnings and 0 errors.
+- `dotnet test --no-build` passed: 644 tests.
+
+Residual risk:
+- Postgres smoke tests were skipped because `AUTOTRADE_TEST_POSTGRES` was not set.
+- This slice provides deterministic score/calibration infrastructure only; it
+  does not yet run backtest, shadow, paper, Live allocation, or SelfImprove
+  strategy update loops.

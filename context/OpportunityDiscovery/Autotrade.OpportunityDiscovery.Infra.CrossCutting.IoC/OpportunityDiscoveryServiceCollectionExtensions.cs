@@ -25,12 +25,20 @@ public static class OpportunityDiscoveryServiceCollectionExtensions
 
         services.AddScoped<IResearchRunRepository, ResearchRunRepository>();
         services.AddScoped<IEvidenceItemRepository, EvidenceItemRepository>();
+        services.AddScoped<ISourceProfileRepository, SourceProfileRepository>();
+        services.AddScoped<ISourceObservationRepository, SourceObservationRepository>();
+        services.AddScoped<IEvidenceSnapshotRepository, EvidenceSnapshotRepository>();
+        services.AddScoped<IOpportunityV2Repository, OpportunityV2Repository>();
         services.AddScoped<IMarketOpportunityRepository, MarketOpportunityRepository>();
         services.AddScoped<IOpportunityReviewRepository, OpportunityReviewRepository>();
 
         services.AddScoped<OpportunityQueryService>();
         services.AddScoped<IOpportunityQueryService>(sp => sp.GetRequiredService<OpportunityQueryService>());
         services.AddScoped<IPublishedOpportunityFeed>(sp => sp.GetRequiredService<OpportunityQueryService>());
+        services.AddScoped<ISourceRegistryService, SourceRegistryService>();
+        services.AddScoped<IOpportunityEvidenceExplainService, OpportunityEvidenceExplainService>();
+        services.AddScoped<IOpportunityScoringService, OpportunityScoringService>();
+        services.AddScoped<IExecutableOpportunityPolicyFeed, ExecutableOpportunityPolicyFeed>();
         services.AddScoped<IOpportunityDiscoveryService, OpportunityDiscoveryService>();
 
         services.AddHttpClient<IEvidenceSource, GdeltDocApiSource>();

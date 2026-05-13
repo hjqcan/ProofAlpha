@@ -79,9 +79,21 @@ public interface IOpportunityV2Repository
         OpportunityScore score,
         CancellationToken cancellationToken = default);
 
+    Task<OpportunityFeatureSnapshot?> GetLatestFeatureSnapshotAsync(
+        Guid hypothesisId,
+        CancellationToken cancellationToken = default);
+
+    Task<OpportunityScore?> GetLatestScoreAsync(
+        Guid hypothesisId,
+        CancellationToken cancellationToken = default);
+
     Task AddEvaluationRunAsync(OpportunityEvaluationRun run, CancellationToken cancellationToken = default);
 
     Task UpdateEvaluationRunAsync(OpportunityEvaluationRun run, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<OpportunityEvaluationRun>> ListEvaluationRunsAsync(
+        Guid hypothesisId,
+        CancellationToken cancellationToken = default);
 
     Task AddPromotionGateAsync(OpportunityPromotionGate gate, CancellationToken cancellationToken = default);
 
@@ -96,6 +108,10 @@ public interface IOpportunityV2Repository
 
     Task AddExecutablePolicyAsync(ExecutableOpportunityPolicy policy, CancellationToken cancellationToken = default);
 
+    Task<ExecutableOpportunityPolicy?> GetExecutablePolicyAsync(
+        Guid policyId,
+        CancellationToken cancellationToken = default);
+
     Task UpdateExecutablePolicyAsync(ExecutableOpportunityPolicy policy, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<ExecutableOpportunityPolicy>> ListExecutablePoliciesAsync(
@@ -103,8 +119,56 @@ public interface IOpportunityV2Repository
         int limit,
         CancellationToken cancellationToken = default);
 
+    Task<ExecutableOpportunityPolicy?> GetActiveExecutablePolicyForHypothesisAsync(
+        Guid hypothesisId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<ExecutableOpportunityPolicyFeedItem>> ListExecutablePolicyFeedItemsAsync(
+        DateTimeOffset now,
+        int limit,
+        CancellationToken cancellationToken = default);
+
     Task AddLiveAllocationAsync(OpportunityLiveAllocation allocation, CancellationToken cancellationToken = default);
+
+    Task<OpportunityLiveAllocation?> GetLiveAllocationAsync(
+        Guid allocationId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<OpportunityLiveAllocation>> ListActiveLiveAllocationsAsync(
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default);
+
+    Task<OpportunityLiveAllocation?> GetActiveLiveAllocationForHypothesisAsync(
+        Guid hypothesisId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<OpportunityHypothesis>> ListLiveHypothesesAsync(
+        CancellationToken cancellationToken = default);
+
+    Task AddLiveAllocationWithHypothesisTransitionAsync(
+        OpportunityLiveAllocation allocation,
+        OpportunityHypothesis hypothesis,
+        OpportunityLifecycleTransition transition,
+        CancellationToken cancellationToken = default);
+
+    Task SuspendLiveOpportunityAsync(
+        OpportunityHypothesis hypothesis,
+        OpportunityLifecycleTransition transition,
+        ExecutableOpportunityPolicy policy,
+        OpportunityLiveAllocation? allocation,
+        CancellationToken cancellationToken = default);
 }
+
+public sealed record ExecutableOpportunityPolicyFeedItem(
+    ExecutableOpportunityPolicy Policy,
+    Guid ScoreId,
+    Guid GateRunId,
+    Guid AllocationId,
+    string ScoreVersion,
+    decimal AllocationMaxNotional,
+    decimal AllocationMaxContracts);
 
 public interface IMarketOpportunityRepository
 {

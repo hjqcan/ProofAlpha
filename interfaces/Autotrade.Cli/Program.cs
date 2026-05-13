@@ -650,6 +650,7 @@ var opportunityLimitOption = CreateOptionWithDefault("--limit", 50, "Maximum rec
 var opportunityIdOption = CreateRequiredOption<Guid>("--id", "Opportunity ID");
 var opportunityActorOption = CreateOptionWithDefault("--actor", "cli", "Review actor");
 var opportunityNotesOption = CreateOption<string?>("--notes", "Review notes");
+var opportunityReasonOption = CreateOption<string?>("--reason", "Operator reason");
 
 var opportunityScanCommand = new Command("scan", "Scan active Polymarket markets for opportunities");
 opportunityScanCommand.Add(opportunityMinVolumeOption);
@@ -705,6 +706,111 @@ SetAction(opportunityShowCommand, async pr =>
             new { opportunityId = pr.GetValue(opportunityIdOption) },
             resolvedConfigPath,
             host => OpportunityCommands.ShowAsync(CreateContext(host, options), pr.GetValue(opportunityIdOption)))
+        .ConfigureAwait(false);
+});
+
+var opportunityScoreCommand = new Command("score", "Show v2 score and calibration state");
+opportunityScoreCommand.Add(opportunityIdOption);
+SetAction(opportunityScoreCommand, async pr =>
+{
+    var options = CreateGlobalOptions(pr);
+    var resolvedConfigPath = ResolveConfigPathFromParse(pr);
+    return await CommandAuditService.ExecuteWithAuditAsync(
+            "opportunity score",
+            new { opportunityId = pr.GetValue(opportunityIdOption) },
+            resolvedConfigPath,
+            host => OpportunityCommands.ScoreAsync(CreateContext(host, options), pr.GetValue(opportunityIdOption)))
+        .ConfigureAwait(false);
+});
+
+var opportunityReplayCommand = new Command("replay", "Show replay and promotion-gate status");
+opportunityReplayCommand.Add(opportunityIdOption);
+SetAction(opportunityReplayCommand, async pr =>
+{
+    var options = CreateGlobalOptions(pr);
+    var resolvedConfigPath = ResolveConfigPathFromParse(pr);
+    return await CommandAuditService.ExecuteWithAuditAsync(
+            "opportunity replay",
+            new { opportunityId = pr.GetValue(opportunityIdOption) },
+            resolvedConfigPath,
+            host => OpportunityCommands.ReplayAsync(CreateContext(host, options), pr.GetValue(opportunityIdOption)))
+        .ConfigureAwait(false);
+});
+
+var opportunityPromoteCommand = new Command("promote", "Evaluate v2 promotion to LiveEligible");
+opportunityPromoteCommand.Add(opportunityIdOption);
+opportunityPromoteCommand.Add(opportunityActorOption);
+opportunityPromoteCommand.Add(opportunityReasonOption);
+SetAction(opportunityPromoteCommand, async pr =>
+{
+    var options = CreateGlobalOptions(pr);
+    var resolvedConfigPath = ResolveConfigPathFromParse(pr);
+    return await CommandAuditService.ExecuteWithAuditAsync(
+            "opportunity promote",
+            new
+            {
+                opportunityId = pr.GetValue(opportunityIdOption),
+                actor = pr.GetValue(opportunityActorOption),
+                reason = pr.GetValue(opportunityReasonOption)
+            },
+            resolvedConfigPath,
+            host => OpportunityCommands.PromoteAsync(
+                CreateContext(host, options),
+                pr.GetValue(opportunityIdOption),
+                pr.GetValue(opportunityActorOption) ?? "cli",
+                pr.GetValue(opportunityReasonOption)))
+        .ConfigureAwait(false);
+});
+
+var opportunityLiveStatusCommand = new Command("live-status", "Show executable policies and active Live allocations");
+SetAction(opportunityLiveStatusCommand, async pr =>
+{
+    var options = CreateGlobalOptions(pr);
+    var resolvedConfigPath = ResolveConfigPathFromParse(pr);
+    return await CommandAuditService.ExecuteWithAuditAsync(
+            "opportunity live-status",
+            new { },
+            resolvedConfigPath,
+            host => OpportunityCommands.LiveStatusAsync(CreateContext(host, options)))
+        .ConfigureAwait(false);
+});
+
+var opportunitySuspendCommand = new Command("suspend", "Suspend a v2 opportunity without deleting evidence");
+opportunitySuspendCommand.Add(opportunityIdOption);
+opportunitySuspendCommand.Add(opportunityActorOption);
+opportunitySuspendCommand.Add(opportunityReasonOption);
+SetAction(opportunitySuspendCommand, async pr =>
+{
+    var options = CreateGlobalOptions(pr);
+    var resolvedConfigPath = ResolveConfigPathFromParse(pr);
+    return await CommandAuditService.ExecuteWithAuditAsync(
+            "opportunity suspend",
+            new
+            {
+                opportunityId = pr.GetValue(opportunityIdOption),
+                actor = pr.GetValue(opportunityActorOption),
+                reason = pr.GetValue(opportunityReasonOption)
+            },
+            resolvedConfigPath,
+            host => OpportunityCommands.SuspendAsync(
+                CreateContext(host, options),
+                pr.GetValue(opportunityIdOption),
+                pr.GetValue(opportunityActorOption) ?? "cli",
+                pr.GetValue(opportunityReasonOption)))
+        .ConfigureAwait(false);
+});
+
+var opportunityExplainCommand = new Command("explain", "Show redacted v2 evidence, score, gate, and allocation provenance");
+opportunityExplainCommand.Add(opportunityIdOption);
+SetAction(opportunityExplainCommand, async pr =>
+{
+    var options = CreateGlobalOptions(pr);
+    var resolvedConfigPath = ResolveConfigPathFromParse(pr);
+    return await CommandAuditService.ExecuteWithAuditAsync(
+            "opportunity explain",
+            new { opportunityId = pr.GetValue(opportunityIdOption) },
+            resolvedConfigPath,
+            host => OpportunityCommands.ExplainAsync(CreateContext(host, options), pr.GetValue(opportunityIdOption)))
         .ConfigureAwait(false);
 });
 
@@ -771,6 +877,12 @@ SetAction(opportunityPublishCommand, async pr =>
 opportunityCommand.Add(opportunityScanCommand);
 opportunityCommand.Add(opportunityListCommand);
 opportunityCommand.Add(opportunityShowCommand);
+opportunityCommand.Add(opportunityScoreCommand);
+opportunityCommand.Add(opportunityReplayCommand);
+opportunityCommand.Add(opportunityPromoteCommand);
+opportunityCommand.Add(opportunityLiveStatusCommand);
+opportunityCommand.Add(opportunitySuspendCommand);
+opportunityCommand.Add(opportunityExplainCommand);
 opportunityCommand.Add(opportunityApproveCommand);
 opportunityCommand.Add(opportunityRejectCommand);
 opportunityCommand.Add(opportunityPublishCommand);

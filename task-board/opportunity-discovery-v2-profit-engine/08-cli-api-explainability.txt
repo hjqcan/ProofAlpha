@@ -3,7 +3,7 @@ ODV2-T008: CLI/API Explainability and Operator Controls
 
 Status
 ------
-[TODO]
+[DONE]
 
 
 Goal
@@ -44,3 +44,55 @@ Acceptance
 - CLI and API return the same contract shape.
 - Explain output is redacted for secrets.
 - Operators can suspend an opportunity without deleting evidence.
+
+
+Implementation Notes
+--------------------
+- Added `IOpportunityOperatorService` shared contracts for score, replay,
+  promote, Live status, suspend, and explain responses.
+- Added `OpportunityOperatorService` to assemble point-in-time evidence,
+  source profile versions, conflicts, market tape ids, prompt/model/score
+  versions, score breakdown, expected EV, executable capacity, gates,
+  evaluation runs, executable policy, allocation state, and risk/compliance
+  reasons.
+- Explain output redacts sensitive JSON/text keys such as API keys, private
+  keys, secrets, passwords, authorization values, bearer values, mnemonics, and
+  seed phrases.
+- Added `api/opportunities` endpoints for score, replay, promote, live-status,
+  suspend, and explain; responses use the same application contracts used by
+  the CLI.
+- Added CLI commands:
+  - `opportunity score --id <id>`
+  - `opportunity replay --id <id>`
+  - `opportunity promote --id <id>`
+  - `opportunity live-status`
+  - `opportunity suspend --id <id> --reason <reason>`
+  - `opportunity explain --id <id>`
+- Manual suspend uses the existing Live allocation suspension service, so it
+  suspends hypothesis, policy, allocation, and cancels matching open orders
+  where order/execution services are available, while leaving evidence rows
+  untouched.
+
+
+Tests Added Or Updated
+----------------------
+- `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Tests/OpportunityOperatorServiceTests.cs`
+  covers redacted explain output and manual suspension preserving evidence.
+- `interfaces/Autotrade.Api.Tests/OpportunityControllerContractTests.cs`
+  covers API return types for shared operator contracts.
+
+
+Validation
+----------
+- `dotnet test context\OpportunityDiscovery\Autotrade.OpportunityDiscovery.Tests\Autotrade.OpportunityDiscovery.Tests.csproj`
+  passed: 33 tests.
+- `dotnet test interfaces\Autotrade.Api.Tests\Autotrade.Api.Tests.csproj`
+  passed: 141 tests.
+- `dotnet build` passed with 0 warnings and 0 errors.
+- `dotnet test --no-build` passed: 660 tests.
+- `AUTOTRADE_TEST_POSTGRES=not set`; optional Postgres smoke tests were skipped.
+
+
+Residual Risk
+-------------
+- None known for this slice. No schema migration was required.

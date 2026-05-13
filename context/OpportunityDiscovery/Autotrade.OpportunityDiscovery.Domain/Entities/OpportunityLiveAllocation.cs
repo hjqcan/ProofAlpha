@@ -65,6 +65,9 @@ public sealed class OpportunityLiveAllocation : Entity, IAggregateRoot
         => Status == OpportunityLiveAllocationStatus.Active && ValidUntilUtc > now;
 
     public void Suspend(DateTimeOffset now)
+        => Suspend(Reason, now);
+
+    public void Suspend(string reason, DateTimeOffset now)
     {
         if (Status != OpportunityLiveAllocationStatus.Active)
         {
@@ -72,6 +75,7 @@ public sealed class OpportunityLiveAllocation : Entity, IAggregateRoot
         }
 
         Status = OpportunityLiveAllocationStatus.Suspended;
+        Reason = Required(reason, nameof(reason), 2048);
         UpdatedAtUtc = now == default ? DateTimeOffset.UtcNow : now;
     }
 

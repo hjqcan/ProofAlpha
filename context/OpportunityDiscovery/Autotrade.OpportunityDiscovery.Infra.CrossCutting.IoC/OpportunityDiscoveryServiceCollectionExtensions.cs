@@ -20,6 +20,8 @@ public static class OpportunityDiscoveryServiceCollectionExtensions
 
         services.Configure<OpportunityDiscoveryOptions>(
             configuration.GetSection(OpportunityDiscoveryOptions.SectionName));
+        services.Configure<OpportunityLiveAllocationOptions>(
+            configuration.GetSection(OpportunityLiveAllocationOptions.SectionName));
         services.AddOpenAiCompatibleLlmJsonClient(
             configuration.GetSection($"{OpportunityDiscoveryOptions.SectionName}:Llm"));
 
@@ -38,6 +40,10 @@ public static class OpportunityDiscoveryServiceCollectionExtensions
         services.AddScoped<ISourceRegistryService, SourceRegistryService>();
         services.AddScoped<IOpportunityEvidenceExplainService, OpportunityEvidenceExplainService>();
         services.AddScoped<IOpportunityScoringService, OpportunityScoringService>();
+        services.AddScoped<IOpportunityValidationGateService, OpportunityValidationGateService>();
+        services.AddScoped<IOpportunityLiveAllocationService, OpportunityLiveAllocationService>();
+        services.AddScoped<IOpportunityOperatorService, OpportunityOperatorService>();
+        services.AddScoped<IOpportunityPaperValidationSource, StrategyPaperValidationSource>();
         services.AddScoped<IExecutableOpportunityPolicyFeed, ExecutableOpportunityPolicyFeed>();
         services.AddScoped<IOpportunityDiscoveryService, OpportunityDiscoveryService>();
 

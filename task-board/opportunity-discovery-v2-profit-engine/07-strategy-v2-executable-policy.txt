@@ -3,7 +3,7 @@ ODV2-T007: LlmOpportunityStrategy v2 Executable Policy
 
 Status
 ------
-[TODO]
+[DONE]
 
 
 Goal
@@ -42,3 +42,50 @@ Acceptance
 - Strategy tests prove no LLM/source dependency is called.
 - Expired, suspended, stale, or over-budget policies do not emit signals.
 - Entry and exit signals remain deterministic for the same snapshot and policy.
+
+
+Implementation Notes
+--------------------
+- `ExecutableOpportunityPolicyDto` now carries policy status, score id, gate run
+  id, allocation id, score version, policy version, and allocation limits for
+  strategy signal provenance and deterministic hot-path guards.
+- `ExecutableOpportunityPolicyFeed` now uses
+  `ListExecutablePolicyFeedItemsAsync`, which only emits active, in-window
+  policies whose hypothesis is `LivePublished`, active policy/allocation ids
+  match, allocation is active, latest required live gates are passed, latest
+  promotable score exists, and a succeeded evaluation run exists.
+- `LlmOpportunityStrategy` consumes `IExecutableOpportunityPolicyFeed` instead
+  of `IPublishedOpportunityFeed`, filters stale/suspended policies, blocks on
+  stale top-of-book, max spread, max policy/allocation notional, max active
+  opportunities, per-cycle notional, and global/strategy kill switch.
+- Signal `ContextJson` now includes opportunity id, policy id, score id, gate
+  run id, allocation id, score version, policy version, evidence ids, edge, fair
+  probability, action, observed price, and quantity.
+
+
+Tests Added Or Updated
+----------------------
+- `context/Strategy/Autotrade.Strategy.Tests/LlmOpportunityStrategyTests.cs`
+  covers v2 feed consumption, no extra source calls during evaluation, stale
+  order-book blocking, over-cycle-budget blocking, kill-switch blocking,
+  deterministic entry/exit signals, and executable-policy take-profit exits.
+- `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Tests/OpportunityV2DomainTests.cs`
+  now proves the executable-policy feed excludes suspended, expired, and future
+  policies while returning verified provenance for active live-published
+  policies.
+
+
+Validation
+----------
+- `dotnet test context\Strategy\Autotrade.Strategy.Tests\Autotrade.Strategy.Tests.csproj`
+  passed: 103 tests.
+- `dotnet test context\OpportunityDiscovery\Autotrade.OpportunityDiscovery.Tests\Autotrade.OpportunityDiscovery.Tests.csproj`
+  passed: 31 tests.
+- `dotnet build` passed with 0 warnings and 0 errors.
+- `dotnet test --no-build` passed: 655 tests.
+- `AUTOTRADE_TEST_POSTGRES=not set`; optional Postgres smoke tests were skipped.
+
+
+Residual Risk
+-------------
+- None known for this slice. No schema migration was required.

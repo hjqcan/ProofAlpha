@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Autotrade.OpportunityDiscovery.Application.Contract;
+using Autotrade.OpportunityDiscovery.Domain.Shared.Enums;
 using Autotrade.Strategy.Application.Contract.Strategies;
 using Autotrade.Strategy.Application.Strategies.Common;
 using Autotrade.Trading.Application.Contract.Risk;
@@ -13,18 +14,21 @@ public sealed class LlmOpportunityStrategy : TradingStrategyBase
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    private readonly IPublishedOpportunityFeed _opportunityFeed;
+    private readonly IExecutableOpportunityPolicyFeed _policyFeed;
     private readonly IOptionsMonitor<LlmOpportunityOptions> _optionsMonitor;
-    private readonly ConcurrentDictionary<string, PublishedOpportunityDto> _published = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, ExecutableOpportunityPolicyDto> _policies = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, SingleLegMarketState> _states = new(StringComparer.OrdinalIgnoreCase);
+    private readonly object _cycleBudgetLock = new();
+    private readonly HashSet<string> _cycleEntryMarkets = new(StringComparer.OrdinalIgnoreCase);
+    private decimal _cycleAllocatedNotional;
 
     public LlmOpportunityStrategy(
         StrategyContext context,
-        IPublishedOpportunityFeed opportunityFeed,
+        IExecutableOpportunityPolicyFeed policyFeed,
         IOptionsMonitor<LlmOpportunityOptions> optionsMonitor)
         : base(context, "LlmOpportunity")
     {
-        _opportunityFeed = opportunityFeed ?? throw new ArgumentNullException(nameof(opportunityFeed));
+        _policyFeed = policyFeed ?? throw new ArgumentNullException(nameof(policyFeed));
         _optionsMonitor = optionsMonitor ?? throw new ArgumentNullException(nameof(optionsMonitor));
     }
 
@@ -32,27 +36,33 @@ public sealed class LlmOpportunityStrategy : TradingStrategyBase
     {
         var options = _optionsMonitor.CurrentValue;
         options.Validate();
-        if (!options.Enabled)
+        ResetCycleBudget();
+        if (!options.Enabled || IsRiskBlocked())
         {
-            _published.Clear();
+            _policies.Clear();
             return Array.Empty<string>();
         }
 
         var now = DateTimeOffset.UtcNow;
-        var opportunities = await _opportunityFeed.GetPublishedAsync(cancellationToken).ConfigureAwait(false);
-        var selected = opportunities
-            .Where(item => item.ValidUntilUtc > now)
+        var policies = await _policyFeed.GetExecutableAsync(options.MaxMarkets, cancellationToken).ConfigureAwait(false);
+        var selected = policies
+            .Where(IsExecutablePolicy)
             .OrderByDescending(item => item.Edge)
             .Take(options.MaxMarkets)
             .ToList();
 
-        _published.Clear();
+        _policies.Clear();
         foreach (var item in selected)
         {
-            _published[item.MarketId] = item;
+            _policies[item.MarketId] = item;
         }
 
         return selected.Select(item => item.MarketId).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+        bool IsExecutablePolicy(ExecutableOpportunityPolicyDto policy)
+            => policy.Status == ExecutableOpportunityPolicyStatus.Active &&
+               policy.ValidFromUtc <= now &&
+               policy.ValidUntilUtc > now;
     }
 
     public override Task<StrategySignal?> EvaluateEntryAsync(
@@ -61,41 +71,50 @@ public sealed class LlmOpportunityStrategy : TradingStrategyBase
     {
         var options = _optionsMonitor.CurrentValue;
         options.Validate();
-        if (!options.Enabled || State != StrategyState.Running)
+        if (!options.Enabled || State != StrategyState.Running || IsRiskBlocked())
         {
             return Task.FromResult<StrategySignal?>(null);
         }
 
-        if (!_published.TryGetValue(snapshot.Market.MarketId, out var opportunity) ||
-            opportunity.ValidUntilUtc <= DateTimeOffset.UtcNow)
+        var now = DateTimeOffset.UtcNow;
+        if (!_policies.TryGetValue(snapshot.Market.MarketId, out var policy) ||
+            policy.Status != ExecutableOpportunityPolicyStatus.Active ||
+            policy.ValidFromUtc > now ||
+            policy.ValidUntilUtc <= now)
         {
             return Task.FromResult<StrategySignal?>(null);
         }
 
         var state = GetState(snapshot.Market.MarketId);
-        var now = DateTimeOffset.UtcNow;
         if (state.HasPosition || state.HasOpenEntryOrder || IsInCooldown(state.LastEntryAttemptUtc, now, options.EntryCooldownSeconds))
         {
             return Task.FromResult<StrategySignal?>(null);
         }
 
-        if (!StrategyTopBook.TryGetQuote(snapshot, opportunity.Outcome, out var quote) ||
+        if (!StrategyTopBook.TryGetQuote(snapshot, policy.Outcome, out var quote) ||
             !StrategyTopBook.IsFresh(snapshot, quote, options.MaxOrderBookAgeSeconds) ||
-            quote.Spread > opportunity.Policy.MaxSpread ||
-            quote.AskPrice > opportunity.Policy.EntryMaxPrice)
+            quote.Spread > policy.MaxSpread ||
+            quote.AskPrice > policy.EntryMaxPrice)
         {
             return Task.FromResult<StrategySignal?>(null);
         }
 
         var limitPrice = StrategyTopBook.ClampPrice(quote.AskPrice * (1m + options.MaxSlippage));
+        var maxNotional = Math.Min(policy.MaxNotional, policy.AllocationMaxNotional);
+        var maxContracts = Math.Min(policy.Quantity, policy.AllocationMaxContracts);
         var quantity = StrategyTopBook.CalculateQuantity(
-            opportunity.Policy.Quantity,
+            maxContracts,
             minQuantity: 0.000001m,
-            opportunity.Policy.MaxNotional,
-            opportunity.Policy.MaxNotional - state.OpenNotional,
+            maxNotional,
+            maxNotional - state.OpenNotional,
             limitPrice,
             quote.AskSize);
         if (quantity <= 0m)
+        {
+            return Task.FromResult<StrategySignal?>(null);
+        }
+
+        if (!TryReserveEntryBudget(snapshot.Market.MarketId, quantity * limitPrice, options))
         {
             return Task.FromResult<StrategySignal?>(null);
         }
@@ -116,9 +135,9 @@ public sealed class LlmOpportunityStrategy : TradingStrategyBase
         return Task.FromResult<StrategySignal?>(new StrategySignal(
             StrategySignalType.Entry,
             snapshot.Market.MarketId,
-            $"LLM opportunity entry edge={opportunity.Edge:F4} fair={opportunity.Policy.FairProbability:F4}",
+            $"LLM opportunity entry edge={policy.Edge:F4} fair={policy.FairProbability:F4}",
             new[] { order },
-            BuildContextJson(opportunity, "entry", quote.AskPrice, quantity)));
+            BuildContextJson(policy, "entry", quote.AskPrice, quantity)));
     }
 
     public override Task<StrategySignal?> EvaluateExitAsync(
@@ -127,12 +146,12 @@ public sealed class LlmOpportunityStrategy : TradingStrategyBase
     {
         var options = _optionsMonitor.CurrentValue;
         options.Validate();
-        if (!options.Enabled || State != StrategyState.Running)
+        if (!options.Enabled || State != StrategyState.Running || IsRiskBlocked())
         {
             return Task.FromResult<StrategySignal?>(null);
         }
 
-        if (!_published.TryGetValue(snapshot.Market.MarketId, out var opportunity))
+        if (!_policies.TryGetValue(snapshot.Market.MarketId, out var policy))
         {
             return Task.FromResult<StrategySignal?>(null);
         }
@@ -155,9 +174,9 @@ public sealed class LlmOpportunityStrategy : TradingStrategyBase
             return Task.FromResult<StrategySignal?>(null);
         }
 
-        var takeProfit = quote.BidPrice >= opportunity.Policy.TakeProfitPrice;
-        var stopLoss = quote.BidPrice <= opportunity.Policy.StopLossPrice;
-        var expired = opportunity.ValidUntilUtc <= now;
+        var takeProfit = quote.BidPrice >= policy.TakeProfitPrice;
+        var stopLoss = quote.BidPrice <= policy.StopLossPrice;
+        var expired = policy.ValidUntilUtc <= now;
         if (!takeProfit && !stopLoss && !expired)
         {
             return Task.FromResult<StrategySignal?>(null);
@@ -189,7 +208,7 @@ public sealed class LlmOpportunityStrategy : TradingStrategyBase
             snapshot.Market.MarketId,
             $"LLM opportunity exit {reason}: bid={quote.BidPrice:F4}",
             new[] { order },
-            BuildContextJson(opportunity, reason, quote.BidPrice, quantity)));
+            BuildContextJson(policy, reason, quote.BidPrice, quantity)));
     }
 
     public override Task OnOrderUpdateAsync(
@@ -210,18 +229,62 @@ public sealed class LlmOpportunityStrategy : TradingStrategyBase
         return lastAttemptUtc.HasValue && now - lastAttemptUtc.Value < TimeSpan.FromSeconds(cooldownSeconds);
     }
 
+    private bool IsRiskBlocked()
+        => Context.RiskManager.IsKillSwitchActive || Context.RiskManager.IsStrategyBlocked(Id);
+
+    private void ResetCycleBudget()
+    {
+        lock (_cycleBudgetLock)
+        {
+            _cycleAllocatedNotional = 0m;
+            _cycleEntryMarkets.Clear();
+        }
+    }
+
+    private bool TryReserveEntryBudget(string marketId, decimal notional, LlmOpportunityOptions options)
+    {
+        lock (_cycleBudgetLock)
+        {
+            var activeMarketCount = _states.Values.Count(state => state.HasPosition || state.HasOpenEntryOrder);
+            var alreadyReserved = _cycleEntryMarkets.Contains(marketId);
+            var alreadyActive = _states.TryGetValue(marketId, out var currentState) &&
+                (currentState.HasPosition || currentState.HasOpenEntryOrder);
+            if (!alreadyReserved &&
+                !alreadyActive &&
+                activeMarketCount + _cycleEntryMarkets.Count >= options.MaxActiveOpportunities)
+            {
+                return false;
+            }
+
+            if (_cycleAllocatedNotional + notional > options.MaxPerCycleNotional)
+            {
+                return false;
+            }
+
+            _cycleAllocatedNotional += notional;
+            _cycleEntryMarkets.Add(marketId);
+            return true;
+        }
+    }
+
     private static string BuildContextJson(
-        PublishedOpportunityDto opportunity,
+        ExecutableOpportunityPolicyDto policy,
         string action,
         decimal observedPrice,
         decimal quantity)
     {
         return JsonSerializer.Serialize(new
         {
-            opportunityId = opportunity.OpportunityId,
-            researchRunId = opportunity.ResearchRunId,
-            evidenceIds = opportunity.EvidenceIds,
-            opportunity.Edge,
+            opportunityId = policy.HypothesisId,
+            policyId = policy.PolicyId,
+            scoreId = policy.ScoreId,
+            gateRunId = policy.GateRunId,
+            allocationId = policy.AllocationId,
+            scoreVersion = policy.ScoreVersion,
+            policyVersion = policy.PolicyVersion,
+            evidenceIds = policy.EvidenceIds,
+            policy.Edge,
+            policy.FairProbability,
             action,
             observedPrice,
             quantity

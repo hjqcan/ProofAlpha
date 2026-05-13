@@ -328,6 +328,40 @@ public sealed class OpportunityV2Repository : IOpportunityV2Repository
         await _context.Commit().ConfigureAwait(false);
     }
 
+    public async Task<OpportunityFeatureSnapshot?> GetLatestFeatureSnapshotAsync(
+        Guid hypothesisId,
+        CancellationToken cancellationToken = default)
+    {
+        if (hypothesisId == Guid.Empty)
+        {
+            return null;
+        }
+
+        return await _context.OpportunityFeatureSnapshots
+            .Where(item => item.HypothesisId == hypothesisId)
+            .OrderByDescending(item => item.CreatedAtUtc)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task<OpportunityScore?> GetLatestScoreAsync(
+        Guid hypothesisId,
+        CancellationToken cancellationToken = default)
+    {
+        if (hypothesisId == Guid.Empty)
+        {
+            return null;
+        }
+
+        return await _context.OpportunityScores
+            .Where(item => item.HypothesisId == hypothesisId)
+            .OrderByDescending(item => item.CreatedAtUtc)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public async Task AddEvaluationRunAsync(OpportunityEvaluationRun run, CancellationToken cancellationToken = default)
     {
         _context.OpportunityEvaluationRuns.Add(run);
@@ -338,6 +372,18 @@ public sealed class OpportunityV2Repository : IOpportunityV2Repository
     {
         _context.OpportunityEvaluationRuns.Update(run);
         await _context.Commit().ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<OpportunityEvaluationRun>> ListEvaluationRunsAsync(
+        Guid hypothesisId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.OpportunityEvaluationRuns
+            .Where(item => item.HypothesisId == hypothesisId)
+            .OrderByDescending(item => item.StartedAtUtc)
+            .AsNoTracking()
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
     }
 
     public async Task AddPromotionGateAsync(OpportunityPromotionGate gate, CancellationToken cancellationToken = default)
@@ -374,6 +420,20 @@ public sealed class OpportunityV2Repository : IOpportunityV2Repository
         await _context.Commit().ConfigureAwait(false);
     }
 
+    public async Task<ExecutableOpportunityPolicy?> GetExecutablePolicyAsync(
+        Guid policyId,
+        CancellationToken cancellationToken = default)
+    {
+        if (policyId == Guid.Empty)
+        {
+            return null;
+        }
+
+        return await _context.ExecutableOpportunityPolicies
+            .FirstOrDefaultAsync(item => item.Id == policyId, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public async Task UpdateExecutablePolicyAsync(ExecutableOpportunityPolicy policy, CancellationToken cancellationToken = default)
     {
         _context.ExecutableOpportunityPolicies.Update(policy);
@@ -396,11 +456,229 @@ public sealed class OpportunityV2Repository : IOpportunityV2Repository
             .ConfigureAwait(false);
     }
 
+    public async Task<ExecutableOpportunityPolicy?> GetActiveExecutablePolicyForHypothesisAsync(
+        Guid hypothesisId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default)
+    {
+        if (hypothesisId == Guid.Empty)
+        {
+            return null;
+        }
+
+        return await _context.ExecutableOpportunityPolicies
+            .Where(item => item.HypothesisId == hypothesisId
+                && item.Status == ExecutableOpportunityPolicyStatus.Active
+                && item.ValidFromUtc <= now
+                && item.ValidUntilUtc > now)
+            .OrderByDescending(item => item.UpdatedAtUtc)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<ExecutableOpportunityPolicyFeedItem>> ListExecutablePolicyFeedItemsAsync(
+        DateTimeOffset now,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        var requestedLimit = Math.Clamp(limit, 1, 500);
+        var candidates = await (
+                from policy in _context.ExecutableOpportunityPolicies.AsNoTracking()
+                join hypothesis in _context.OpportunityHypotheses.AsNoTracking()
+                    on policy.HypothesisId equals hypothesis.Id
+                join allocation in _context.OpportunityLiveAllocations.AsNoTracking()
+                    on policy.Id equals allocation.ExecutablePolicyId
+                where policy.Status == ExecutableOpportunityPolicyStatus.Active
+                    && policy.ValidFromUtc <= now
+                    && policy.ValidUntilUtc > now
+                    && hypothesis.Status == OpportunityHypothesisStatus.LivePublished
+                    && hypothesis.ActivePolicyId == policy.Id
+                    && hypothesis.ActiveLiveAllocationId == allocation.Id
+                    && allocation.Status == OpportunityLiveAllocationStatus.Active
+                    && allocation.ValidUntilUtc > now
+                orderby policy.Edge descending
+                select new
+                {
+                    Policy = policy,
+                    Allocation = allocation
+                })
+            .Take(500)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (candidates.Count == 0)
+        {
+            return Array.Empty<ExecutableOpportunityPolicyFeedItem>();
+        }
+
+        var hypothesisIds = candidates
+            .Select(item => item.Policy.HypothesisId)
+            .Distinct()
+            .ToList();
+
+        var latestScores = (await _context.OpportunityScores
+                .AsNoTracking()
+                .Where(score => hypothesisIds.Contains(score.HypothesisId) && score.CanPromote)
+                .OrderByDescending(score => score.CreatedAtUtc)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false))
+            .GroupBy(score => score.HypothesisId)
+            .ToDictionary(group => group.Key, group => group.First());
+
+        var latestRuns = (await _context.OpportunityEvaluationRuns
+                .AsNoTracking()
+                .Where(run => hypothesisIds.Contains(run.HypothesisId)
+                    && run.Status == OpportunityEvaluationRunStatus.Succeeded)
+                .OrderByDescending(run => run.UpdatedAtUtc)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false))
+            .GroupBy(run => run.HypothesisId)
+            .ToDictionary(group => group.Key, group => group.First());
+
+        var latestGates = (await _context.OpportunityPromotionGates
+                .AsNoTracking()
+                .Where(gate => hypothesisIds.Contains(gate.HypothesisId))
+                .OrderByDescending(gate => gate.EvaluatedAtUtc)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false))
+            .GroupBy(gate => gate.HypothesisId)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .GroupBy(gate => gate.GateKind)
+                    .ToDictionary(
+                        gateGroup => gateGroup.Key,
+                        gateGroup => gateGroup.First()));
+
+        var result = new List<ExecutableOpportunityPolicyFeedItem>(requestedLimit);
+        foreach (var candidate in candidates)
+        {
+            var hypothesisId = candidate.Policy.HypothesisId;
+            if (!latestScores.TryGetValue(hypothesisId, out var score) ||
+                !latestRuns.TryGetValue(hypothesisId, out var run) ||
+                !latestGates.TryGetValue(hypothesisId, out var gatesByKind) ||
+                !HasCurrentPassedLiveGates(gatesByKind))
+            {
+                continue;
+            }
+
+            result.Add(new ExecutableOpportunityPolicyFeedItem(
+                candidate.Policy,
+                score.Id,
+                run.Id,
+                candidate.Allocation.Id,
+                score.ScoreVersion,
+                candidate.Allocation.MaxNotional,
+                candidate.Allocation.MaxContracts));
+
+            if (result.Count >= requestedLimit)
+            {
+                break;
+            }
+        }
+
+        return result;
+    }
+
     public async Task AddLiveAllocationAsync(OpportunityLiveAllocation allocation, CancellationToken cancellationToken = default)
     {
         _context.OpportunityLiveAllocations.Add(allocation);
         await _context.Commit().ConfigureAwait(false);
     }
+
+    public async Task<OpportunityLiveAllocation?> GetLiveAllocationAsync(
+        Guid allocationId,
+        CancellationToken cancellationToken = default)
+    {
+        if (allocationId == Guid.Empty)
+        {
+            return null;
+        }
+
+        return await _context.OpportunityLiveAllocations
+            .FirstOrDefaultAsync(item => item.Id == allocationId, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<OpportunityLiveAllocation>> ListActiveLiveAllocationsAsync(
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.OpportunityLiveAllocations
+            .Where(item => item.Status == OpportunityLiveAllocationStatus.Active && item.ValidUntilUtc > now)
+            .AsNoTracking()
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task<OpportunityLiveAllocation?> GetActiveLiveAllocationForHypothesisAsync(
+        Guid hypothesisId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default)
+    {
+        if (hypothesisId == Guid.Empty)
+        {
+            return null;
+        }
+
+        return await _context.OpportunityLiveAllocations
+            .Where(item => item.HypothesisId == hypothesisId
+                && item.Status == OpportunityLiveAllocationStatus.Active
+                && item.ValidUntilUtc > now)
+            .OrderByDescending(item => item.UpdatedAtUtc)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<OpportunityHypothesis>> ListLiveHypothesesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.OpportunityHypotheses
+            .Where(item => item.Status == OpportunityHypothesisStatus.LiveEligible
+                || item.Status == OpportunityHypothesisStatus.LivePublished)
+            .OrderByDescending(item => item.UpdatedAtUtc)
+            .AsNoTracking()
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task AddLiveAllocationWithHypothesisTransitionAsync(
+        OpportunityLiveAllocation allocation,
+        OpportunityHypothesis hypothesis,
+        OpportunityLifecycleTransition transition,
+        CancellationToken cancellationToken = default)
+    {
+        _context.OpportunityLiveAllocations.Add(allocation);
+        _context.OpportunityHypotheses.Update(hypothesis);
+        _context.OpportunityLifecycleTransitions.Add(transition);
+        await _context.Commit().ConfigureAwait(false);
+    }
+
+    public async Task SuspendLiveOpportunityAsync(
+        OpportunityHypothesis hypothesis,
+        OpportunityLifecycleTransition transition,
+        ExecutableOpportunityPolicy policy,
+        OpportunityLiveAllocation? allocation,
+        CancellationToken cancellationToken = default)
+    {
+        _context.OpportunityHypotheses.Update(hypothesis);
+        _context.OpportunityLifecycleTransitions.Add(transition);
+        _context.ExecutableOpportunityPolicies.Update(policy);
+        if (allocation is not null)
+        {
+            _context.OpportunityLiveAllocations.Update(allocation);
+        }
+
+        await _context.Commit().ConfigureAwait(false);
+    }
+
+    private static bool HasCurrentPassedLiveGates(
+        IReadOnlyDictionary<OpportunityPromotionGateKind, OpportunityPromotionGate> gatesByKind)
+        => OpportunityHypothesis.RequiredLiveGateKinds.All(kind =>
+            gatesByKind.TryGetValue(kind, out var gate) &&
+            gate.Status == OpportunityPromotionGateStatus.Passed);
 }
 
 public sealed class MarketOpportunityRepository : IMarketOpportunityRepository

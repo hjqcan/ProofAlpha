@@ -100,9 +100,14 @@ public sealed record OpportunityScoringResult(
 public sealed record ExecutableOpportunityPolicyDto(
     Guid PolicyId,
     Guid HypothesisId,
+    Guid ScoreId,
+    Guid GateRunId,
+    Guid AllocationId,
     string PolicyVersion,
+    string ScoreVersion,
     string MarketId,
     OutcomeSide Outcome,
+    ExecutableOpportunityPolicyStatus Status,
     decimal FairProbability,
     decimal Confidence,
     decimal Edge,
@@ -112,6 +117,8 @@ public sealed record ExecutableOpportunityPolicyDto(
     decimal MaxSpread,
     decimal Quantity,
     decimal MaxNotional,
+    decimal AllocationMaxNotional,
+    decimal AllocationMaxContracts,
     DateTimeOffset ValidFromUtc,
     DateTimeOffset ValidUntilUtc,
     IReadOnlyList<Guid> EvidenceIds);

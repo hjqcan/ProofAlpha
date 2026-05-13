@@ -3,7 +3,7 @@ ODV2-T006: Auto Live Micro-Allocation and Kill Criteria
 
 Status
 ------
-[TODO]
+[DONE]
 
 
 Goal
@@ -47,3 +47,52 @@ Acceptance
   gates all pass.
 - Suspension writes audit trail and blocks future feed publication.
 - Unfilled open orders are canceled on suspension.
+
+
+Completion Evidence
+-------------------
+Closed on 2026-05-13.
+
+Code paths changed:
+- `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Application.Contract/OpportunityLiveAllocationContracts.cs`
+  added conservative default Live micro-allocation options, allocation DTOs,
+  request/result contracts, kill-criteria metrics, suspension contracts, and
+  `IOpportunityLiveAllocationService`.
+- `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Application/OpportunityLiveAllocationService.cs`
+  creates Live allocations only after latest required gates, active Live arming,
+  recent account sync, risk state, compliance guard, active executable policy,
+  and conservative exposure limits pass; it blocks configured limit increases
+  unless compliance explicitly allows unsafe Live parameters.
+- `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Domain/Entities/OpportunityLiveAllocation.cs`
+  records suspension reason updates when allocations are suspended.
+- `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Application/OpportunityV2Mapper.cs`
+  maps Live allocation DTOs.
+- `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Application/Repositories.cs`
+  and `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Infra.Data/Repositories/OpportunityDiscoveryRepositories.cs`
+  added executable policy lookup, active allocation listing, Live allocation
+  persistence with lifecycle transition, and suspension persistence.
+- `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Infra.CrossCutting.IoC/OpportunityDiscoveryServiceCollectionExtensions.cs`
+  registers Live allocation options and service.
+
+Tests added or updated:
+- `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Tests/OpportunityLiveAllocationServiceTests.cs`
+  covers Live arming blocking, successful default micro-allocation publication,
+  configured limit increases blocked without compliance support, kill-criteria
+  suspension audit trail, policy/allocation/hypothesis suspension, executable
+  feed exclusion after suspension, and canceling matching open orders.
+
+Validation:
+- `dotnet test context\OpportunityDiscovery\Autotrade.OpportunityDiscovery.Tests\Autotrade.OpportunityDiscovery.Tests.csproj`
+  passed: 31 tests.
+- `dotnet build` passed with 0 warnings and 0 errors.
+- `dotnet test --no-build` passed: 653 tests.
+
+Migration:
+- No EF migration was required for this slice. It uses existing
+  `OpportunityLiveAllocations`, `ExecutableOpportunityPolicies`, and
+  lifecycle-transition tables.
+
+Residual risk:
+- Postgres smoke tests were skipped because `AUTOTRADE_TEST_POSTGRES` was not set.
+- This slice creates and suspends micro-allocation records; the Strategy hot path
+  still needs to consume the v2 executable-policy feed in ODV2-T007.

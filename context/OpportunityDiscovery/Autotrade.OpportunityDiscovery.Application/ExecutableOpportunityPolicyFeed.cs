@@ -15,9 +15,9 @@ public sealed class ExecutableOpportunityPolicyFeed : IExecutableOpportunityPoli
         int limit = 50,
         CancellationToken cancellationToken = default)
     {
-        var policies = await _repository
-            .ListExecutablePoliciesAsync(DateTimeOffset.UtcNow, Math.Clamp(limit, 1, 500), cancellationToken)
+        var items = await _repository
+            .ListExecutablePolicyFeedItemsAsync(DateTimeOffset.UtcNow, Math.Clamp(limit, 1, 500), cancellationToken)
             .ConfigureAwait(false);
-        return policies.Select(OpportunityV2Mapper.ToDto).ToList();
+        return items.Select(OpportunityV2Mapper.ToDto).ToList();
     }
 }

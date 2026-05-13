@@ -3,7 +3,7 @@ ODV2-T005: Backtest, Shadow, Paper, and Promotion Gates
 
 Status
 ------
-[TODO]
+[DONE]
 
 
 Goal
@@ -46,3 +46,62 @@ Acceptance
 - Gate result includes evidence ids, metrics, thresholds, and explanation.
 - Paper report, slippage, PnL, risk, and live arming infrastructure are reused
   instead of duplicated.
+
+
+Completion Evidence
+-------------------
+Closed on 2026-05-13.
+
+Code paths changed:
+- `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Domain.Shared/Enums/OpportunityDiscoveryEnums.cs`
+  added the `Shadow` promotion gate kind.
+- `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Domain/Entities/OpportunityHypothesis.cs`
+  now requires the Shadow gate before Live eligibility.
+- `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Application.Contract/OpportunityValidationContracts.cs`
+  added validation gate contracts, thresholds, sample metrics, paper validation
+  snapshot contracts, and `IOpportunityValidationGateService`.
+- `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Application/OpportunityValidationGateService.cs`
+  evaluates Backtest, Shadow, Paper, ExecutionQuality, Risk, and Compliance
+  gates, persists evaluation runs and promotion gates, blocks future evidence
+  and future price windows, records stable replay seeds, applies default
+  thresholds, and only marks `LiveEligible` when the latest required gates pass.
+- `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Application/OpportunityV2Mapper.cs`
+  maps evaluation runs and lifecycle transitions.
+- `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Application/Repositories.cs`
+  and `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Infra.Data/Repositories/OpportunityDiscoveryRepositories.cs`
+  added hypothesis lookup plus atomic evaluation/gate and hypothesis/transition
+  persistence methods.
+- `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Infra.CrossCutting.IoC/StrategyPaperValidationSource.cs`
+  adapts existing Strategy `IPaperRunReportService` and
+  `IPaperPromotionChecklistService` output into OpportunityDiscovery paper gate
+  metrics, reusing paper PnL, slippage, risk evidence, residual risks, and
+  live-arming unchanged status.
+- `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Infra.CrossCutting.IoC/OpportunityDiscoveryServiceCollectionExtensions.cs`
+  registers the validation gate service and paper validation adapter.
+
+Tests added or updated:
+- `context/OpportunityDiscovery/Autotrade.OpportunityDiscovery.Tests/OpportunityValidationGateServiceTests.cs`
+  covers passed backtest gate persistence, stable replay seeds for identical
+  inputs, future-evidence rejection without replay execution, paper source
+  reuse with non-positive PnL blocking, failed required gate blocking
+  `LiveEligible`, and all latest required gates transitioning a paper-validated
+  hypothesis to `LiveEligible`.
+- Existing v2 lifecycle tests now also exercise the added Shadow required gate
+  through `OpportunityHypothesis.RequiredLiveGateKinds`.
+
+Validation:
+- `dotnet test context\OpportunityDiscovery\Autotrade.OpportunityDiscovery.Tests\Autotrade.OpportunityDiscovery.Tests.csproj`
+  passed: 27 tests.
+- `dotnet build` passed with 0 warnings and 0 errors.
+- `dotnet test --no-build` passed: 649 tests.
+
+Migration:
+- No EF migration was required for this slice. The only domain persistence shape
+  change is an additional string-converted enum value (`Shadow`) and new
+  application services/contracts.
+
+Residual risk:
+- Postgres smoke tests were skipped because `AUTOTRADE_TEST_POSTGRES` was not set.
+- This slice creates deterministic validation and promotion gates; it does not
+  yet create Live micro-allocation records or wire the executable-policy feed
+  into a strategy hot path.

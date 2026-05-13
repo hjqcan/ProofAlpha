@@ -65,6 +65,101 @@ public static class OpportunityCommands
         return ExitCodes.Success;
     }
 
+    public static async Task<int> ScoreAsync(CommandContext context, Guid opportunityId)
+    {
+        using var scope = context.Host.Services.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IOpportunityOperatorService>();
+        var result = await service.GetScoreAsync(opportunityId, CancellationToken.None).ConfigureAwait(false);
+        OutputFormatter.WriteSuccess("Opportunity score.", result, context.GlobalOptions);
+        return result.Hypothesis is null ? ExitCodes.NotFound : ExitCodes.Success;
+    }
+
+    public static async Task<int> ReplayAsync(CommandContext context, Guid opportunityId)
+    {
+        using var scope = context.Host.Services.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IOpportunityOperatorService>();
+        var result = await service.GetReplayAsync(opportunityId, CancellationToken.None).ConfigureAwait(false);
+        OutputFormatter.WriteSuccess("Opportunity replay status.", result, context.GlobalOptions);
+        return result.Hypothesis is null ? ExitCodes.NotFound : ExitCodes.Success;
+    }
+
+    public static async Task<int> PromoteAsync(
+        CommandContext context,
+        Guid opportunityId,
+        string actor,
+        string? reason)
+    {
+        if (!ConfirmationService.ConfirmDestructive($"opportunity promote --id {opportunityId}", context.GlobalOptions))
+        {
+            OutputFormatter.WriteError("Operation cancelled.", "CANCELLED", context.GlobalOptions, ExitCodes.UserCancelled);
+            return ExitCodes.UserCancelled;
+        }
+
+        using var scope = context.Host.Services.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IOpportunityOperatorService>();
+        var result = await service.PromoteAsync(
+                new OpportunityPromoteRequest(
+                    opportunityId,
+                    ResolveActor(actor),
+                    string.IsNullOrWhiteSpace(reason) ? "operator promotion" : reason.Trim()),
+                CancellationToken.None)
+            .ConfigureAwait(false);
+
+        OutputFormatter.WriteSuccess("Opportunity promotion evaluated.", result, context.GlobalOptions);
+        return result.Accepted ? ExitCodes.Success : ExitCodes.ValidationFailed;
+    }
+
+    public static async Task<int> LiveStatusAsync(CommandContext context)
+    {
+        using var scope = context.Host.Services.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IOpportunityOperatorService>();
+        var result = await service.GetLiveStatusAsync(CancellationToken.None).ConfigureAwait(false);
+        OutputFormatter.WriteSuccess("Opportunity Live status.", result, context.GlobalOptions);
+        return ExitCodes.Success;
+    }
+
+    public static async Task<int> SuspendAsync(
+        CommandContext context,
+        Guid opportunityId,
+        string actor,
+        string? reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            OutputFormatter.WriteError("Suspension reason is required.", "VALIDATION_FAILED", context.GlobalOptions, ExitCodes.ValidationFailed);
+            return ExitCodes.ValidationFailed;
+        }
+
+        if (!ConfirmationService.ConfirmDestructive($"opportunity suspend --id {opportunityId}", context.GlobalOptions))
+        {
+            OutputFormatter.WriteError("Operation cancelled.", "CANCELLED", context.GlobalOptions, ExitCodes.UserCancelled);
+            return ExitCodes.UserCancelled;
+        }
+
+        using var scope = context.Host.Services.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IOpportunityOperatorService>();
+        var result = await service.SuspendAsync(
+                new OpportunityOperatorSuspendRequest(
+                    opportunityId,
+                    ResolveActor(actor),
+                    reason.Trim(),
+                    StrategyId: "llm_opportunity"),
+                CancellationToken.None)
+            .ConfigureAwait(false);
+
+        OutputFormatter.WriteSuccess("Opportunity suspension evaluated.", result, context.GlobalOptions);
+        return result.Suspended ? ExitCodes.Success : ExitCodes.ValidationFailed;
+    }
+
+    public static async Task<int> ExplainAsync(CommandContext context, Guid opportunityId)
+    {
+        using var scope = context.Host.Services.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IOpportunityOperatorService>();
+        var result = await service.ExplainAsync(opportunityId, null, CancellationToken.None).ConfigureAwait(false);
+        OutputFormatter.WriteSuccess("Opportunity explanation.", result, context.GlobalOptions);
+        return result.Hypothesis is null ? ExitCodes.NotFound : ExitCodes.Success;
+    }
+
     public static Task<int> ApproveAsync(
         CommandContext context,
         Guid opportunityId,

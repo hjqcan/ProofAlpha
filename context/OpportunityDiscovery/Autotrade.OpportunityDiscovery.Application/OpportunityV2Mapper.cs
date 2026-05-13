@@ -97,25 +97,45 @@ internal static class OpportunityV2Mapper
             run.CompletedAtUtc,
             run.UpdatedAtUtc);
 
-    public static ExecutableOpportunityPolicyDto ToDto(ExecutableOpportunityPolicy policy)
+    public static OpportunityLiveAllocationDto ToDto(OpportunityLiveAllocation allocation)
         => new(
-            policy.Id,
-            policy.HypothesisId,
-            policy.PolicyVersion,
-            policy.MarketId,
-            (OutcomeSide)policy.Outcome,
-            policy.FairProbability,
-            policy.Confidence,
-            policy.Edge,
-            policy.EntryMaxPrice,
-            policy.TakeProfitPrice,
-            policy.StopLossPrice,
-            policy.MaxSpread,
-            policy.Quantity,
-            policy.MaxNotional,
-            policy.ValidFromUtc,
-            policy.ValidUntilUtc,
-            DeserializeEvidenceIds(policy.EvidenceIdsJson));
+            allocation.Id,
+            allocation.HypothesisId,
+            allocation.ExecutablePolicyId,
+            allocation.MaxNotional,
+            allocation.MaxContracts,
+            allocation.ValidUntilUtc,
+            allocation.Status,
+            allocation.Reason,
+            allocation.CreatedAtUtc,
+            allocation.UpdatedAtUtc);
+
+    public static ExecutableOpportunityPolicyDto ToDto(ExecutableOpportunityPolicyFeedItem item)
+        => new(
+            item.Policy.Id,
+            item.Policy.HypothesisId,
+            item.ScoreId,
+            item.GateRunId,
+            item.AllocationId,
+            item.Policy.PolicyVersion,
+            item.ScoreVersion,
+            item.Policy.MarketId,
+            (OutcomeSide)item.Policy.Outcome,
+            item.Policy.Status,
+            item.Policy.FairProbability,
+            item.Policy.Confidence,
+            item.Policy.Edge,
+            item.Policy.EntryMaxPrice,
+            item.Policy.TakeProfitPrice,
+            item.Policy.StopLossPrice,
+            item.Policy.MaxSpread,
+            item.Policy.Quantity,
+            item.Policy.MaxNotional,
+            item.AllocationMaxNotional,
+            item.AllocationMaxContracts,
+            item.Policy.ValidFromUtc,
+            item.Policy.ValidUntilUtc,
+            DeserializeEvidenceIds(item.Policy.EvidenceIdsJson));
 
     private static IReadOnlyList<Guid> DeserializeEvidenceIds(string evidenceIdsJson)
     {

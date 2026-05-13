@@ -3,7 +3,7 @@ ODV2-T009: Integrated Validation and Operations
 
 Status
 ------
-[TODO]
+[DONE]
 
 
 Goal
@@ -42,3 +42,49 @@ Acceptance
 - No secret material is present in config, fixtures, logs, or exported replay.
 - The runbook explicitly says the system seeks measurable positive expected
   value and does not guarantee profit.
+
+
+Release Evidence
+----------------
+- Added release evidence directory:
+  `artifacts/opportunity-discovery/v2-release/`.
+- Added `market-tape-replay-fixture.json` with point-in-time replay snapshots
+  and deterministic replay checks.
+- Added `source-registry-fixture.json` with source profiles, authority kinds,
+  Live gate eligibility, and conflict state.
+- Added `scoring-fixture.json` with feature vector, score, calibration bucket,
+  edge, net edge, and promotion state.
+- Added `promotion-gate-fixture.json` with evidence, backtest, paper,
+  execution-quality, risk, and compliance gate results.
+- Added `paper-validation-report.json` with paper-run criteria, residual risks,
+  and Live arming unchanged.
+- Added `explain-output-example.json` with redacted operator explain output
+  covering hypothesis, evidence, score, gates, policy, allocation, and blocking
+  reasons.
+- Added `live-micro-allocation-dry-run.json` with micro-allocation limits,
+  hot-path checks, and kill criteria.
+- Added `release-evidence.md` and `secret-scan.md`.
+- Updated `docs/operations/autotrade-operator-runbook.md` with the
+  OpportunityDiscovery v2 operator workflow, CLI/API commands, promotion and
+  suspension evidence requirements, and the explicit statement that the system
+  seeks measurable positive expected value and does not guarantee profit.
+
+
+Validation Summary
+------------------
+- `dotnet restore`: passed; all projects were up to date.
+- `dotnet build`: passed; 0 warnings and 0 errors.
+- `dotnet test`: passed; 660 tests passed, 0 failed, 0 skipped.
+- Targeted secret scan: passed with 0 blocking findings across 14 config,
+  fixture, and log files in the T009 scope.
+- JSON fixture parse check: passed for all seven v2 release JSON fixtures.
+- `AUTOTRADE_TEST_POSTGRES`: not set; optional Postgres smoke tests were
+  skipped.
+
+
+Residual Risk
+-------------
+- T009 release evidence is deterministic fixture and dry-run evidence. It does
+  not prove Live profitability or guarantee future profit.
+- Optional Postgres smoke coverage remains pending until
+  `AUTOTRADE_TEST_POSTGRES` is available.

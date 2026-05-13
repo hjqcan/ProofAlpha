@@ -37,22 +37,21 @@ Task Order
 2. [DONE] ODV2-T002 Source registry and official source packs.
 3. [DONE] ODV2-T003 OpportunityDiscovery v2 domain and point-in-time evidence.
 4. [DONE] ODV2-T004 Feature extraction, scoring, and calibration.
-5. [TODO] ODV2-T005 Backtest, shadow, paper, and promotion gates.
-6. [TODO] ODV2-T006 Auto Live micro-allocation and kill criteria.
-7. [TODO] ODV2-T007 LlmOpportunityStrategy v2 executable-policy feed.
-8. [TODO] ODV2-T008 CLI/API explainability and operator controls.
-9. [TODO] ODV2-T009 Integrated validation, operations, and release evidence.
+5. [DONE] ODV2-T005 Backtest, shadow, paper, and promotion gates.
+6. [DONE] ODV2-T006 Auto Live micro-allocation and kill criteria.
+7. [DONE] ODV2-T007 LlmOpportunityStrategy v2 executable-policy feed.
+8. [DONE] ODV2-T008 CLI/API explainability and operator controls.
+9. [DONE] ODV2-T009 Integrated validation, operations, and release evidence.
 
 
 Current Implementation Slice
 ----------------------------
-ODV2-T004 is closed as of 2026-05-13. It added deterministic feature scoring,
-net-edge promotion blocking, calibration buckets against market-implied
-probability, persisted score breakdowns, expanded score persistence, and EF
-migration `20260513142822_OpportunityScoringCalibration`.
+ODV2-T009 is closed as of 2026-05-13. It added deterministic release evidence
+fixtures, runbook guidance, validation summaries, and a targeted secret scan for
+the OpportunityDiscovery v2 profit engine.
 
-The next permitted implementation slice is ODV2-T005 backtest, shadow, paper,
-and promotion gates.
+The OpportunityDiscovery v2 profit-engine board is closed. This does not mark
+the broader autonomous OpportunityDiscovery/SelfImprove profit loop complete.
 
 
 Acceptance Evidence

@@ -10,6 +10,10 @@ public sealed class LlmOpportunityOptions
 
     public int MaxMarkets { get; set; } = 20;
 
+    public int MaxActiveOpportunities { get; set; } = 3;
+
+    public decimal MaxPerCycleNotional { get; set; } = 20m;
+
     public int EntryCooldownSeconds { get; set; } = 60;
 
     public int ExitCooldownSeconds { get; set; } = 15;
@@ -28,6 +32,16 @@ public sealed class LlmOpportunityOptions
         if (MaxMarkets <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(MaxMarkets), MaxMarkets, "MaxMarkets must be positive.");
+        }
+
+        if (MaxActiveOpportunities <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(MaxActiveOpportunities), MaxActiveOpportunities, "MaxActiveOpportunities must be positive.");
+        }
+
+        if (MaxPerCycleNotional <= 0m)
+        {
+            throw new ArgumentOutOfRangeException(nameof(MaxPerCycleNotional), MaxPerCycleNotional, "MaxPerCycleNotional must be positive.");
         }
 
         if (EntryCooldownSeconds < 0 || ExitCooldownSeconds < 0 || MaxOrderBookAgeSeconds < 0)

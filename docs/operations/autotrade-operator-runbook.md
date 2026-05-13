@@ -152,6 +152,75 @@ Do not arm Live from stale acceptance evidence or while runtime gates are
 blocked by database migrations, API reachability, credentials, or compliance
 checks.
 
+## OpportunityDiscovery v2
+
+OpportunityDiscovery v2 is an evidence and validation workflow. The system
+seeks measurable positive expected value and does not guarantee profit. Treat
+every score, replay, gate, promotion, and allocation as evidence to inspect, not
+as a promise of future outcome.
+
+Release evidence for the v2 profit engine is kept under:
+
+```text
+artifacts/opportunity-discovery/v2-release/
+```
+
+Required local validation before reviewing a v2 opportunity:
+
+```powershell
+dotnet restore
+dotnet build
+dotnet test
+```
+
+Use the v2 operator commands from the built CLI DLL after `dotnet build`:
+
+```powershell
+dotnet .\interfaces\Autotrade.Cli\bin\Debug\net10.0\Autotrade.Cli.dll opportunity score --id <opportunity-id> --json
+dotnet .\interfaces\Autotrade.Cli\bin\Debug\net10.0\Autotrade.Cli.dll opportunity replay --id <opportunity-id> --json
+dotnet .\interfaces\Autotrade.Cli\bin\Debug\net10.0\Autotrade.Cli.dll opportunity explain --id <opportunity-id> --json
+dotnet .\interfaces\Autotrade.Cli\bin\Debug\net10.0\Autotrade.Cli.dll opportunity live-status --json
+```
+
+Promotion and suspension are destructive operator actions and require explicit
+reason capture:
+
+```powershell
+dotnet .\interfaces\Autotrade.Cli\bin\Debug\net10.0\Autotrade.Cli.dll opportunity promote --id <opportunity-id> --actor <operator> --reason "<evidence id and decision>" --yes --json
+dotnet .\interfaces\Autotrade.Cli\bin\Debug\net10.0\Autotrade.Cli.dll opportunity suspend --id <opportunity-id> --actor <operator> --reason "<incident or drift reason>" --yes --json
+```
+
+The equivalent API endpoints are:
+
+```text
+GET  /api/opportunities/{opportunityId}/score
+GET  /api/opportunities/{opportunityId}/replay
+POST /api/opportunities/{opportunityId}/promote
+GET  /api/opportunities/live-status
+POST /api/opportunities/{opportunityId}/suspend
+GET  /api/opportunities/{opportunityId}/explain
+```
+
+Before any v2 opportunity is considered for Live publication, verify:
+
+- the explain output references persisted evidence, source profiles, conflicts,
+  market tape slice, prompt version, model version, feature snapshot, score,
+  promotion gates, evaluation runs, policy, and allocation;
+- the latest required gates are `Passed`: evidence, backtest, paper,
+  execution quality, risk, and compliance;
+- replay consumed point-in-time market tape and did not use current order book
+  data for historical decisions;
+- the executable policy is `Active`, within its validity window, and connected
+  to the same active Live allocation recorded on the hypothesis;
+- micro-allocation limits are still at reviewed defaults or have a separate
+  signed operational review;
+- source drift, calibration drift, adverse slippage, drawdown, compliance
+  events, and risk events are below kill thresholds;
+- no config, fixture, log, or exported replay file contains private material.
+
+If a Live allocation is suspended, preserve all evidence records. Suspension is
+an operator state transition and order-cancel workflow, not evidence deletion.
+
 ## Incident Review
 
 Use the incident runbook for symptom-specific actions:

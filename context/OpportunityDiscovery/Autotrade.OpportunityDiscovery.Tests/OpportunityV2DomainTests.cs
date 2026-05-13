@@ -108,25 +108,20 @@ public sealed class OpportunityV2DomainTests
         var repository = new OpportunityV2Repository(context);
         var feed = new ExecutableOpportunityPolicyFeed(repository);
         var now = DateTimeOffset.UtcNow;
-        var active = Policy(now.AddMinutes(-1), now.AddHours(1), edge: 0.08m);
-        active.Activate(now);
-        var suspended = Policy(now.AddMinutes(-1), now.AddHours(1), edge: 0.09m);
-        suspended.Activate(now);
-        suspended.Suspend(now);
-        var expired = Policy(now.AddHours(-2), now.AddHours(-1), edge: 0.10m);
-        var future = Policy(now.AddHours(1), now.AddHours(2), edge: 0.11m);
-        future.Activate(now);
-
-        await repository.AddExecutablePolicyAsync(active);
-        await repository.AddExecutablePolicyAsync(suspended);
-        await repository.AddExecutablePolicyAsync(expired);
-        await repository.AddExecutablePolicyAsync(future);
+        var active = await SeedPolicyFeedCandidateAsync(repository, now, now.AddMinutes(-1), now.AddHours(1), edge: 0.08m);
+        await SeedPolicyFeedCandidateAsync(repository, now, now.AddMinutes(-1), now.AddHours(1), edge: 0.09m, suspend: true);
+        await SeedPolicyFeedCandidateAsync(repository, now, now.AddHours(-2), now.AddHours(-1), edge: 0.10m);
+        await SeedPolicyFeedCandidateAsync(repository, now, now.AddHours(1), now.AddHours(2), edge: 0.11m);
 
         var executable = await feed.GetExecutableAsync();
 
         var policy = Assert.Single(executable);
         Assert.Equal(active.Id, policy.PolicyId);
         Assert.Equal(0.08m, policy.Edge);
+        Assert.NotEqual(Guid.Empty, policy.ScoreId);
+        Assert.NotEqual(Guid.Empty, policy.GateRunId);
+        Assert.NotEqual(Guid.Empty, policy.AllocationId);
+        Assert.Equal("score-v1", policy.ScoreVersion);
     }
 
     private static OpportunityHypothesis Hypothesis()
@@ -161,11 +156,12 @@ public sealed class OpportunityV2DomainTests
             DateTimeOffset.UtcNow);
 
     private static ExecutableOpportunityPolicy Policy(
+        Guid hypothesisId,
         DateTimeOffset validFromUtc,
         DateTimeOffset validUntilUtc,
         decimal edge)
         => new(
-            Guid.NewGuid(),
+            hypothesisId,
             "policy-v1",
             "market-1",
             OpportunityOutcomeSide.Yes,
@@ -182,6 +178,84 @@ public sealed class OpportunityV2DomainTests
             validUntilUtc,
             "[]",
             DateTimeOffset.UtcNow);
+
+    private static async Task<ExecutableOpportunityPolicy> SeedPolicyFeedCandidateAsync(
+        OpportunityV2Repository repository,
+        DateTimeOffset now,
+        DateTimeOffset validFromUtc,
+        DateTimeOffset validUntilUtc,
+        decimal edge,
+        bool suspend = false)
+    {
+        var hypothesis = Hypothesis();
+        hypothesis.MarkScored("score-v1", "test", "scored", [], now.AddSeconds(1));
+        var backtestGate = Gate(hypothesis.Id, OpportunityPromotionGateKind.Backtest);
+        hypothesis.MarkBacktestPassed("seed-1", [backtestGate], "test", "backtest", [], now.AddSeconds(2));
+        var paperGate = Gate(hypothesis.Id, OpportunityPromotionGateKind.Paper);
+        hypothesis.MarkPaperValidated([paperGate], "test", "paper", [], now.AddSeconds(3));
+
+        var policy = Policy(hypothesis.Id, validFromUtc, validUntilUtc, edge);
+        if (validUntilUtc > now)
+        {
+            policy.Activate(now);
+        }
+
+        if (suspend)
+        {
+            policy.Suspend(now.AddSeconds(1));
+        }
+
+        var gates = AllRequiredGates(hypothesis.Id);
+        var allocation = new OpportunityLiveAllocation(
+            hypothesis.Id,
+            policy.Id,
+            5m,
+            5m,
+            validUntilUtc,
+            "test allocation",
+            now);
+        hypothesis.MarkLiveEligible(gates, policy.Id, "test", "eligible", [], now.AddSeconds(4));
+        hypothesis.PublishLive(gates, policy.Id, allocation.Id, "test", "published", [], now.AddSeconds(5));
+
+        var score = new OpportunityScore(
+            hypothesis.Id,
+            Guid.NewGuid(),
+            "score-v1",
+            0.61m,
+            0.62m,
+            0.72m,
+            edge,
+            0.54m,
+            0.55m,
+            0.01m,
+            0.01m,
+            edge,
+            5m,
+            true,
+            "default",
+            "{}",
+            now);
+        var run = new OpportunityEvaluationRun(
+            hypothesis.Id,
+            OpportunityEvaluationKind.Backtest,
+            "backtest-v1",
+            "tape:market-1",
+            "seed-1",
+            now);
+        run.MarkSucceeded("{}", now.AddSeconds(1));
+
+        await repository.AddHypothesisAsync(hypothesis);
+        await repository.AddExecutablePolicyAsync(policy);
+        await repository.AddLiveAllocationAsync(allocation);
+        await repository.AddScoreAsync(score);
+        await repository.AddEvaluationRunAsync(run);
+        foreach (var gate in gates)
+        {
+            await repository.AddPromotionGateAsync(gate);
+        }
+
+        return policy;
+    }
 
     private static OpportunityDiscoveryContext CreateContext()
     {

@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using Autotrade.Llm;
 using Autotrade.MarketData.Application.Contract.Catalog;
 using Autotrade.OpportunityDiscovery.Application.Contract;
@@ -9,6 +10,7 @@ using Autotrade.OpportunityDiscovery.Application.Contract.Analysis;
 using Autotrade.OpportunityDiscovery.Application.Evidence;
 using Autotrade.OpportunityDiscovery.Domain.Entities;
 using Autotrade.OpportunityDiscovery.Domain.Shared.Enums;
+using Autotrade.Trading.Domain.Shared.Enums;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -151,6 +153,203 @@ public sealed class OpportunityDiscoveryService : IOpportunityDiscoveryService
         catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
         {
             _logger.LogError(ex, "OpportunityDiscovery scan failed for run {RunId}", run.Id);
+            run.MarkFailed(ex.Message, DateTimeOffset.UtcNow);
+            await _runRepository.UpdateAsync(run, cancellationToken).ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    public async Task<OpportunityUserMessageIngestionResult> IngestUserMessageAsync(
+        OpportunityUserMessageIngestionRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var now = DateTimeOffset.UtcNow;
+        var actor = NormalizeRequired(request.Actor, "operator", nameof(request.Actor), 128);
+        var sourceName = NormalizeRequired(request.SourceName, "user-message", nameof(request.SourceName), 128);
+        var title = NormalizeRequired(request.Title, null, nameof(request.Title), 512);
+        var message = Truncate(RedactText(NormalizeRequired(request.Message, null, nameof(request.Message), 4096)), 4096);
+        var publishedAtUtc = request.PublishedAtUtc?.ToUniversalTime();
+        if (publishedAtUtc > now.AddMinutes(5))
+        {
+            throw new ArgumentException("PublishedAtUtc cannot be in the future.", nameof(request));
+        }
+
+        var preliminaryHash = ComputeHash(JsonSerializer.Serialize(new
+        {
+            sourceName,
+            title,
+            message,
+            publishedAtUtc
+        }, JsonOptions));
+        var url = NormalizeManualUrl(request.Url, preliminaryHash);
+        var contentHash = ComputeHash($"{NormalizeUrl(url)}|{title}|{message}|{publishedAtUtc:O}");
+        var run = new ResearchRun(
+            $"user-message:{actor}",
+            JsonSerializer.Serialize(new
+            {
+                kind = "user-provided-message",
+                sourceName,
+                title,
+                url,
+                actor
+            }, JsonOptions),
+            now);
+
+        await _runRepository.AddAsync(run, cancellationToken).ConfigureAwait(false);
+        run.MarkRunning(now);
+        await _runRepository.UpdateAsync(run, cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            var evidence = new EvidenceItem(
+                run.Id,
+                EvidenceSourceKind.Manual,
+                sourceName,
+                url,
+                title,
+                message,
+                publishedAtUtc,
+                now,
+                contentHash,
+                JsonSerializer.Serialize(new
+                {
+                    kind = "user-provided-message",
+                    actor,
+                    sourceName,
+                    title,
+                    message,
+                    url,
+                    publishedAtUtc,
+                    redacted = true
+                }, JsonOptions),
+                request.SourceQuality);
+
+            await _evidenceRepository.AddRangeDedupAsync([evidence], cancellationToken).ConfigureAwait(false);
+            var persisted = await _evidenceRepository.GetByRunAsync(run.Id, cancellationToken).ConfigureAwait(false);
+            var persistedEvidence = persisted.FirstOrDefault(item =>
+                    string.Equals(item.ContentHash, contentHash, StringComparison.OrdinalIgnoreCase))
+                ?? throw new InvalidOperationException("User-provided evidence was not persisted.");
+
+            run.MarkSucceeded(persisted.Count, 0, DateTimeOffset.UtcNow);
+            await _runRepository.UpdateAsync(run, cancellationToken).ConfigureAwait(false);
+
+            return new OpportunityUserMessageIngestionResult(
+                OpportunityMapper.ToDto(run),
+                OpportunityMapper.ToDto(persistedEvidence));
+        }
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogError(ex, "OpportunityDiscovery user message ingestion failed for run {RunId}", run.Id);
+            run.MarkFailed(ex.Message, DateTimeOffset.UtcNow);
+            await _runRepository.UpdateAsync(run, cancellationToken).ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    public async Task<OpportunityAccountActivityIngestionResult> IngestPolymarketAccountActivityAsync(
+        OpportunityAccountActivityIngestionRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var now = DateTimeOffset.UtcNow;
+        var actor = NormalizeRequired(request.Actor, "operator", nameof(request.Actor), 128);
+        var sourceName = NormalizeRequired(request.SourceName, "public-account-activity", nameof(request.SourceName), 128);
+        var walletAddress = NormalizeRequired(request.WalletAddress, null, nameof(request.WalletAddress), 128);
+        var observedAtUtc = request.ObservedAtUtc?.ToUniversalTime() ?? now;
+        if (observedAtUtc > now.AddMinutes(5))
+        {
+            throw new ArgumentException("ObservedAtUtc cannot be in the future.", nameof(request));
+        }
+
+        var activities = NormalizeAccountActivities(request.Activities, now);
+        var aggregates = BuildAccountActivityAggregates(activities);
+        var latestExecutionUtc = activities.Max(activity => activity.ExecutedAtUtc);
+        var preliminaryHash = ComputeHash(JsonSerializer.Serialize(new
+        {
+            walletAddress,
+            sourceName,
+            observedAtUtc,
+            activities
+        }, JsonOptions));
+        var url = NormalizeAccountActivityUrl(request.Url, walletAddress, preliminaryHash);
+        var summaryPayload = new
+        {
+            kind = "polymarket-public-account-activity",
+            walletAddress,
+            sourceName,
+            observedAtUtc,
+            activityCount = activities.Count,
+            marketCount = aggregates.Count,
+            aggregates
+        };
+        var summaryJson = JsonSerializer.Serialize(summaryPayload, JsonOptions);
+        var summary = Truncate(summaryJson, 4096);
+        var contentHash = ComputeHash($"{NormalizeUrl(url)}|{walletAddress}|{summaryJson}");
+        var run = new ResearchRun(
+            $"polymarket-account:{actor}",
+            JsonSerializer.Serialize(new
+            {
+                kind = "polymarket-public-account-activity",
+                walletAddress,
+                sourceName,
+                url,
+                actor,
+                activityCount = activities.Count,
+                marketCount = aggregates.Count
+            }, JsonOptions),
+            now);
+
+        await _runRepository.AddAsync(run, cancellationToken).ConfigureAwait(false);
+        run.MarkRunning(now);
+        await _runRepository.UpdateAsync(run, cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            var evidence = new EvidenceItem(
+                run.Id,
+                EvidenceSourceKind.Polymarket,
+                sourceName,
+                url,
+                $"Public Polymarket account activity for {FormatWalletLabel(walletAddress)}",
+                summary,
+                latestExecutionUtc,
+                observedAtUtc,
+                contentHash,
+                JsonSerializer.Serialize(new
+                {
+                    kind = "polymarket-public-account-activity",
+                    actor,
+                    walletAddress,
+                    sourceName,
+                    url,
+                    observedAtUtc,
+                    latestExecutionUtc,
+                    activities,
+                    aggregates,
+                    redacted = true
+                }, JsonOptions),
+                request.SourceQuality);
+
+            await _evidenceRepository.AddRangeDedupAsync([evidence], cancellationToken).ConfigureAwait(false);
+            var persisted = await _evidenceRepository.GetByRunAsync(run.Id, cancellationToken).ConfigureAwait(false);
+            var persistedEvidence = persisted.FirstOrDefault(item =>
+                    string.Equals(item.ContentHash, contentHash, StringComparison.OrdinalIgnoreCase))
+                ?? throw new InvalidOperationException("Polymarket account activity evidence was not persisted.");
+
+            run.MarkSucceeded(persisted.Count, 0, DateTimeOffset.UtcNow);
+            await _runRepository.UpdateAsync(run, cancellationToken).ConfigureAwait(false);
+
+            return new OpportunityAccountActivityIngestionResult(
+                OpportunityMapper.ToDto(run),
+                OpportunityMapper.ToDto(persistedEvidence),
+                summaryJson);
+        }
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogError(ex, "OpportunityDiscovery account activity ingestion failed for run {RunId}", run.Id);
             run.MarkFailed(ex.Message, DateTimeOffset.UtcNow);
             await _runRepository.UpdateAsync(run, cancellationToken).ConfigureAwait(false);
             throw;
@@ -683,8 +882,188 @@ public sealed class OpportunityDiscoveryService : IOpportunityDiscoveryService
             ?? throw new InvalidOperationException($"Opportunity {opportunityId} was not found.");
     }
 
+    private static IReadOnlyList<NormalizedAccountActivity> NormalizeAccountActivities(
+        IReadOnlyList<OpportunityAccountActivityEntry>? activities,
+        DateTimeOffset now)
+    {
+        if (activities is null || activities.Count == 0)
+        {
+            throw new ArgumentException("Activities cannot be empty.", nameof(activities));
+        }
+
+        if (activities.Count > 1000)
+        {
+            throw new ArgumentException("Activities cannot contain more than 1000 entries.", nameof(activities));
+        }
+
+        var normalized = new List<NormalizedAccountActivity>(activities.Count);
+        for (var i = 0; i < activities.Count; i++)
+        {
+            var entry = activities[i] ?? throw new ArgumentException($"Activities[{i}] cannot be null.", nameof(activities));
+            var marketId = NormalizeRequired(entry.MarketId, null, $"Activities[{i}].MarketId", 128);
+            if (entry.Outcome is not OutcomeSide.Yes and not OutcomeSide.No)
+            {
+                throw new ArgumentException($"Activities[{i}].Outcome must be Yes or No.", nameof(activities));
+            }
+
+            if (entry.Side is not OrderSide.Buy and not OrderSide.Sell)
+            {
+                throw new ArgumentException($"Activities[{i}].Side must be Buy or Sell.", nameof(activities));
+            }
+
+            if (entry.Price is < 0m or > 1m)
+            {
+                throw new ArgumentOutOfRangeException(nameof(activities), $"Activities[{i}].Price must be between 0 and 1.");
+            }
+
+            if (entry.Quantity <= 0m)
+            {
+                throw new ArgumentOutOfRangeException(nameof(activities), $"Activities[{i}].Quantity must be positive.");
+            }
+
+            var executedAtUtc = entry.ExecutedAtUtc.ToUniversalTime();
+            if (executedAtUtc == default)
+            {
+                throw new ArgumentException($"Activities[{i}].ExecutedAtUtc is required.", nameof(activities));
+            }
+
+            if (executedAtUtc > now.AddMinutes(5))
+            {
+                throw new ArgumentException($"Activities[{i}].ExecutedAtUtc cannot be in the future.", nameof(activities));
+            }
+
+            normalized.Add(new NormalizedAccountActivity(
+                marketId,
+                entry.Outcome,
+                entry.Side,
+                entry.Price,
+                entry.Quantity,
+                executedAtUtc,
+                NormalizeOptional(entry.TransactionHash, 128),
+                NormalizeOptional(entry.Notes is null ? null : RedactText(entry.Notes), 1024)));
+        }
+
+        return normalized
+            .OrderBy(activity => activity.ExecutedAtUtc)
+            .ThenBy(activity => activity.MarketId, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(activity => activity.Outcome)
+            .ToList();
+    }
+
+    private static IReadOnlyList<AccountActivityAggregate> BuildAccountActivityAggregates(
+        IReadOnlyList<NormalizedAccountActivity> activities)
+    {
+        return activities
+            .GroupBy(activity => new { activity.MarketId, activity.Outcome })
+            .Select(group =>
+            {
+                var buyQuantity = group
+                    .Where(activity => activity.Side == OrderSide.Buy)
+                    .Sum(activity => activity.Quantity);
+                var sellQuantity = group
+                    .Where(activity => activity.Side == OrderSide.Sell)
+                    .Sum(activity => activity.Quantity);
+                var buyNotional = group
+                    .Where(activity => activity.Side == OrderSide.Buy)
+                    .Sum(activity => activity.Price * activity.Quantity);
+                var sellNotional = group
+                    .Where(activity => activity.Side == OrderSide.Sell)
+                    .Sum(activity => activity.Price * activity.Quantity);
+
+                return new AccountActivityAggregate(
+                    group.Key.MarketId,
+                    group.Key.Outcome,
+                    group.Count(),
+                    buyQuantity,
+                    sellQuantity,
+                    buyQuantity - sellQuantity,
+                    buyNotional + sellNotional,
+                    buyQuantity == 0m ? null : buyNotional / buyQuantity,
+                    sellQuantity == 0m ? null : sellNotional / sellQuantity,
+                    group.Min(activity => activity.ExecutedAtUtc),
+                    group.Max(activity => activity.ExecutedAtUtc));
+            })
+            .OrderBy(aggregate => aggregate.MarketId, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(aggregate => aggregate.Outcome)
+            .ToList();
+    }
+
     private static string ComputeHash(string value)
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
+
+    private static string NormalizeRequired(string? value, string? defaultValue, string paramName, int maxLength)
+    {
+        var resolved = string.IsNullOrWhiteSpace(value) ? defaultValue : value;
+        if (string.IsNullOrWhiteSpace(resolved))
+        {
+            throw new ArgumentException($"{paramName} cannot be empty.", paramName);
+        }
+
+        return Truncate(resolved.Trim(), maxLength);
+    }
+
+    private static string NormalizeManualUrl(string? value, string preliminaryHash)
+    {
+        var redacted = string.IsNullOrWhiteSpace(value) ? null : RedactText(value.Trim());
+        if (!string.IsNullOrWhiteSpace(redacted))
+        {
+            return Truncate(redacted, 2048);
+        }
+
+        return $"manual://user-message/{preliminaryHash[..16]}";
+    }
+
+    private static string NormalizeAccountActivityUrl(string? value, string walletAddress, string preliminaryHash)
+    {
+        var redacted = string.IsNullOrWhiteSpace(value) ? null : RedactText(value.Trim());
+        if (!string.IsNullOrWhiteSpace(redacted))
+        {
+            return Truncate(redacted, 2048);
+        }
+
+        return $"polymarket://account/{SafeReferenceSegment(walletAddress)}/{preliminaryHash[..16]}";
+    }
+
+    private static string? NormalizeOptional(string? value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return Truncate(value.Trim(), maxLength);
+    }
+
+    private static string SafeReferenceSegment(string value)
+    {
+        var sanitized = Regex.Replace(value.Trim(), "[^A-Za-z0-9_.-]+", "-").Trim('-');
+        return string.IsNullOrWhiteSpace(sanitized) ? "wallet" : Truncate(sanitized, 64);
+    }
+
+    private static string FormatWalletLabel(string walletAddress)
+    {
+        var trimmed = walletAddress.Trim();
+        return trimmed.Length <= 12 ? trimmed : $"{trimmed[..6]}...{trimmed[^4..]}";
+    }
+
+    private static string RedactText(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var redacted = Regex.Replace(
+            value,
+            "(?i)(api[_ -]?key|secret|password|private[_ -]?key|mnemonic|seed phrase|access[_ -]?token|refresh[_ -]?token)\\s*[:=]\\s*[^\\s,;]+",
+            "$1=[REDACTED]");
+        redacted = Regex.Replace(redacted, "(?i)bearer\\s+[a-z0-9_.\\-=]+", "Bearer [REDACTED]");
+        redacted = Regex.Replace(redacted, "sk-[A-Za-z0-9]{12,}", "sk-[REDACTED]");
+        return redacted;
+    }
+
+    private static string Truncate(string value, int maxLength)
+        => value.Length <= maxLength ? value : value[..maxLength];
 
     private static IReadOnlyList<Guid> DeserializeEvidenceIds(string evidenceIdsJson)
     {
@@ -763,4 +1142,27 @@ public sealed class OpportunityDiscoveryService : IOpportunityDiscoveryService
                     sourceKey = SourceKey
                 }, JsonOptions));
     }
+
+    private sealed record NormalizedAccountActivity(
+        string MarketId,
+        OutcomeSide Outcome,
+        OrderSide Side,
+        decimal Price,
+        decimal Quantity,
+        DateTimeOffset ExecutedAtUtc,
+        string? TransactionHash,
+        string? Notes);
+
+    private sealed record AccountActivityAggregate(
+        string MarketId,
+        OutcomeSide Outcome,
+        int ActivityCount,
+        decimal BuyQuantity,
+        decimal SellQuantity,
+        decimal NetQuantity,
+        decimal TotalNotional,
+        decimal? AverageBuyPrice,
+        decimal? AverageSellPrice,
+        DateTimeOffset FirstExecutedAtUtc,
+        DateTimeOffset LastExecutedAtUtc);
 }

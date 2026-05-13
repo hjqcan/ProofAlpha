@@ -5,8 +5,38 @@ namespace Autotrade.Api.Controllers;
 
 [ApiController]
 [Route("api/opportunities")]
-public sealed class OpportunityController(IOpportunityOperatorService operatorService) : ControllerBase
+public sealed class OpportunityController(
+    IOpportunityOperatorService operatorService,
+    IOpportunityDiscoveryService discoveryService) : ControllerBase
 {
+    [HttpPost("user-messages")]
+    public async Task<ActionResult<OpportunityUserMessageIngestionResult>> IngestUserMessage(
+        [FromBody] OpportunityUserMessageIngestionRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return BadRequest("Request body is required.");
+        }
+
+        var response = await discoveryService.IngestUserMessageAsync(request, cancellationToken).ConfigureAwait(false);
+        return Accepted(response);
+    }
+
+    [HttpPost("account-activity")]
+    public async Task<ActionResult<OpportunityAccountActivityIngestionResult>> IngestAccountActivity(
+        [FromBody] OpportunityAccountActivityIngestionRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return BadRequest("Request body is required.");
+        }
+
+        var response = await discoveryService.IngestPolymarketAccountActivityAsync(request, cancellationToken).ConfigureAwait(false);
+        return Accepted(response);
+    }
+
     [HttpGet("{opportunityId:guid}/score")]
     public async Task<ActionResult<OpportunityScoreStatusResponse>> GetScore(
         Guid opportunityId,

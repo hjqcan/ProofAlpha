@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Autotrade.Cli.Infrastructure;
 using Autotrade.OpportunityDiscovery.Application.Contract;
 using Autotrade.OpportunityDiscovery.Domain.Shared.Enums;
@@ -7,6 +9,12 @@ namespace Autotrade.Cli.Commands;
 
 public static class OpportunityCommands
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        PropertyNameCaseInsensitive = true,
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
+    };
+
     public static async Task<int> ScanAsync(
         CommandContext context,
         decimal minVolume24h,
@@ -21,6 +29,104 @@ public static class OpportunityCommands
             .ConfigureAwait(false);
 
         OutputFormatter.WriteSuccess("Opportunity scan completed.", result, context.GlobalOptions);
+        return ExitCodes.Success;
+    }
+
+    public static async Task<int> IngestMessageAsync(
+        CommandContext context,
+        string sourceName,
+        string title,
+        string message,
+        string? url,
+        DateTimeOffset? publishedAtUtc,
+        string actor,
+        decimal sourceQuality)
+    {
+        using var scope = context.Host.Services.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IOpportunityDiscoveryService>();
+        var result = await service.IngestUserMessageAsync(
+                new OpportunityUserMessageIngestionRequest(
+                    sourceName,
+                    title,
+                    message,
+                    url,
+                    publishedAtUtc,
+                    ResolveActor(actor),
+                    sourceQuality),
+                CancellationToken.None)
+            .ConfigureAwait(false);
+
+        OutputFormatter.WriteSuccess("User-provided opportunity evidence ingested.", result, context.GlobalOptions);
+        return ExitCodes.Success;
+    }
+
+    public static async Task<int> IngestAccountActivityAsync(
+        CommandContext context,
+        FileInfo input,
+        string actor)
+    {
+        if (input is null || !input.Exists)
+        {
+            OutputFormatter.WriteError(
+                $"Account activity input file was not found: {input?.FullName ?? "<null>"}",
+                "VALIDATION_FAILED",
+                context.GlobalOptions,
+                ExitCodes.ValidationFailed);
+            return ExitCodes.ValidationFailed;
+        }
+
+        OpportunityAccountActivityIngestionRequest? request;
+        try
+        {
+            var json = await File.ReadAllTextAsync(input.FullName, CancellationToken.None).ConfigureAwait(false);
+            request = JsonSerializer.Deserialize<OpportunityAccountActivityIngestionRequest>(json, JsonOptions);
+        }
+        catch (JsonException ex)
+        {
+            OutputFormatter.WriteError(
+                $"Account activity input JSON is invalid: {ex.Message}",
+                "VALIDATION_FAILED",
+                context.GlobalOptions,
+                ExitCodes.ValidationFailed);
+            return ExitCodes.ValidationFailed;
+        }
+        catch (IOException ex)
+        {
+            OutputFormatter.WriteError(
+                $"Account activity input file could not be read: {ex.Message}",
+                "VALIDATION_FAILED",
+                context.GlobalOptions,
+                ExitCodes.ValidationFailed);
+            return ExitCodes.ValidationFailed;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            OutputFormatter.WriteError(
+                $"Account activity input file could not be read: {ex.Message}",
+                "VALIDATION_FAILED",
+                context.GlobalOptions,
+                ExitCodes.ValidationFailed);
+            return ExitCodes.ValidationFailed;
+        }
+
+        if (request is null)
+        {
+            OutputFormatter.WriteError(
+                "Account activity input JSON was empty.",
+                "VALIDATION_FAILED",
+                context.GlobalOptions,
+                ExitCodes.ValidationFailed);
+            return ExitCodes.ValidationFailed;
+        }
+
+        using var scope = context.Host.Services.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IOpportunityDiscoveryService>();
+        var result = await service.IngestPolymarketAccountActivityAsync(
+                request with { Actor = ResolveActor(actor) },
+                CancellationToken.None)
+            .ConfigureAwait(false);
+
+        OutputFormatter.WriteSuccess("Polymarket account activity evidence ingested.", result, context.GlobalOptions);
         return ExitCodes.Success;
     }
 

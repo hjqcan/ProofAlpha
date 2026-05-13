@@ -163,6 +163,126 @@ public sealed class OpportunityDiscoveryServiceTests
         Assert.Single(await repository.GetByRunAsync(otherRunId));
     }
 
+    [Fact]
+    public async Task IngestUserMessageAsync_RedactsSecretsAndPersistsManualEvidence()
+    {
+        await using var context = CreateContext();
+        var repositories = CreateRepositories(context);
+        var service = CreateService(
+            repositories,
+            new FakeMarketCatalogReader(Market()),
+            [],
+            new PromptDrivenLlmClient());
+
+        var result = await service.IngestUserMessageAsync(
+            new OpportunityUserMessageIngestionRequest(
+                "operator-note",
+                "Weather market update",
+                "Rain delay likely changes odds. api_key=local-redaction-sentinel private_key=local-private-sentinel",
+                Actor: "analyst",
+                SourceQuality: 0.7m));
+
+        Assert.Equal(ResearchRunStatus.Succeeded, result.Run.Status);
+        Assert.Equal("user-message:analyst", result.Run.Trigger);
+        Assert.Equal(1, result.Run.EvidenceCount);
+        Assert.Equal(0, result.Run.OpportunityCount);
+        Assert.Equal(EvidenceSourceKind.Manual, result.Evidence.SourceKind);
+        Assert.Equal("operator-note", result.Evidence.SourceName);
+        Assert.StartsWith("manual://user-message/", result.Evidence.Url, StringComparison.Ordinal);
+        Assert.Contains("[REDACTED]", result.Evidence.Summary, StringComparison.Ordinal);
+        Assert.DoesNotContain("local-redaction-sentinel", result.Evidence.Summary, StringComparison.Ordinal);
+        Assert.DoesNotContain("local-private-sentinel", result.Evidence.Summary, StringComparison.Ordinal);
+
+        var persisted = Assert.Single(await repositories.EvidenceRepository.GetByRunAsync(result.Run.Id));
+        Assert.Contains("[REDACTED]", persisted.RawJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("local-redaction-sentinel", persisted.RawJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("local-private-sentinel", persisted.RawJson, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task IngestPolymarketAccountActivityAsync_PersistsPolymarketEvidenceSummary()
+    {
+        await using var context = CreateContext();
+        var repositories = CreateRepositories(context);
+        var service = CreateService(
+            repositories,
+            new FakeMarketCatalogReader(Market()),
+            [],
+            new PromptDrivenLlmClient());
+        var executedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-10);
+
+        var result = await service.IngestPolymarketAccountActivityAsync(
+            new OpportunityAccountActivityIngestionRequest(
+                "0xabc123abc123abc123abc123abc123abc123abcd",
+                [
+                    new OpportunityAccountActivityEntry(
+                        "market-alpha",
+                        OutcomeSide.Yes,
+                        OrderSide.Buy,
+                        0.42m,
+                        10m,
+                        executedAtUtc,
+                        "0xtx1",
+                        "entry note api_key=local-redaction-sentinel"),
+                    new OpportunityAccountActivityEntry(
+                        "market-alpha",
+                        OutcomeSide.Yes,
+                        OrderSide.Sell,
+                        0.55m,
+                        4m,
+                        executedAtUtc.AddMinutes(2),
+                        "0xtx2")
+                ],
+                Actor: "analyst",
+                SourceQuality: 0.8m));
+
+        Assert.Equal(ResearchRunStatus.Succeeded, result.Run.Status);
+        Assert.Equal("polymarket-account:analyst", result.Run.Trigger);
+        Assert.Equal(1, result.Run.EvidenceCount);
+        Assert.Equal(0, result.Run.OpportunityCount);
+        Assert.Equal(EvidenceSourceKind.Polymarket, result.Evidence.SourceKind);
+        Assert.Equal("public-account-activity", result.Evidence.SourceName);
+        Assert.StartsWith("polymarket://account/0xabc123abc123abc123abc123abc123abc123abcd/", result.Evidence.Url, StringComparison.Ordinal);
+
+        using var summary = JsonDocument.Parse(result.SummaryJson);
+        Assert.Equal("polymarket-public-account-activity", summary.RootElement.GetProperty("kind").GetString());
+        Assert.Equal(2, summary.RootElement.GetProperty("activityCount").GetInt32());
+        var aggregate = Assert.Single(summary.RootElement.GetProperty("aggregates").EnumerateArray());
+        Assert.Equal("market-alpha", aggregate.GetProperty("marketId").GetString());
+        Assert.Equal(6m, aggregate.GetProperty("netQuantity").GetDecimal());
+        Assert.Equal(6.4m, aggregate.GetProperty("totalNotional").GetDecimal());
+
+        var persisted = Assert.Single(await repositories.EvidenceRepository.GetByRunAsync(result.Run.Id));
+        Assert.Contains("[REDACTED]", persisted.RawJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("local-redaction-sentinel", persisted.RawJson, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task IngestPolymarketAccountActivityAsync_RejectsInvalidActivityPrice()
+    {
+        await using var context = CreateContext();
+        var repositories = CreateRepositories(context);
+        var service = CreateService(
+            repositories,
+            new FakeMarketCatalogReader(Market()),
+            [],
+            new PromptDrivenLlmClient());
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            service.IngestPolymarketAccountActivityAsync(
+                new OpportunityAccountActivityIngestionRequest(
+                    "0xabc123abc123abc123abc123abc123abc123abcd",
+                    [
+                        new OpportunityAccountActivityEntry(
+                            "market-alpha",
+                            OutcomeSide.Yes,
+                            OrderSide.Buy,
+                            1.25m,
+                            10m,
+                            DateTimeOffset.UtcNow.AddMinutes(-1))
+                    ])));
+    }
+
     private static OpportunityDiscoveryService CreateService(
         RepositorySet repositories,
         IMarketCatalogReader marketCatalog,

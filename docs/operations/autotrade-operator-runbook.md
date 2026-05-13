@@ -182,6 +182,43 @@ dotnet .\interfaces\Autotrade.Cli\bin\Debug\net10.0\Autotrade.Cli.dll opportunit
 dotnet .\interfaces\Autotrade.Cli\bin\Debug\net10.0\Autotrade.Cli.dll opportunity live-status --json
 ```
 
+When an operator or external workflow supplies a message as evidence, ingest it
+as redacted Manual evidence. The command audit records message length, not the
+raw message body:
+
+```powershell
+dotnet .\interfaces\Autotrade.Cli\bin\Debug\net10.0\Autotrade.Cli.dll opportunity ingest-message --source-name <source> --title <title> --message <message> --actor <operator> --json
+```
+
+When an operator or external workflow supplies public Polymarket wallet activity,
+ingest it as Polymarket evidence from a JSON file. The command audit records the
+file path and size, not the submitted activity body:
+
+```powershell
+dotnet .\interfaces\Autotrade.Cli\bin\Debug\net10.0\Autotrade.Cli.dll opportunity ingest-account-activity --input .\artifacts\opportunity-discovery\account-activity-request.json --actor <operator> --json
+```
+
+The input file shape is:
+
+```json
+{
+  "walletAddress": "0xabc123abc123abc123abc123abc123abc123abcd",
+  "sourceName": "public-account-activity",
+  "observedAtUtc": "2026-05-13T15:50:00Z",
+  "activities": [
+    {
+      "marketId": "market-alpha",
+      "outcome": "yes",
+      "side": "buy",
+      "price": 0.42,
+      "quantity": 10,
+      "executedAtUtc": "2026-05-13T15:40:00Z",
+      "transactionHash": "0xtx"
+    }
+  ]
+}
+```
+
 Promotion and suspension are destructive operator actions and require explicit
 reason capture:
 
@@ -194,6 +231,8 @@ The equivalent API endpoints are:
 
 ```text
 GET  /api/opportunities/{opportunityId}/score
+POST /api/opportunities/user-messages
+POST /api/opportunities/account-activity
 GET  /api/opportunities/{opportunityId}/replay
 POST /api/opportunities/{opportunityId}/promote
 GET  /api/opportunities/live-status

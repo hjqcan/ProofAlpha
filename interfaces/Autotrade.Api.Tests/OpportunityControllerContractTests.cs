@@ -1,5 +1,7 @@
 using Autotrade.Api.Controllers;
 using Autotrade.OpportunityDiscovery.Application.Contract;
+using Autotrade.OpportunityDiscovery.Domain.Shared.Enums;
+using Autotrade.Trading.Domain.Shared.Enums;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Autotrade.Api.Tests;
@@ -10,7 +12,7 @@ public sealed class OpportunityControllerContractTests
     public async Task GetScoreReturnsSharedOperatorContract()
     {
         var opportunityId = Guid.NewGuid();
-        var controller = new OpportunityController(new StubOperatorService(opportunityId));
+        var controller = CreateController(opportunityId);
 
         var result = await controller.GetScore(opportunityId, CancellationToken.None);
 
@@ -23,7 +25,7 @@ public sealed class OpportunityControllerContractTests
     public async Task SuspendReturnsSharedOperatorContract()
     {
         var opportunityId = Guid.NewGuid();
-        var controller = new OpportunityController(new StubOperatorService(opportunityId));
+        var controller = CreateController(opportunityId);
 
         var result = await controller.Suspend(
             opportunityId,
@@ -35,6 +37,55 @@ public sealed class OpportunityControllerContractTests
         Assert.True(response.Suspended);
         Assert.Equal(opportunityId, response.OpportunityId);
     }
+
+    [Fact]
+    public async Task IngestUserMessageReturnsSharedDiscoveryContract()
+    {
+        var opportunityId = Guid.NewGuid();
+        var controller = CreateController(opportunityId);
+
+        var result = await controller.IngestUserMessage(
+            new OpportunityUserMessageIngestionRequest(
+                "operator-note",
+                "Local source",
+                "User supplied market evidence"),
+            CancellationToken.None);
+
+        var accepted = Assert.IsType<AcceptedResult>(result.Result);
+        var response = Assert.IsType<OpportunityUserMessageIngestionResult>(accepted.Value);
+        Assert.Equal(EvidenceSourceKind.Manual, response.Evidence.SourceKind);
+        Assert.Equal("operator-note", response.Evidence.SourceName);
+    }
+
+    [Fact]
+    public async Task IngestAccountActivityReturnsSharedDiscoveryContract()
+    {
+        var opportunityId = Guid.NewGuid();
+        var controller = CreateController(opportunityId);
+
+        var result = await controller.IngestAccountActivity(
+            new OpportunityAccountActivityIngestionRequest(
+                "0xabc123abc123abc123abc123abc123abc123abcd",
+                [
+                    new OpportunityAccountActivityEntry(
+                        "market-alpha",
+                        OutcomeSide.Yes,
+                        OrderSide.Buy,
+                        0.42m,
+                        10m,
+                        DateTimeOffset.UtcNow.AddMinutes(-1))
+                ]),
+            CancellationToken.None);
+
+        var accepted = Assert.IsType<AcceptedResult>(result.Result);
+        var response = Assert.IsType<OpportunityAccountActivityIngestionResult>(accepted.Value);
+        Assert.Equal(EvidenceSourceKind.Polymarket, response.Evidence.SourceKind);
+        Assert.Equal("public-account-activity", response.Evidence.SourceName);
+        Assert.Contains("\"activityCount\":1", response.SummaryJson, StringComparison.Ordinal);
+    }
+
+    private static OpportunityController CreateController(Guid opportunityId)
+        => new(new StubOperatorService(opportunityId), new StubDiscoveryService());
 
     private sealed class StubOperatorService(Guid opportunityId) : IOpportunityOperatorService
     {
@@ -107,6 +158,81 @@ public sealed class OpportunityControllerContractTests
                 "test",
                 Guid.NewGuid(),
                 Guid.NewGuid(),
+                DateTimeOffset.UtcNow,
+                DateTimeOffset.UtcNow);
+    }
+
+    private sealed class StubDiscoveryService : IOpportunityDiscoveryService
+    {
+        public Task<OpportunityScanResult> ScanAsync(
+            OpportunityScanRequest request,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(new OpportunityScanResult(Run(), []));
+
+        public Task<OpportunityUserMessageIngestionResult> IngestUserMessageAsync(
+            OpportunityUserMessageIngestionRequest request,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(new OpportunityUserMessageIngestionResult(
+                Run(),
+                new EvidenceItemDto(
+                    Guid.NewGuid(),
+                    Guid.NewGuid(),
+                    EvidenceSourceKind.Manual,
+                    request.SourceName,
+                    request.Url ?? "manual://user-message/test",
+                    request.Title,
+                    request.Message,
+                    request.PublishedAtUtc,
+                    DateTimeOffset.UtcNow,
+                    "hash",
+                    request.SourceQuality)));
+
+        public Task<OpportunityAccountActivityIngestionResult> IngestPolymarketAccountActivityAsync(
+            OpportunityAccountActivityIngestionRequest request,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(new OpportunityAccountActivityIngestionResult(
+                Run("polymarket-account:api-test"),
+                new EvidenceItemDto(
+                    Guid.NewGuid(),
+                    Guid.NewGuid(),
+                    EvidenceSourceKind.Polymarket,
+                    request.SourceName,
+                    request.Url ?? "polymarket://account/test/hash",
+                    $"Public Polymarket account activity for {request.WalletAddress}",
+                    "account activity summary",
+                    request.Activities.Max(activity => activity.ExecutedAtUtc),
+                    request.ObservedAtUtc ?? DateTimeOffset.UtcNow,
+                    "hash",
+                    request.SourceQuality),
+                $"{{\"activityCount\":{request.Activities.Count}}}"));
+
+        public Task<MarketOpportunityDto> ApproveAsync(
+            OpportunityReviewRequest request,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<MarketOpportunityDto> RejectAsync(
+            OpportunityReviewRequest request,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<MarketOpportunityDto> PublishAsync(
+            OpportunityReviewRequest request,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<int> ExpireStaleAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(0);
+
+        private static ResearchRunDto Run(string trigger = "user-message:api-test")
+            => new(
+                Guid.NewGuid(),
+                trigger,
+                "[]",
+                ResearchRunStatus.Succeeded,
+                1,
+                0,
+                null,
                 DateTimeOffset.UtcNow,
                 DateTimeOffset.UtcNow);
     }

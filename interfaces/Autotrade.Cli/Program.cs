@@ -651,6 +651,13 @@ var opportunityIdOption = CreateRequiredOption<Guid>("--id", "Opportunity ID");
 var opportunityActorOption = CreateOptionWithDefault("--actor", "cli", "Review actor");
 var opportunityNotesOption = CreateOption<string?>("--notes", "Review notes");
 var opportunityReasonOption = CreateOption<string?>("--reason", "Operator reason");
+var opportunityMessageSourceNameOption = CreateOptionWithDefault("--source-name", "user-message", "User-provided message source name");
+var opportunityMessageTitleOption = CreateRequiredOption<string>("--title", "User-provided message title");
+var opportunityMessageOption = CreateRequiredOption<string>("--message", "User-provided message body");
+var opportunityMessageUrlOption = CreateOption<string?>("--url", "Optional source URL or local reference");
+var opportunityMessagePublishedAtOption = CreateOption<DateTimeOffset?>("--published-at-utc", "Optional source publication timestamp");
+var opportunityMessageQualityOption = CreateOptionWithDefault("--source-quality", 0.55m, "Source quality score in 0..1");
+var opportunityAccountActivityInputOption = CreateRequiredOption<FileInfo>("--input", "Polymarket account activity ingestion request JSON file");
 
 var opportunityScanCommand = new Command("scan", "Scan active Polymarket markets for opportunities");
 opportunityScanCommand.Add(opportunityMinVolumeOption);
@@ -674,6 +681,68 @@ SetAction(opportunityScanCommand, async pr =>
                 pr.GetValue(opportunityMinVolumeOption),
                 pr.GetValue(opportunityMinLiquidityOption),
                 pr.GetValue(opportunityMaxMarketsOption)))
+        .ConfigureAwait(false);
+});
+
+var opportunityIngestMessageCommand = new Command("ingest-message", "Ingest a user-provided message as redacted Manual evidence");
+opportunityIngestMessageCommand.Add(opportunityMessageSourceNameOption);
+opportunityIngestMessageCommand.Add(opportunityMessageTitleOption);
+opportunityIngestMessageCommand.Add(opportunityMessageOption);
+opportunityIngestMessageCommand.Add(opportunityMessageUrlOption);
+opportunityIngestMessageCommand.Add(opportunityMessagePublishedAtOption);
+opportunityIngestMessageCommand.Add(opportunityActorOption);
+opportunityIngestMessageCommand.Add(opportunityMessageQualityOption);
+SetAction(opportunityIngestMessageCommand, async pr =>
+{
+    var options = CreateGlobalOptions(pr);
+    var resolvedConfigPath = ResolveConfigPathFromParse(pr);
+    var message = pr.GetRequiredValue(opportunityMessageOption);
+    return await CommandAuditService.ExecuteWithAuditAsync(
+            "opportunity ingest-message",
+            new
+            {
+                sourceName = pr.GetValue(opportunityMessageSourceNameOption),
+                title = pr.GetRequiredValue(opportunityMessageTitleOption),
+                url = pr.GetValue(opportunityMessageUrlOption),
+                publishedAtUtc = pr.GetValue(opportunityMessagePublishedAtOption),
+                actor = pr.GetValue(opportunityActorOption),
+                sourceQuality = pr.GetValue(opportunityMessageQualityOption),
+                messageLength = message.Length
+            },
+            resolvedConfigPath,
+            host => OpportunityCommands.IngestMessageAsync(
+                CreateContext(host, options),
+                pr.GetValue(opportunityMessageSourceNameOption) ?? "user-message",
+                pr.GetRequiredValue(opportunityMessageTitleOption),
+                message,
+                pr.GetValue(opportunityMessageUrlOption),
+                pr.GetValue(opportunityMessagePublishedAtOption),
+                pr.GetValue(opportunityActorOption) ?? "cli",
+                pr.GetValue(opportunityMessageQualityOption)))
+        .ConfigureAwait(false);
+});
+
+var opportunityIngestAccountActivityCommand = new Command("ingest-account-activity", "Ingest a public Polymarket account activity snapshot as Polymarket evidence");
+opportunityIngestAccountActivityCommand.Add(opportunityAccountActivityInputOption);
+opportunityIngestAccountActivityCommand.Add(opportunityActorOption);
+SetAction(opportunityIngestAccountActivityCommand, async pr =>
+{
+    var options = CreateGlobalOptions(pr);
+    var resolvedConfigPath = ResolveConfigPathFromParse(pr);
+    var input = pr.GetRequiredValue(opportunityAccountActivityInputOption);
+    return await CommandAuditService.ExecuteWithAuditAsync(
+            "opportunity ingest-account-activity",
+            new
+            {
+                inputPath = input.FullName,
+                fileLength = input.Exists ? input.Length : (long?)null,
+                actor = pr.GetValue(opportunityActorOption)
+            },
+            resolvedConfigPath,
+            host => OpportunityCommands.IngestAccountActivityAsync(
+                CreateContext(host, options),
+                input,
+                pr.GetValue(opportunityActorOption) ?? "cli"))
         .ConfigureAwait(false);
 });
 
@@ -875,6 +944,8 @@ SetAction(opportunityPublishCommand, async pr =>
 });
 
 opportunityCommand.Add(opportunityScanCommand);
+opportunityCommand.Add(opportunityIngestMessageCommand);
+opportunityCommand.Add(opportunityIngestAccountActivityCommand);
 opportunityCommand.Add(opportunityListCommand);
 opportunityCommand.Add(opportunityShowCommand);
 opportunityCommand.Add(opportunityScoreCommand);

@@ -289,6 +289,86 @@ public sealed class PolymarketClientContractTests : IClassFixture<MockServerFixt
     }
 
     [Fact]
+    public async Task GetBuilderTradesAsync_AggregatesPaginatedBuilderTrades_FromBuilderEndpoint()
+    {
+        var builderCode = Bytes32('b');
+        const string secondCursor = "NQ==";
+
+        _fixture.Server
+            .Given(Request.Create()
+                .WithPath("/builder/trades")
+                .UsingGet()
+                .WithParam("builder_code", builderCode)
+                .WithParam("market", "market-1")
+                .WithParam("next_cursor", PolymarketConstants.InitialCursor))
+            .RespondWith(Response.Create()
+                .WithStatusCode(200)
+                .WithBody($$"""
+                {
+                  "data": [
+                    {
+                      "id": "builder-trade-1",
+                      "takerOrderHash": "exchange-1",
+                      "market": "market-1",
+                      "assetId": "asset-1",
+                      "side": "BUY",
+                      "size": "10",
+                      "sizeUsdc": "4.2",
+                      "price": "0.42",
+                      "fee": "0.01",
+                      "feeUsdc": "0.01",
+                      "status": "MATCHED",
+                      "builder": "{{builderCode}}"
+                    }
+                  ],
+                  "next_cursor": "{{secondCursor}}",
+                  "limit": 100,
+                  "count": 1
+                }
+                """));
+
+        _fixture.Server
+            .Given(Request.Create()
+                .WithPath("/builder/trades")
+                .UsingGet()
+                .WithParam("builder_code", builderCode)
+                .WithParam("market", "market-1")
+                .WithParam("next_cursor", secondCursor))
+            .RespondWith(Response.Create()
+                .WithStatusCode(200)
+                .WithBody($$"""
+                {
+                  "data": [
+                    {
+                      "id": "builder-trade-2",
+                      "takerOrderHash": "exchange-2",
+                      "market": "market-1",
+                      "assetId": "asset-2",
+                      "side": "BUY",
+                      "size": "5",
+                      "sizeUsdc": "2.6",
+                      "price": "0.52",
+                      "fee": "0.02",
+                      "feeUsdc": "0.02",
+                      "status": "MATCHED",
+                      "builder": "{{builderCode}}"
+                    }
+                  ],
+                  "next_cursor": "LTE=",
+                  "limit": 100,
+                  "count": 1
+                }
+                """));
+
+        var result = await _client.GetBuilderTradesAsync(builderCode, market: "market-1");
+
+        result.IsSuccess.Should().BeTrue();
+        result.Data.Should().NotBeNull();
+        result.Data!.Select(trade => trade.Id).Should().Equal("builder-trade-1", "builder-trade-2");
+        result.Data![0].Builder.Should().Be(builderCode);
+    }
+
+    [Fact]
     public async Task PlaceOrderAsync_SignsRawOrderEnvelope_ToOrderEndpoint()
     {
         _fixture.Server
@@ -621,6 +701,90 @@ public sealed class PolymarketClientContractTests : IClassFixture<MockServerFixt
     }
 
     [Fact]
+    public void BuilderEvidenceExternalVerification_MatchesAttributedBuilderTrades()
+    {
+        var builderCode = Bytes32('b');
+        var evidence = CreateBuilderEvidence(builderCode, "exchange-1");
+        var verification = PolymarketBuilderAttribution.VerifyExternalTrades(
+            evidence,
+            new[]
+            {
+                new BuilderTradeInfo
+                {
+                    Id = "builder-trade-1",
+                    TakerOrderHash = "exchange-1",
+                    Market = "market-1",
+                    Side = "BUY",
+                    Size = "10",
+                    SizeUsdc = "4.2",
+                    Price = "0.42",
+                    Fee = "0.01",
+                    FeeUsdc = "0.01",
+                    Builder = builderCode
+                },
+                new BuilderTradeInfo
+                {
+                    Id = "builder-trade-other",
+                    TakerOrderHash = "exchange-other",
+                    Market = "market-1",
+                    Side = "BUY",
+                    Size = "99",
+                    SizeUsdc = "98.01",
+                    Price = "0.99",
+                    Fee = "1",
+                    FeeUsdc = "1",
+                    Builder = builderCode
+                }
+            },
+            DateTimeOffset.Parse("2026-05-13T00:00:00Z"));
+
+        verification.Status.Should().Be("matched");
+        verification.MatchedTradeIds.Should().Equal("builder-trade-1");
+        verification.MatchedVolumeUsdc.Should().Be("4.2");
+        verification.MatchedFeeUsdc.Should().Be("0.01");
+        verification.VerifiedAtUtc.Should().Be(DateTimeOffset.Parse("2026-05-13T00:00:00Z"));
+    }
+
+    [Fact]
+    public void BuilderEvidenceExternalVerification_DoesNotMatchWrongBuilderOrMarket()
+    {
+        var evidence = CreateBuilderEvidence(Bytes32('b'), "exchange-1");
+        var verification = PolymarketBuilderAttribution.VerifyExternalTrades(
+            evidence,
+            new[]
+            {
+                new BuilderTradeInfo
+                {
+                    Id = "wrong-builder",
+                    TakerOrderHash = "exchange-1",
+                    Market = "market-1",
+                    Side = "BUY",
+                    Size = "10",
+                    Price = "0.42",
+                    Fee = "0.01",
+                    Builder = Bytes32('c')
+                },
+                new BuilderTradeInfo
+                {
+                    Id = "wrong-market",
+                    TakerOrderHash = "exchange-1",
+                    Market = "market-2",
+                    Side = "BUY",
+                    Size = "10",
+                    Price = "0.42",
+                    Fee = "0.01",
+                    Builder = Bytes32('b')
+                }
+            },
+            DateTimeOffset.Parse("2026-05-13T00:00:00Z"));
+
+        verification.Status.Should().Be("not_found");
+        verification.MatchedTradeIds.Should().BeNull();
+        verification.MatchedVolumeUsdc.Should().BeNull();
+        verification.MatchedFeeUsdc.Should().BeNull();
+    }
+
+    [Fact]
     public void PolymarketRateLimitOptions_AreConfigured_WithDisabled()
     {
         // Act
@@ -679,6 +843,26 @@ public sealed class PolymarketClientContractTests : IClassFixture<MockServerFixt
             Timestamp = "1777374000000",
             Builder = builderCode
         };
+    }
+
+    private static PolymarketBuilderAttributionEvidence CreateBuilderEvidence(string builderCode, string exchangeOrderId)
+    {
+        var signer = CreateSigner(builderCode);
+        var signed = signer.CreatePostOrderRequest(CreateOrderRequest(), "client-order-1");
+
+        return PolymarketBuilderAttribution.CreateEvidence(
+            new PolymarketBuilderEvidenceRequest(
+                signed,
+                "client-order-1",
+                "dual_leg_arbitrage",
+                "market-1",
+                Bytes32('c'),
+                "0.42",
+                "10",
+                DateTimeOffset.Parse("2026-05-12T00:00:00Z"),
+                exchangeOrderId,
+                "run-1",
+                "audit-1"));
     }
 
     private static string Bytes32(char fill) => $"0x{new string(fill, 64)}";

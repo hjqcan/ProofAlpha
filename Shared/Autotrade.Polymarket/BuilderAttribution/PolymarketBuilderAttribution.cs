@@ -64,7 +64,11 @@ public sealed record RedactedPolymarketOrderEnvelope(
 
 public sealed record PolymarketBuilderExternalVerification(
     string Status,
-    string Reason);
+    string Reason,
+    IReadOnlyList<string>? MatchedTradeIds = null,
+    string? MatchedVolumeUsdc = null,
+    string? MatchedFeeUsdc = null,
+    DateTimeOffset? VerifiedAtUtc = null);
 
 public static class PolymarketBuilderAttribution
 {
@@ -217,6 +221,58 @@ public static class PolymarketBuilderAttribution
         return $"0x{Convert.ToHexString(bytes).ToLowerInvariant()}";
     }
 
+    public static PolymarketBuilderExternalVerification VerifyExternalTrades(
+        PolymarketBuilderAttributionEvidence evidence,
+        IReadOnlyList<BuilderTradeInfo> builderTrades,
+        DateTimeOffset verifiedAtUtc)
+    {
+        ArgumentNullException.ThrowIfNull(evidence);
+        ArgumentNullException.ThrowIfNull(builderTrades);
+
+        var expectedOrderId = evidence.Correlation.OrderId?.Trim();
+        var candidates = builderTrades
+            .Where(trade => BuilderMatches(evidence.BuilderCodeHash, trade.Builder))
+            .Where(trade => string.Equals(trade.Market, evidence.MarketId, StringComparison.OrdinalIgnoreCase));
+
+        if (!string.IsNullOrWhiteSpace(expectedOrderId))
+        {
+            candidates = candidates.Where(trade =>
+                string.Equals(trade.Id, expectedOrderId, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(trade.TakerOrderHash, expectedOrderId, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(trade.MakerOrderHash, expectedOrderId, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var matches = candidates.ToArray();
+        if (matches.Length == 0)
+        {
+            return new PolymarketBuilderExternalVerification(
+                "not_found",
+                string.IsNullOrWhiteSpace(expectedOrderId)
+                    ? "No builder trade matched the evidence builder hash and market."
+                    : "No builder trade matched the evidence builder hash, market, and order id.",
+                VerifiedAtUtc: verifiedAtUtc);
+        }
+
+        var tradeIds = matches
+            .Select(trade => string.IsNullOrWhiteSpace(trade.Id) ? trade.TakerOrderHash : trade.Id)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var volume = matches.Sum(CalculateTradeNotional);
+        var fee = matches.Sum(ParseNonNegativeDecimalFee);
+
+        return new PolymarketBuilderExternalVerification(
+            "matched",
+            $"Matched {matches.Length} Polymarket builder trade(s) to the Arc signal evidence.",
+            tradeIds,
+            FormatDecimal(volume),
+            FormatDecimal(fee),
+            verifiedAtUtc);
+    }
+
     private static string NormalizeBuilderCode(string? builderCode)
     {
         return string.IsNullOrWhiteSpace(builderCode)
@@ -246,5 +302,64 @@ public static class PolymarketBuilderAttribution
     {
         var json = JsonSerializer.Serialize(value, CanonicalJsonOptions);
         return HashValue(json);
+    }
+
+    private static bool BuilderMatches(string expectedBuilderCodeHash, string builderCode)
+    {
+        if (!IsBytes32Hex(builderCode))
+        {
+            return false;
+        }
+
+        return string.Equals(
+            HashValue(NormalizeBuilderCode(builderCode)),
+            expectedBuilderCodeHash,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static decimal CalculateTradeNotional(BuilderTradeInfo trade)
+    {
+        if (TryParseNonNegativeDecimal(trade.SizeUsdc, out var sizeUsdc))
+        {
+            return sizeUsdc;
+        }
+
+        return TryParseNonNegativeDecimal(trade.Price, out var price) &&
+            TryParseNonNegativeDecimal(trade.Size, out var size)
+            ? price * size
+            : 0m;
+    }
+
+    private static decimal ParseNonNegativeDecimalFee(BuilderTradeInfo trade)
+    {
+        if (TryParseNonNegativeDecimal(trade.FeeUsdc, out var feeUsdc))
+        {
+            return feeUsdc;
+        }
+
+        return TryParseNonNegativeDecimal(trade.Fee, out var fee)
+            ? fee
+            : 0m;
+    }
+
+    private static bool TryParseNonNegativeDecimal(string? value, out decimal result)
+    {
+        if (decimal.TryParse(
+                value,
+                System.Globalization.NumberStyles.Number,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out result) &&
+            result >= 0m)
+        {
+            return true;
+        }
+
+        result = 0m;
+        return false;
+    }
+
+    private static string FormatDecimal(decimal value)
+    {
+        return value.ToString("0.############################", System.Globalization.CultureInfo.InvariantCulture);
     }
 }

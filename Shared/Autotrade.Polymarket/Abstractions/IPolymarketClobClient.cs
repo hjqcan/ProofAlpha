@@ -103,8 +103,20 @@ public interface IPolymarketClobClient
     // ─────────────────────────────────────────────────────────────
 
     /// <summary>
+    /// Get trades attributed to a Polymarket builder code.
+    /// </summary>
+    Task<PolymarketApiResult<IReadOnlyList<BuilderTradeInfo>>> GetBuilderTradesAsync(
+        string builderCode,
+        string? market = null,
+        string? assetId = null,
+        string? tradeId = null,
+        string? before = null,
+        string? after = null,
+        string? nextCursor = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 获取账户余额与授权信息（USDC collateral）。
     /// </summary>
     Task<PolymarketApiResult<BalanceAllowance>> GetBalanceAllowanceAsync(CancellationToken cancellationToken = default);
 }
-

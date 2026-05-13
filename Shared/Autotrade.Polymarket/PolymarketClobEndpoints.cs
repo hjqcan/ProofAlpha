@@ -54,6 +54,7 @@ public static class PolymarketClobEndpoints
     public const string CancelMarketOrders = "/cancel-market-orders";
     public const string GetOpenOrders = "/data/orders";
     public const string GetTrades = "/data/trades";
+    public const string GetBuilderTrades = "/builder/trades";
 
     // Balance & allowance
     public const string GetBalanceAllowance = "/balance-allowance";
@@ -66,4 +67,3 @@ public static class PolymarketClobEndpoints
     // Live activity
     public const string GetMarketTradesEventsPrefix = "/live-activity/events/";
 }
-

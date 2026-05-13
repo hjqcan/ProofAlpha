@@ -230,12 +230,26 @@ Add-Check -Target $checks `
     -Evidence "signal-proof.json, builder-attribution.json, performance-outcome.json, revenue-settlement.json" `
     -Details "strategyAligned=$strategyAligned; signalAligned=$signalAligned."
 
+$builderExternalStatus = [string]$builderEvidence.externalVerification.status
+$builderExternalMatched = $builderExternalStatus -eq "matched" -and
+    $builderEvidence.externalVerification.matchedTradeIds -and
+    $builderEvidence.externalVerification.matchedTradeIds.Count -gt 0
+$builderExternalDemo = $builderExternalStatus -eq "not_used"
+$builderAttributionValid = $builderEvidence.builderCodeHash -and
+    $builderEvidence.orderEnvelope.signatureHash -and
+    ($builderExternalDemo -or $builderExternalMatched)
+$builderAttributionDetails = if ($builderExternalMatched) {
+    "signatureHash present; external builder trades matched=$($builderEvidence.externalVerification.matchedTradeIds.Count)."
+} else {
+    "signatureHash present; raw signature is not included in the public artifact; externalVerification=$builderExternalStatus."
+}
+
 Add-Check -Target $checks `
     -Id "builder-attribution" `
-    -Requirement "Polymarket order evidence carries builder attribution without raw signature leakage." `
-    -Status ($(if ($builderEvidence.builderCodeHash -and $builderEvidence.orderEnvelope.signatureHash -and $builderEvidence.externalVerification.status -eq "not_used") { "Passed" } else { "Failed" })) `
+    -Requirement "Polymarket order evidence carries builder attribution without raw signature leakage; real builder-trades evidence is accepted only when matched." `
+    -Status ($(if ($builderAttributionValid) { "Passed" } else { "Failed" })) `
     -Evidence "artifacts/arc-hackathon/demo-run/builder-attribution.json" `
-    -Details "signatureHash present; raw signature is not included in the public artifact."
+    -Details $builderAttributionDetails
 
 Add-Check -Target $checks `
     -Id "performance-ledger" `

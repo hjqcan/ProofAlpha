@@ -860,6 +860,7 @@ var arcBuilderCreatedAtOption = CreateOption<DateTimeOffset?>("--created-at", "E
 var arcBuilderExchangeOrderIdOption = CreateOption<string?>("--exchange-order-id", "Optional exchange order ID");
 var arcBuilderRunSessionIdOption = CreateOption<string?>("--run-session-id", "Optional strategy run session ID");
 var arcBuilderCommandAuditIdOption = CreateOption<string?>("--command-audit-id", "Optional command audit ID");
+var arcBuilderVerifyTradesOption = CreateOptionWithDefault("--verify-builder-trades", false, "Query Polymarket builder trades and require an external match");
 var arcBuilderOutputOption = CreateOption<FileInfo?>("--output", "Output path for full builder attribution evidence JSON");
 var arcBuilderEnvelopeOutputOption = CreateOption<FileInfo?>("--envelope-output", "Output path for redacted order-envelope JSON");
 
@@ -1095,6 +1096,7 @@ arcBuilderEvidenceCommand.Add(arcBuilderCreatedAtOption);
 arcBuilderEvidenceCommand.Add(arcBuilderExchangeOrderIdOption);
 arcBuilderEvidenceCommand.Add(arcBuilderRunSessionIdOption);
 arcBuilderEvidenceCommand.Add(arcBuilderCommandAuditIdOption);
+arcBuilderEvidenceCommand.Add(arcBuilderVerifyTradesOption);
 arcBuilderEvidenceCommand.Add(arcBuilderOutputOption);
 arcBuilderEvidenceCommand.Add(arcBuilderEnvelopeOutputOption);
 SetAction(arcBuilderEvidenceCommand, async pr =>
@@ -1116,6 +1118,7 @@ SetAction(arcBuilderEvidenceCommand, async pr =>
     var exchangeOrderId = pr.GetValue(arcBuilderExchangeOrderIdOption);
     var runSessionId = pr.GetValue(arcBuilderRunSessionIdOption);
     var commandAuditId = pr.GetValue(arcBuilderCommandAuditIdOption);
+    var verifyBuilderTrades = pr.GetValue(arcBuilderVerifyTradesOption);
     var output = pr.GetValue(arcBuilderOutputOption);
     var envelopeOutput = pr.GetValue(arcBuilderEnvelopeOutputOption);
     return await CommandAuditService.ExecuteWithHostAsync(
@@ -1137,6 +1140,7 @@ SetAction(arcBuilderEvidenceCommand, async pr =>
                 exchangeOrderId,
                 runSessionId,
                 commandAuditId,
+                verifyBuilderTrades,
                 output,
                 envelopeOutput),
             suppressConsoleLogs: options.JsonOutput)

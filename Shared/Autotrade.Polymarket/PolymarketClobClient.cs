@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Autotrade.Polymarket.Abstractions;
+using Autotrade.Polymarket.BuilderAttribution;
 using Autotrade.Polymarket.Http;
 using Autotrade.Polymarket.Models;
 using Autotrade.Polymarket.Options;
@@ -455,6 +456,120 @@ public sealed class PolymarketClobClient : IPolymarketClobClient
     }
 
     // ─────────────────────────────────────────────────────────────
+    // Builder Trades
+    // ─────────────────────────────────────────────────────────────
+
+    public async Task<PolymarketApiResult<IReadOnlyList<BuilderTradeInfo>>> GetBuilderTradesAsync(
+        string builderCode,
+        string? market = null,
+        string? assetId = null,
+        string? tradeId = null,
+        string? before = null,
+        string? after = null,
+        string? nextCursor = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (!PolymarketBuilderAttribution.IsBytes32Hex(builderCode))
+        {
+            throw new ArgumentException("builderCode must be bytes32 hex.", nameof(builderCode));
+        }
+
+        var cursor = string.IsNullOrWhiteSpace(nextCursor)
+            ? PolymarketConstants.InitialCursor
+            : nextCursor;
+
+        if (string.Equals(cursor, PolymarketConstants.EndCursor, StringComparison.Ordinal))
+        {
+            return PolymarketApiResult<IReadOnlyList<BuilderTradeInfo>>.Success(200, Array.Empty<BuilderTradeInfo>());
+        }
+
+        var trades = new List<BuilderTradeInfo>();
+        var seenCursors = new HashSet<string>(StringComparer.Ordinal);
+        var statusCode = 200;
+
+        while (!string.Equals(cursor, PolymarketConstants.EndCursor, StringComparison.Ordinal))
+        {
+            if (!seenCursors.Add(cursor))
+            {
+                return PolymarketApiResult<IReadOnlyList<BuilderTradeInfo>>.Failure(
+                    statusCode,
+                    $"Polymarket /builder/trades pagination cursor did not advance: {cursor}",
+                    rawBody: null);
+            }
+
+            var relativeUrl = BuildBuilderTradesUrl(builderCode, market, assetId, tradeId, before, after, cursor);
+
+            var page = await SendAsync<PaginatedResponse<BuilderTradeInfo>>(
+                HttpMethod.Get,
+                relativeUrl: relativeUrl,
+                signingRequestPath: PolymarketClobEndpoints.GetBuilderTrades,
+                authLevel: PolymarketAuthLevel.None,
+                body: null,
+                nonce: null,
+                cancellationToken).ConfigureAwait(false);
+
+            if (!page.IsSuccess || page.Data is null)
+            {
+                return PolymarketApiResult<IReadOnlyList<BuilderTradeInfo>>.Failure(
+                    page.StatusCode,
+                    page.Error?.Message,
+                    page.Error?.RawBody);
+            }
+
+            statusCode = page.StatusCode;
+
+            if (page.Data.Data is { Count: > 0 } pageTrades)
+            {
+                trades.AddRange(pageTrades);
+            }
+
+            if (string.IsNullOrWhiteSpace(page.Data.NextCursor))
+            {
+                return PolymarketApiResult<IReadOnlyList<BuilderTradeInfo>>.Failure(
+                    statusCode,
+                    "Polymarket /builder/trades response did not include next_cursor",
+                    rawBody: null);
+            }
+
+            cursor = page.Data.NextCursor;
+        }
+
+        return PolymarketApiResult<IReadOnlyList<BuilderTradeInfo>>.Success(statusCode, trades);
+    }
+
+    private static string BuildBuilderTradesUrl(
+        string builderCode,
+        string? market,
+        string? assetId,
+        string? tradeId,
+        string? before,
+        string? after,
+        string nextCursor)
+    {
+        var queryParams = new List<string>
+        {
+            $"builder_code={Uri.EscapeDataString(builderCode.Trim())}"
+        };
+
+        AddQueryParam(queryParams, "market", market);
+        AddQueryParam(queryParams, "asset_id", assetId);
+        AddQueryParam(queryParams, "id", tradeId);
+        AddQueryParam(queryParams, "before", before);
+        AddQueryParam(queryParams, "after", after);
+        queryParams.Add($"next_cursor={Uri.EscapeDataString(nextCursor)}");
+
+        return $"{PolymarketClobEndpoints.GetBuilderTrades}?{string.Join("&", queryParams)}";
+    }
+
+    private static void AddQueryParam(List<string> queryParams, string name, string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            queryParams.Add($"{name}={Uri.EscapeDataString(value.Trim())}");
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // Balance
     // ─────────────────────────────────────────────────────────────
 
@@ -697,4 +812,3 @@ public sealed class PolymarketClobClient : IPolymarketClobClient
         return text.Length <= maxLen ? text : text[..maxLen] + "...(truncated)";
     }
 }
-

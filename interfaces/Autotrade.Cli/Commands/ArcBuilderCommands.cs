@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Autotrade.Cli.Infrastructure;
 using Autotrade.Polymarket;
+using Autotrade.Polymarket.Abstractions;
 using Autotrade.Polymarket.BuilderAttribution;
 using Autotrade.Polymarket.Models;
 using Autotrade.Polymarket.Options;
@@ -38,10 +39,31 @@ public static class ArcBuilderCommands
         string? exchangeOrderId,
         string? runSessionId,
         string? commandAuditId,
+        bool verifyBuilderTrades,
         FileInfo? output,
         FileInfo? envelopeOutput,
         CancellationToken cancellationToken = default)
     {
+        if (verifyBuilderTrades && demo)
+        {
+            OutputFormatter.WriteError(
+                "Builder trades verification requires configured Polymarket credentials and cannot run in demo mode.",
+                "BUILDER_TRADES_VERIFY_REQUIRES_CONFIGURED_MODE",
+                context.GlobalOptions,
+                ExitCodes.ValidationFailed);
+            return ExitCodes.ValidationFailed;
+        }
+
+        if (verifyBuilderTrades && string.IsNullOrWhiteSpace(exchangeOrderId))
+        {
+            OutputFormatter.WriteError(
+                "--exchange-order-id is required when --verify-builder-trades is set.",
+                "BUILDER_TRADES_VERIFY_REQUIRES_ORDER_ID",
+                context.GlobalOptions,
+                ExitCodes.ValidationFailed);
+            return ExitCodes.ValidationFailed;
+        }
+
         var options = ResolveOptions(context, demo, builderCode);
         var orderRequest = new OrderRequest
         {
@@ -72,6 +94,38 @@ public static class ArcBuilderCommands
                     exchangeOrderId,
                     runSessionId,
                     commandAuditId));
+            string? verificationFailure = null;
+
+            if (verifyBuilderTrades)
+            {
+                var clobClient = context.Services.GetRequiredService<IPolymarketClobClient>();
+                var trades = await clobClient.GetBuilderTradesAsync(
+                        signedOrder.Order.Builder,
+                        market: marketId,
+                        cancellationToken: cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (!trades.IsSuccess || trades.Data is null)
+                {
+                    OutputFormatter.WriteError(
+                        $"Polymarket builder trades verification failed: {trades.Error?.Message ?? "empty response"}",
+                        "BUILDER_TRADES_VERIFY_FAILED",
+                        context.GlobalOptions,
+                        ExitCodes.GeneralError);
+                    return ExitCodes.GeneralError;
+                }
+
+                var verification = PolymarketBuilderAttribution.VerifyExternalTrades(
+                    evidence,
+                    trades.Data,
+                    DateTimeOffset.UtcNow);
+                evidence = evidence with { ExternalVerification = verification };
+
+                if (!string.Equals(verification.Status, "matched", StringComparison.OrdinalIgnoreCase))
+                {
+                    verificationFailure = verification.Reason;
+                }
+            }
 
             if (output is not null &&
                 !await WriteJsonAsync(context, output, evidence, cancellationToken).ConfigureAwait(false))
@@ -83,6 +137,16 @@ public static class ArcBuilderCommands
                 !await WriteJsonAsync(context, envelopeOutput, evidence.OrderEnvelope, cancellationToken).ConfigureAwait(false))
             {
                 return ExitCodes.UserCancelled;
+            }
+
+            if (verificationFailure is not null)
+            {
+                OutputFormatter.WriteError(
+                    verificationFailure,
+                    "BUILDER_TRADES_NOT_MATCHED",
+                    context.GlobalOptions,
+                    ExitCodes.ValidationFailed);
+                return ExitCodes.ValidationFailed;
             }
 
             OutputFormatter.WriteSuccess("Polymarket builder attribution evidence exported.", evidence, context.GlobalOptions);

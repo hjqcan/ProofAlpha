@@ -26,6 +26,8 @@ public sealed class OpportunityDiscoveryOptions
 
     public OpenAiWebSearchOptions OpenAiWebSearch { get; set; } = new();
 
+    public PolymarketAccountEvidenceOptions PolymarketAccounts { get; set; } = new();
+
     public void Validate()
     {
         if (!PaperOnly)
@@ -46,6 +48,11 @@ public sealed class OpportunityDiscoveryOptions
         if (FreshEvidenceMaxAgeHours <= 0 || DefaultValidHours <= 0 || MaxMarketsPerScan <= 0 || MaxEvidencePerMarket <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(MaxMarketsPerScan), MaxMarketsPerScan, "Freshness, validity, max markets, and max evidence must be positive.");
+        }
+
+        if (PolymarketAccounts.MaxTradesPerWallet <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(PolymarketAccounts.MaxTradesPerWallet), PolymarketAccounts.MaxTradesPerWallet, "MaxTradesPerWallet must be positive.");
         }
     }
 }
@@ -79,4 +86,19 @@ public sealed class OpenAiWebSearchOptions
     public string Model { get; set; } = "gpt-4.1-mini";
 
     public int MaxResults { get; set; } = 5;
+}
+
+public sealed class PolymarketAccountEvidenceOptions
+{
+    public bool Enabled { get; set; }
+
+    public string BaseUrl { get; set; } = "https://data-api.polymarket.com";
+
+    public List<string> WalletAddresses { get; set; } = new();
+
+    public int MaxTradesPerWallet { get; set; } = 50;
+
+    public bool TakerOnly { get; set; }
+
+    public decimal SourceQuality { get; set; } = 0.72m;
 }

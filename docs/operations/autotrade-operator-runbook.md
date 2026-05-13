@@ -219,6 +219,25 @@ The input file shape is:
 }
 ```
 
+For scan-time mining of watched public Polymarket accounts, configure only
+public wallet addresses. This uses the public Polymarket Data API and does not
+need CLOB credentials:
+
+```json
+{
+  "OpportunityDiscovery": {
+    "PolymarketAccounts": {
+      "Enabled": true,
+      "BaseUrl": "https://data-api.polymarket.com",
+      "WalletAddresses": ["0xabc123abc123abc123abc123abc123abc123abcd"],
+      "MaxTradesPerWallet": 50,
+      "TakerOnly": false,
+      "SourceQuality": 0.72
+    }
+  }
+}
+```
+
 Promotion and suspension are destructive operator actions and require explicit
 reason capture:
 

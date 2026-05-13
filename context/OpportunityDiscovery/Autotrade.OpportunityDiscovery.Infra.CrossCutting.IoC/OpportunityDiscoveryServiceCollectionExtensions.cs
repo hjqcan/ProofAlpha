@@ -50,6 +50,7 @@ public static class OpportunityDiscoveryServiceCollectionExtensions
         services.AddHttpClient<IEvidenceSource, GdeltDocApiSource>();
         services.AddHttpClient<IEvidenceSource, RssFeedSource>();
         services.AddHttpClient<IEvidenceSource, OpenAiWebSearchSource>();
+        services.AddHttpClient<IEvidenceSource, PolymarketAccountTradeSource>();
 
         return services;
     }

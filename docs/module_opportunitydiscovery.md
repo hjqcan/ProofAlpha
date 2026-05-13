@@ -109,6 +109,7 @@ context/OpportunityDiscovery/
     GdeltDocApiSource
     RssFeedSource
     OpenAiWebSearchSource
+    PolymarketAccountTradeSource
 
   Autotrade.OpportunityDiscovery.Infra.BackgroundJobs/
     OpportunityMarketScanJob
@@ -494,6 +495,14 @@ Hangfire jobs：
       "ApiKeyEnvVar": "OPENAI_API_KEY",
       "Model": "gpt-4.1-mini",
       "MaxResults": 5
+    },
+    "PolymarketAccounts": {
+      "Enabled": false,
+      "BaseUrl": "https://data-api.polymarket.com",
+      "WalletAddresses": [],
+      "MaxTradesPerWallet": 50,
+      "TakerOnly": false,
+      "SourceQuality": 0.72
     }
   }
 }

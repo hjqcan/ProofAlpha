@@ -88,6 +88,77 @@ public sealed class EvidenceSourceTests
     }
 
     [Fact]
+    public async Task PolymarketAccountTradeSource_NormalizesPublicWalletTradesForMarket()
+    {
+        const string conditionId = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+        const string json = """
+[
+  {
+    "conditionId": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+    "market": "market-1",
+    "title": "Will candidate alpha win the election?",
+    "outcome": "Yes",
+    "side": "BUY",
+    "price": 0.42,
+    "size": 10,
+    "timestamp": 1770000000,
+    "transactionHash": "0xtx1"
+  },
+  {
+    "conditionId": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+    "market": "market-1",
+    "title": "Will candidate alpha win the election?",
+    "outcome": "Yes",
+    "side": "SELL",
+    "price": "0.55",
+    "size": "4",
+    "timestamp": "2026-02-02T00:00:00Z",
+    "transactionHash": "0xtx2"
+  },
+  {
+    "conditionId": "0xother",
+    "market": "other-market",
+    "title": "Other market",
+    "outcome": "No",
+    "side": "BUY",
+    "price": 0.30,
+    "size": 1,
+    "timestamp": 1770000000
+  }
+]
+""";
+        var handler = new CaptureHttpHandler(json);
+        var source = new PolymarketAccountTradeSource(
+            new HttpClient(handler),
+            Options.Create(new OpportunityDiscoveryOptions
+            {
+                PolymarketAccounts = new PolymarketAccountEvidenceOptions
+                {
+                    Enabled = true,
+                    BaseUrl = "https://data-api.example.com",
+                    WalletAddresses = ["0xabc123abc123abc123abc123abc123abc123abcd"],
+                    MaxTradesPerWallet = 10,
+                    SourceQuality = 0.8m
+                }
+            }));
+        var market = Market() with { ConditionId = conditionId };
+
+        var results = await source.SearchAsync(new EvidenceQuery(Guid.NewGuid(), market, 5));
+
+        var item = Assert.Single(results);
+        Assert.Equal(EvidenceSourceKind.Polymarket, item.SourceKind);
+        Assert.Contains("polymarket_account_trades", item.SourceName, StringComparison.Ordinal);
+        Assert.Contains("/trades?", item.Url, StringComparison.Ordinal);
+        Assert.Contains("market=", handler.RequestUri, StringComparison.Ordinal);
+        Assert.Contains(conditionId, handler.RequestUri, StringComparison.Ordinal);
+        Assert.Contains("\"tradeCount\":2", item.Summary, StringComparison.Ordinal);
+        Assert.Contains("\"signedQuantity\":10", item.Summary, StringComparison.Ordinal);
+        Assert.Contains("\"signedQuantity\":-4", item.Summary, StringComparison.Ordinal);
+        Assert.Contains("0xtx1", item.RawJson, StringComparison.Ordinal);
+        Assert.Equal(0.8m, item.SourceQuality);
+    }
+
+    [Fact]
     public async Task OpenAiWebSearchSource_UsesResponsesWebSearchToolAndAnnotations()
     {
         const string apiKeyEnvVar = "AUTOTRADE_TEST_OPENAI_WEB_SEARCH_KEY";
@@ -190,10 +261,13 @@ public sealed class EvidenceSourceTests
 
         public string RequestBody { get; private set; } = string.Empty;
 
+        public string RequestUri { get; private set; } = string.Empty;
+
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
+            RequestUri = request.RequestUri?.ToString() ?? string.Empty;
             RequestBody = request.Content is null
                 ? string.Empty
                 : await request.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);

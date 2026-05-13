@@ -475,6 +475,11 @@ exportReplayPackageCommand.Add(exportToOption);
 exportReplayPackageCommand.Add(exportLimitOption);
 exportReplayPackageCommand.Add(exportOutputOption);
 SetAction(exportReplayPackageCommand, ExportReplayPackageAsync);
+var exportDualLegReplayDemoCommand = new Command("dual-leg-replay-demo", "Export deterministic two-leg arbitrage replay gate evidence");
+exportDualLegReplayDemoCommand.Add(exportStrategyOption);
+exportDualLegReplayDemoCommand.Add(exportMarketOption);
+exportDualLegReplayDemoCommand.Add(exportOutputOption);
+SetAction(exportDualLegReplayDemoCommand, ExportDualLegReplayDemoAsync);
 
 exportCommand.Add(exportDecisionsCommand);
 exportCommand.Add(exportOrdersCommand);
@@ -484,6 +489,7 @@ exportCommand.Add(exportOrderEventsCommand);
 exportCommand.Add(exportRunReportCommand);
 exportCommand.Add(exportPromotionChecklistCommand);
 exportCommand.Add(exportReplayPackageCommand);
+exportCommand.Add(exportDualLegReplayDemoCommand);
 
 // ============================================================================
 // self-improve command group
@@ -1450,6 +1456,25 @@ async Task<int> ExportReplayPackageAsync(ParseResult pr)
                 from,
                 to,
                 limit,
+                output))
+        .ConfigureAwait(false);
+}
+
+async Task<int> ExportDualLegReplayDemoAsync(ParseResult pr)
+{
+    var options = CreateGlobalOptions(pr);
+    var resolvedConfigPath = ResolveConfigPathFromParse(pr);
+    var strategyId = pr.GetValue(exportStrategyOption);
+    var marketId = pr.GetValue(exportMarketOption);
+    var output = pr.GetValue(exportOutputOption);
+    return await CommandAuditService.ExecuteWithAuditAsync(
+            "export dual-leg-replay-demo",
+            new { strategyId, marketId, output = output?.FullName },
+            resolvedConfigPath,
+            host => ExportCommands.ExportDualLegReplayDemoAsync(
+                CreateContext(host, options),
+                strategyId,
+                marketId,
                 output))
         .ConfigureAwait(false);
 }

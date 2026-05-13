@@ -1,0 +1,46 @@
+ODV2-T003: OpportunityDiscovery v2 Domain and Point-in-Time Evidence
+====================================================================
+
+Status
+------
+[TODO]
+
+
+Goal
+----
+Replace the v1 Candidate/Approved/Published workflow with a replayable v2
+opportunity lifecycle.
+
+
+Domain Model
+------------
+- `OpportunityHypothesis`
+- `OpportunityFeatureSnapshot`
+- `OpportunityScore`
+- `OpportunityEvaluationRun`
+- `OpportunityPromotionGate`
+- `ExecutableOpportunityPolicy`
+- `OpportunityLiveAllocation`
+
+
+Lifecycle
+---------
+`Discovered -> Scored -> BacktestPassed -> PaperValidated -> LiveEligible ->
+LivePublished -> Suspended/Expired`
+
+
+Rules
+-----
+- Existing `MarketOpportunity` can remain for compatibility but must not be the
+  final v2 Live publication source.
+- Every lifecycle transition must record actor/system source, timestamp, reason,
+  and evidence ids.
+- Every hypothesis must link to a source snapshot, market tape slice, prompt
+  version, model version, score version, and replay seed when applicable.
+
+
+Acceptance
+----------
+- Invalid lifecycle transitions throw deterministic domain exceptions.
+- `LivePublished` cannot be reached without passing gate records.
+- Expired or suspended policies are excluded from executable feed.

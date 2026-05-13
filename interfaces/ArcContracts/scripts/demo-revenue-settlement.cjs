@@ -27,6 +27,11 @@ async function main() {
   const chainId = Number(network.chainId);
   const signalId = process.env.ARC_REVENUE_SIGNAL_ID ||
     "0x7cc384e6393c4b85f9340bec439a81eca1d31778996494429c750946c7bb5cff";
+  const strategyId = process.env.ARC_REVENUE_STRATEGY_ID || "repricing_lag_arbitrage";
+  const executionId = process.env.ARC_REVENUE_EXECUTION_ID || null;
+  const runSessionId = process.env.ARC_REVENUE_RUN_SESSION_ID || null;
+  const clientOrderId = process.env.ARC_REVENUE_CLIENT_ORDER_ID || null;
+  const exchangeOrderId = process.env.ARC_REVENUE_EXCHANGE_ORDER_ID || executionId;
   const sourceTransactionHash = process.env.ARC_REVENUE_SOURCE_TX_HASH ||
     "0xf5f60a2de3f184f38ed7b66b919d8f5056c0025f8a70ab9baad9d535b7b6c28d";
   const grossAmountMicroUsdc = process.env.ARC_REVENUE_GROSS_MICRO_USDC || "10000000";
@@ -66,8 +71,15 @@ async function main() {
     sourceKind: "SubscriptionFee",
     simulated: false,
     localEvm: true,
-    strategyId: "repricing_lag_arbitrage",
+    strategyId,
     signalId,
+    executionId,
+    correlation: {
+      arcSignalId: signalId,
+      runSessionId,
+      clientOrderId,
+      exchangeOrderId
+    },
     sourceTransactionHash,
     eventName: "SettlementRecorded",
     settlementId,

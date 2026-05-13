@@ -371,8 +371,17 @@ function New-SecretScan {
                     elseif ($line -match "PrivateKeyEnvironmentVariable|ARC_SETTLEMENT_PRIVATE_KEY") {
                         $allowedReason = "environment variable name only; no private key value is present"
                     }
-                    elseif ($line -match "EnvVar|EnvironmentVariable|OPENAI_API_KEY|[A-Z][A-Z0-9_]*(API_KEY|API_SECRET|PASSPHRASE|PRIVATE_KEY)") {
+                    elseif ($line -match 'EnvVar|EnvironmentVariable|OPENAI_API_KEY|[A-Z][A-Z0-9_]*(API_KEY|API_SECRET|PASSPHRASE|PRIVATE_KEY)|"(API_KEY|API_SECRET|PASSPHRASE|PRIVATE_KEY)"') {
                         $allowedReason = "environment variable name only; no secret value is present"
+                    }
+                    elseif ($relativeForMatch -like "scripts/*" -and $line -match 'Authorization\s*=\s*"Bearer\s+\$') {
+                        $allowedReason = "script uses a runtime API key variable in an Authorization header; no secret value is present"
+                    }
+                    elseif ($relativeForMatch -like "scripts/*" -and $line -match 'IsNullOrWhiteSpace\(\$[A-Za-z0-9_.]*apiKey\)') {
+                        $allowedReason = "script checks whether a runtime API key variable is empty; no secret value is present"
+                    }
+                    elseif ($relativeForMatch -like "scripts/*" -and $line -match '^\s*apiKey\s*=\s*\$[A-Za-z0-9_.]*apiKey\s*$') {
+                        $allowedReason = "script stores a runtime API key variable in local configuration; no secret value is present"
                     }
                     elseif ($relativeForMatch -like "scripts/*" -and $line -match "\[redacted\]|redact|regex\s*=|-match|-notmatch|privateKeyField|apiSecretField|apiKeyField|passphraseField|mnemonicField|hardhatPrivateKey|notForPublicMarker") {
                         $allowedReason = "script scanner pattern, redacted fixture, or redaction policy text; no secret value is present"
@@ -466,6 +475,10 @@ $riskEnvelopeHash = "0x9c7b7b3ccfb4e55ab07a273b974365eb8fcee2659f80f0c9b3b27a2fd
 $unsubscribedWallet = "0x1234567890abcdef1234567890abcdef12345678"
 $subscriptionGrossUsdc = "25"
 $subscriptionGrossMicroUsdc = "25000000"
+$demoRunSessionId = "demo-run-session-phase11"
+$demoClientOrderId = "demo-client-order-phase11"
+$demoExchangeOrderId = "demo-exchange-order-phase11"
+$demoCommandAuditId = "demo-audit-phase11"
 
 $signalProofPath = Join-Path $artifactDir "signal-proof.json"
 $provenanceDir = Join-Path $artifactDir "provenance"
@@ -671,7 +684,7 @@ Invoke-DemoStep `
         "--config", $configPath, "--json", "--yes",
         "arc", "builder", "evidence",
         "--demo",
-        "--client-order-id", "demo-client-order-phase11",
+        "--client-order-id", $demoClientOrderId,
         "--strategy-id", $strategyId,
         "--market-id", $marketId,
         "--arc-signal-id", $signalId,
@@ -681,11 +694,24 @@ Invoke-DemoStep `
         "--size", "10",
         "--time-in-force", "GTC",
         "--created-at", "2026-05-12T00:00:00Z",
-        "--exchange-order-id", "demo-exchange-order-phase11",
-        "--run-session-id", "demo-run-session-phase11",
-        "--command-audit-id", "demo-audit-phase11",
+        "--exchange-order-id", $demoExchangeOrderId,
+        "--run-session-id", $demoRunSessionId,
+        "--command-audit-id", $demoCommandAuditId,
         "--output", (Join-Path $artifactDir "builder-attribution.json"),
         "--envelope-output", (Join-Path $artifactDir "order-envelope-redacted.json")
+    ) `
+    -TimeoutSeconds 600 | Out-Null
+
+Invoke-DemoStep `
+    -Name "Dual-leg deterministic replay gate" `
+    -FilePath $dotnet `
+    -Arguments @(
+        "run", "--no-build", "--project", "interfaces\Autotrade.Cli", "--",
+        "--config", $configPath, "--json", "--yes",
+        "export", "dual-leg-replay-demo",
+        "--strategy-id", $strategyId,
+        "--market-id", $marketId,
+        "--output", (Join-Path $artifactDir "dual-leg-replay.json")
     ) `
     -TimeoutSeconds 600 | Out-Null
 
@@ -698,6 +724,11 @@ Invoke-DemoStep `
         ARC_PERFORMANCE_SIGNAL_ID = $signalId
         ARC_PERFORMANCE_SIGNAL_TX_HASH = [string](Read-JsonFile (Join-Path $artifactDir "signal-publication.json")).transactionHash
         ARC_PERFORMANCE_STRATEGY_ID = $strategyId
+        ARC_PERFORMANCE_MARKET_ID = $marketId
+        ARC_PERFORMANCE_EXECUTION_ID = $demoExchangeOrderId
+        ARC_PERFORMANCE_RUN_SESSION_ID = $demoRunSessionId
+        ARC_PERFORMANCE_CLIENT_ORDER_ID = $demoClientOrderId
+        ARC_PERFORMANCE_EXCHANGE_ORDER_ID = $demoExchangeOrderId
     } `
     -TimeoutSeconds 900 | Out-Null
 Assert-Artifact (Join-Path $tempPerformanceDir "performance-outcome.json")
@@ -712,6 +743,11 @@ Invoke-DemoStep `
     -Environment @{
         ARC_REVENUE_DEMO_RESULT = $tempRevenuePath
         ARC_REVENUE_SIGNAL_ID = $signalId
+        ARC_REVENUE_STRATEGY_ID = $strategyId
+        ARC_REVENUE_EXECUTION_ID = $demoExchangeOrderId
+        ARC_REVENUE_RUN_SESSION_ID = $demoRunSessionId
+        ARC_REVENUE_CLIENT_ORDER_ID = $demoClientOrderId
+        ARC_REVENUE_EXCHANGE_ORDER_ID = $demoExchangeOrderId
         ARC_REVENUE_SOURCE_TX_HASH = $subscriptionTx
         ARC_REVENUE_GROSS_MICRO_USDC = $subscriptionGrossMicroUsdc
     } `
@@ -758,10 +794,36 @@ $performanceOutcome = Read-JsonFile (Join-Path $artifactDir "performance-outcome
 $revenueSettlement = Read-JsonFile (Join-Path $artifactDir "revenue-settlement.json")
 $localClosedLoop = Read-JsonFile (Join-Path $artifactDir "local-evm-closed-loop.json")
 $builderEvidence = Read-JsonFile (Join-Path $artifactDir "builder-attribution.json")
+$dualLegReplay = Read-JsonFile (Join-Path $artifactDir "dual-leg-replay.json")
 $accessDenied = Read-JsonFile (Join-Path $artifactDir "access-denied.json")
 $accessAllowed = Read-JsonFile (Join-Path $artifactDir "access-allowed.json")
 $autoTradePermission = Read-JsonFile (Join-Path $artifactDir "autotrade-permission.json")
 $subscriptionTx = [string]$subscriptionArtifact.transactionHash
+$matchedBuilderTradeIds = @()
+if ($builderEvidence.externalVerification.status -eq "matched" -and $builderEvidence.externalVerification.matchedTradeIds) {
+    $matchedBuilderTradeIds = @($builderEvidence.externalVerification.matchedTradeIds)
+}
+$executionCorrelation = [ordered]@{
+    documentVersion = "proofalpha-arc-execution-correlation.v1"
+    signalId = $signalId
+    strategyId = $strategyId
+    marketId = $marketId
+    runSessionId = $demoRunSessionId
+    clientOrderId = $demoClientOrderId
+    exchangeOrderId = $demoExchangeOrderId
+    commandAuditId = $demoCommandAuditId
+    builderTradeIds = [object[]]$matchedBuilderTradeIds
+    artifacts = [ordered]@{
+        signalProof = "artifacts/arc-hackathon/demo-run/signal-proof.json"
+        signalPublication = "artifacts/arc-hackathon/demo-run/signal-publication.json"
+        builderAttribution = "artifacts/arc-hackathon/demo-run/builder-attribution.json"
+        dualLegReplay = "artifacts/arc-hackathon/demo-run/dual-leg-replay.json"
+        performanceOutcome = "artifacts/arc-hackathon/demo-run/performance-outcome.json"
+        revenueSettlement = "artifacts/arc-hackathon/demo-run/revenue-settlement.json"
+    }
+    generatedAtUtc = (Get-Date).ToUniversalTime().ToString("O")
+}
+Write-JsonFile -Path (Join-Path $artifactDir "execution-correlation.json") -Value $executionCorrelation
 
 Assert-DemoInvariant -Condition ([string]$signalProofArtifact.strategyId -eq $strategyId) -Message "Signal proof strategy id does not match the demo strategy."
 Assert-DemoInvariant -Condition ([string]$signalPublication.signalId -eq $signalId) -Message "Signal publication id does not match the demo signal id."
@@ -771,10 +833,31 @@ Assert-DemoInvariant -Condition ([string]$accessAllowed.data.strategyKey -eq $st
 Assert-DemoInvariant -Condition ([bool]($accessAllowed.data.permissions -contains "RequestPaperAutoTrade")) -Message "Access allowed artifact does not grant paper auto-trade permission."
 Assert-DemoInvariant -Condition ([string]$builderEvidence.arcSignalId -eq $signalId) -Message "Builder attribution artifact is not linked to the demo signal id."
 Assert-DemoInvariant -Condition ([string]$builderEvidence.strategyId -eq $strategyId) -Message "Builder attribution artifact is not linked to the demo strategy id."
+Assert-DemoInvariant -Condition ([string]$builderEvidence.correlation.runSessionId -eq $demoRunSessionId) -Message "Builder attribution artifact is not linked to the demo run session id."
+Assert-DemoInvariant -Condition ([string]$builderEvidence.correlation.clientOrderId -eq $demoClientOrderId) -Message "Builder attribution artifact is not linked to the demo client order id."
+Assert-DemoInvariant -Condition ([string]$builderEvidence.correlation.orderId -eq $demoExchangeOrderId) -Message "Builder attribution artifact is not linked to the demo exchange order id."
+Assert-DemoInvariant -Condition ([string]$dualLegReplay.documentVersion -eq "proofalpha-dual-leg-replay-gate.v1") -Message "Dual-leg replay artifact has an unexpected document version."
+Assert-DemoInvariant -Condition ([string]$dualLegReplay.strategyId -eq $strategyId) -Message "Dual-leg replay artifact is not linked to the demo strategy id."
+Assert-DemoInvariant -Condition ([string]$dualLegReplay.gate.status -eq "Passed") -Message "Dual-leg replay gate did not pass."
+Assert-DemoInvariant -Condition ([bool]$dualLegReplay.acceptedCase.result.accepted) -Message "Dual-leg replay accepted case did not fill both legs."
+Assert-DemoInvariant -Condition ([decimal]$dualLegReplay.acceptedCase.result.netEdgeUsdc -gt 0) -Message "Dual-leg replay accepted case did not produce positive net edge."
+$dualLegRejectedCases = @($dualLegReplay.rejectedCases)
+Assert-DemoInvariant -Condition ($dualLegRejectedCases.Count -eq 3) -Message "Dual-leg replay artifact does not include all required rejected cases."
+Assert-DemoInvariant -Condition (-not [bool]($dualLegRejectedCases | Where-Object { [bool]$_.result.accepted -or -not [bool]$_.passed } | Select-Object -First 1)) -Message "Dual-leg replay rejected cases did not all fail closed."
 Assert-DemoInvariant -Condition ([string]$performanceOutcome.signalId -eq $signalId) -Message "Performance outcome artifact is not linked to the demo signal id."
 Assert-DemoInvariant -Condition ([string]$performanceOutcome.strategyId -eq $strategyId) -Message "Performance outcome artifact is not linked to the demo strategy id."
+Assert-DemoInvariant -Condition ([string]$performanceOutcome.executionId -eq $demoExchangeOrderId) -Message "Performance outcome artifact is not linked to the demo exchange order id."
+Assert-DemoInvariant -Condition ([string]$performanceOutcome.correlation.runSessionId -eq $demoRunSessionId) -Message "Performance outcome artifact is not linked to the demo run session id."
+Assert-DemoInvariant -Condition ([string]$performanceOutcome.correlation.clientOrderId -eq $demoClientOrderId) -Message "Performance outcome artifact is not linked to the demo client order id."
 Assert-DemoInvariant -Condition ([string]$revenueSettlement.signalId -eq $signalId) -Message "Revenue settlement artifact is not linked to the demo signal id."
 Assert-DemoInvariant -Condition ([string]$revenueSettlement.strategyId -eq $strategyId) -Message "Revenue settlement artifact is not linked to the demo strategy id."
+Assert-DemoInvariant -Condition ([string]$revenueSettlement.executionId -eq $demoExchangeOrderId) -Message "Revenue settlement artifact is not linked to the demo exchange order id."
+Assert-DemoInvariant -Condition ([string]$revenueSettlement.correlation.runSessionId -eq $demoRunSessionId) -Message "Revenue settlement artifact is not linked to the demo run session id."
+Assert-DemoInvariant -Condition ([string]$revenueSettlement.correlation.clientOrderId -eq $demoClientOrderId) -Message "Revenue settlement artifact is not linked to the demo client order id."
+Assert-DemoInvariant -Condition ([string]$executionCorrelation.signalId -eq $signalId) -Message "Execution correlation artifact is not linked to the demo signal id."
+Assert-DemoInvariant -Condition ([string]$executionCorrelation.runSessionId -eq $demoRunSessionId) -Message "Execution correlation artifact is not linked to the demo run session id."
+Assert-DemoInvariant -Condition ([string]$executionCorrelation.clientOrderId -eq $demoClientOrderId) -Message "Execution correlation artifact is not linked to the demo client order id."
+Assert-DemoInvariant -Condition ([string]$executionCorrelation.exchangeOrderId -eq $demoExchangeOrderId) -Message "Execution correlation artifact is not linked to the demo exchange order id."
 Assert-DemoInvariant -Condition ([string]$localClosedLoop.signalPublication.signalId -eq $signalId) -Message "Local closed-loop signal is not linked to the demo signal id."
 Assert-DemoInvariant -Condition ([string]$localClosedLoop.signalPublication.strategyId -eq $strategyId) -Message "Local closed-loop signal is not linked to the demo strategy id."
 Assert-DemoInvariant -Condition ([bool]$localClosedLoop.subscription.hasAccess) -Message "Local closed-loop subscription did not grant access."
@@ -794,6 +877,8 @@ $evidence = @(
     (Get-FileEvidence -Path (Join-Path $artifactDir "autotrade-permission.json") -Description "paper auto-trade permission entitlement")
     (Get-FileEvidence -Path (Join-Path $artifactDir "builder-attribution.json") -Description "redacted Polymarket builder attribution evidence")
     (Get-FileEvidence -Path (Join-Path $artifactDir "order-envelope-redacted.json") -Description "redacted signed order envelope hash evidence")
+    (Get-FileEvidence -Path (Join-Path $artifactDir "dual-leg-replay.json") -Description "deterministic two-leg replay gate with positive and rejected cases")
+    (Get-FileEvidence -Path (Join-Path $artifactDir "execution-correlation.json") -Description "single-run signal/order/performance/revenue correlation record")
     (Get-FileEvidence -Path (Join-Path $artifactDir "performance-outcome.json") -Description "local EVM OutcomeRecorded artifact")
     (Get-FileEvidence -Path (Join-Path $artifactDir "agent-reputation.json") -Description "performance/reputation aggregate")
     (Get-FileEvidence -Path (Join-Path $artifactDir "revenue-settlement.json") -Description "local EVM SettlementRecorded artifact")
@@ -821,6 +906,7 @@ $summary.Add("- Access denied allowed flag: ``$($accessDenied.data.hasAccess)``"
 $summary.Add("- Access allowed flag: ``$($accessAllowed.data.hasAccess)``") | Out-Null
 $summary.Add("- Paper auto-trade permission: ``$($autoTradePermission.allowed)``") | Out-Null
 $summary.Add("- Builder evidence signal id: ``$($builderEvidence.arcSignalId)``") | Out-Null
+$summary.Add("- Dual-leg replay gate: ``$($dualLegReplay.gate.status)``") | Out-Null
 $summary.Add("- Performance outcome signal id: ``$($performanceOutcome.signalId)``") | Out-Null
 $summary.Add("- Performance outcome tx: ``$($performanceOutcome.transactionHash)``") | Out-Null
 $summary.Add("- Revenue settlement signal id: ``$($revenueSettlement.signalId)``") | Out-Null

@@ -1,0 +1,53 @@
+ODV2-T002: Source Registry and Official Source Packs
+====================================================
+
+Status
+------
+[TODO]
+
+
+Goal
+----
+Replace flat source-quality scoring with durable source profiles, source
+observations, official confirmations, and conflict tracking.
+
+
+Scope
+-----
+- Add `SourceProfile`, `SourceObservation`, `EvidenceSnapshot`,
+  `EvidenceCitation`, `EvidenceConflict`, and `OfficialConfirmation`.
+- Preserve compatibility with existing `EvidenceItem`.
+- Source profiles must record:
+  - source kind and name
+  - official/non-official classification
+  - expected latency
+  - covered market categories
+  - historical conflict rate
+  - historical contribution to passed gates
+  - current reliability score
+- Implement source packs:
+  - Polymarket market/orderbook/trades
+  - crypto price/oracle
+  - macro official data
+  - SEC filings
+  - weather alerts
+  - sports schedule/injury/result
+  - election/polling
+
+
+Rules
+-----
+- GDELT, RSS, and OpenAI web search may discover leads but may not alone trigger
+  Live eligibility.
+- Official API confirmation or strong multi-source confirmation is required for
+  Live gates.
+- Every evidence snapshot must be point-in-time and immutable.
+
+
+Acceptance
+----------
+- Evidence snapshots can be reconstructed for an opportunity as of creation
+  time.
+- Source conflict is visible in explain output.
+- Non-official news alone cannot pass Live promotion.
+- Source profile updates are append-only or versioned.

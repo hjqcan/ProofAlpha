@@ -1,0 +1,154 @@
+ODV2-T001: MarketData Durable Tape and Replay
+=============================================
+
+Status
+------
+[WIP]
+
+Progress
+--------
+2026-05-13:
+
+- [DONE] Added append-only MarketData tape contracts and entities.
+- [DONE] Added EF mappings, indexes, and migration `AddMarketDataTape`.
+- [DONE] Added `EfMarketTapeRepository` for append, dedup, read, and replay
+  slice queries.
+- [DONE] Added `MarketReplayBacktestRunner` with explicit
+  `top-of-book-degraded-v1` fill model.
+- [DONE] Wired CLOB WebSocket book, price-change, and last-trade events through
+  `IMarketTapeRecorder` without injecting scoped EF contexts into singleton
+  synchronizer.
+- [DONE] Added tests for top tick dedup, as-of replay clamping, and deterministic
+  top-of-book backtest.
+- [TODO] Add CLOB REST polling gap-repair writer.
+- [TODO] Add depth-aware fill model for promotion-grade backtests.
+- [TODO] Add replay export integration for market tape slices.
+
+
+Goal
+----
+Persist enough append-only market data to backtest and replay opportunity
+decisions without forward-looking data.
+
+
+Why This Comes First
+--------------------
+Opportunity quality cannot be measured from current in-memory order book state.
+The system must record historical prices, top-of-book, depth snapshots, trades,
+and resolution events before any scoring or Live promotion claim is meaningful.
+
+
+Scope
+-----
+- Add append-only MarketData entities:
+  - `MarketPriceTick`
+  - `OrderBookTopTick`
+  - `OrderBookDepthSnapshot`
+  - `ClobTradeTick`
+  - `MarketResolutionEvent`
+- Add contract DTOs and repository interfaces:
+  - `IMarketTapeWriter`
+  - `IMarketTapeReader`
+  - `IMarketReplayReader`
+- Add EF Core mappings and indexes in `MarketDataContext`.
+- Add idempotent upsert/append semantics for duplicate WebSocket and polling
+  events.
+- Add deterministic replay primitives for top-of-book slices.
+- Add a minimal backtest runner that computes executable entry/exit opportunity
+  performance from persisted top-of-book ticks.
+
+
+Out of Scope
+------------
+- Source registry.
+- LLM prompt changes.
+- Live publishing.
+- Full order book depth fill model. This task stores depth snapshots and exposes
+  them, but promotion-grade fill modeling belongs to ODV2-T005.
+
+
+Implementation Steps
+--------------------
+1. Domain and contract model
+   - Create MarketData tape entity classes under
+     `Autotrade.MarketData.Domain/Entities`.
+   - Create contract records under
+     `Autotrade.MarketData.Application.Contract/Tape`.
+   - Keep DTOs immutable and avoid exposing EF entities across the contract
+     boundary.
+
+2. EF persistence
+   - Add `DbSet` properties.
+   - Configure numeric precision for price, size, fee, notional, and quantity.
+   - Configure `RawJson` as `jsonb` for Postgres.
+   - Add indexes:
+     - `MarketPriceTicks(MarketId, TokenId, TimestampUtc)`
+     - `OrderBookTopTicks(MarketId, TokenId, TimestampUtc)`
+     - `OrderBookDepthSnapshots(MarketId, TokenId, TimestampUtc)`
+     - `ClobTradeTicks(MarketId, TokenId, TimestampUtc)`
+     - `MarketResolutionEvents(MarketId, ResolvedAtUtc)`
+   - Add unique dedup indexes where source event identity exists:
+     - top ticks: `(MarketId, TokenId, SourceSequence)`
+     - depth snapshots: `(MarketId, TokenId, SnapshotHash, TimestampUtc)`
+     - trades: `(MarketId, TokenId, ExchangeTradeId)`
+
+3. Repository and replay APIs
+   - Implement `EfMarketTapeRepository`.
+   - `Append*Async` must ignore exact duplicates and never mutate existing tape.
+   - `GetTopTicksAsync` must sort ascending by timestamp.
+   - `GetReplaySliceAsync` must clamp data to `asOfUtc`.
+
+4. Ingestion wiring
+   - Add a lightweight `MarketTapeRecorder` that converts CLOB WebSocket events
+     into tape DTOs.
+   - Wire it from `OrderBookSynchronizer` only after repository tests are green.
+   - On write failure, log and emit metrics, but do not break the in-memory
+     order book path.
+
+5. Backtest primitive
+   - Add `MarketReplayBacktestRunner` with top-of-book degraded mode.
+   - Input:
+     - market id
+     - token id
+     - side/outcome
+     - entry max price
+     - take-profit price
+     - stop-loss price
+     - quantity
+     - max notional
+     - from/to/as-of timestamps
+   - Output:
+     - entry fill timestamp and price
+     - exit fill timestamp and price
+     - gross PnL
+     - estimated fees
+     - net PnL
+     - replay seed
+     - completeness notes
+
+
+Acceptance
+----------
+- Duplicate top ticks do not create duplicate rows.
+- Replay reads never include ticks after `asOfUtc`.
+- Replay output is deterministic for the same input.
+- Tests cover append, dedup, ordering, and forward-looking guard.
+- Targeted command passes:
+  - `dotnet test context/MarketData/Autotrade.MarketData.Tests/Autotrade.MarketData.Tests.csproj`
+
+
+Completion Evidence
+-------------------
+- [DONE] Changed files include MarketData tape contracts, tape entities,
+  `MarketDataContext`, `EfMarketTapeRepository`, `ScopedMarketTapeRecorder`,
+  `OrderBookSynchronizer`, DI registration, migration files, and
+  `MarketTapeRepositoryTests`.
+- [DONE] Targeted test passed:
+  `dotnet test context/MarketData/Autotrade.MarketData.Tests/Autotrade.MarketData.Tests.csproj`
+  with 26 passed.
+- [DONE] Full validation passed:
+  `dotnet build` with 0 warnings and 0 errors.
+- [DONE] Full test passed:
+  `dotnet test --no-build` with all listed test assemblies passing.
+- [DONE] Postgres smoke was not run because `AUTOTRADE_TEST_POSTGRES` was not
+  set in this environment.

@@ -4,10 +4,12 @@ using Autotrade.MarketData.Application.Contract.OrderBook;
 using Autotrade.MarketData.Application.Contract.Repositories;
 using Autotrade.MarketData.Application.Contract.Snapshots;
 using Autotrade.MarketData.Application.Contract.Spot;
+using Autotrade.MarketData.Application.Contract.Tape;
 using Autotrade.MarketData.Application.Contract.Windows;
 using Autotrade.MarketData.Application.OrderBook;
 using Autotrade.MarketData.Application.Snapshots;
 using Autotrade.MarketData.Application.Spot;
+using Autotrade.MarketData.Application.Tape;
 using Autotrade.MarketData.Application.WebSocket.Clob;
 using Autotrade.MarketData.Application.WebSocket.Options;
 using Autotrade.MarketData.Application.WebSocket.Rtds;
@@ -70,6 +72,12 @@ public static class MarketDataServiceCollectionExtensions
 
         // 市场目录同步（Gamma API -> MarketCatalog + 持久化）
         services.AddScoped<IMarketRepository, EfMarketRepository>();
+        services.AddScoped<EfMarketTapeRepository>();
+        services.AddScoped<IMarketTapeWriter>(sp => sp.GetRequiredService<EfMarketTapeRepository>());
+        services.AddScoped<IMarketTapeReader>(sp => sp.GetRequiredService<EfMarketTapeRepository>());
+        services.AddScoped<IMarketReplayReader>(sp => sp.GetRequiredService<EfMarketTapeRepository>());
+        services.AddScoped<IMarketReplayBacktestRunner, MarketReplayBacktestRunner>();
+        services.AddSingleton<IMarketTapeRecorder, ScopedMarketTapeRecorder>();
 
         // 订单簿订阅管理（由策略引擎驱动）
         services.AddSingleton<IOrderBookSubscriptionService, OrderBookSubscriptionService>();

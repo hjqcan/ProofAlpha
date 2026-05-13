@@ -1,0 +1,44 @@
+ODV2-T009: Integrated Validation and Operations
+===============================================
+
+Status
+------
+[TODO]
+
+
+Goal
+----
+Close OpportunityDiscovery v2 with build, test, replay, and operator evidence.
+
+
+Required Commands
+-----------------
+- `dotnet restore`
+- `dotnet build`
+- `dotnet test`
+
+
+Optional Smoke
+--------------
+Run Postgres smoke tests only when `AUTOTRADE_TEST_POSTGRES` is set.
+
+
+Evidence Artifacts
+------------------
+- market tape replay fixture
+- source registry fixture
+- scoring fixture
+- promotion gate fixture
+- paper validation report
+- explain output example
+- live micro-allocation dry run
+- operator runbook update
+
+
+Acceptance
+----------
+- Full test suite passes.
+- No warnings are introduced.
+- No secret material is present in config, fixtures, logs, or exported replay.
+- The runbook explicitly says the system seeks measurable positive expected
+  value and does not guarantee profit.

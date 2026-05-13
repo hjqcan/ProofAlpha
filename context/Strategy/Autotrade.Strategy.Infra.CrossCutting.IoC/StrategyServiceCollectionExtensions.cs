@@ -167,6 +167,7 @@ public static class StrategyServiceCollectionExtensions
             sp => sp.GetRequiredService<IPaperRunSessionService>());
         services.AddScoped<IPaperRunReportService, PaperRunReportService>();
         services.AddScoped<IPaperPromotionChecklistService, PaperPromotionChecklistService>();
+        services.AddScoped<IDualLegArbitrageReplayRunner, DualLegArbitrageReplayRunner>();
 
         services.AddScoped<ICommandAuditRepository, CommandAuditRepository>();
         services.AddScoped<ICommandAuditLogger, CommandAuditLogger>();

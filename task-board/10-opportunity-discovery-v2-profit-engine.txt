@@ -1,0 +1,86 @@
+OpportunityDiscovery v2: Profit-Driven Autonomous Opportunity Engine
+====================================================================
+
+Purpose
+-------
+Upgrade OpportunityDiscovery from an LLM research draft workflow into a
+calibrated, replayable, risk-gated opportunity engine that can eventually publish
+very small Live allocations after deterministic validation.
+
+This board does not promise guaranteed profit. It defines the engineering work
+needed to measure whether an opportunity class has positive expected value after
+fees, slippage, liquidity limits, calibration error, source conflict, and risk
+constraints.
+
+
+Non-Negotiable Rules
+--------------------
+1. Market history comes first. No opportunity may be backtested from in-memory
+   order books alone.
+2. Point-in-time evidence is mandatory. Backtest, shadow, paper, and Live gates
+   must only consume information known at the evaluated timestamp.
+3. LLMs may draft hypotheses and summarize evidence. LLMs may not decide fair
+   probability, sizing, publication, or execution.
+4. Strategy hot paths may not call LLMs, source APIs, or the internet.
+5. Live publishing must pass backtest, paper, execution-quality, risk, and
+   compliance gates.
+6. Default Live allocation is micro-sized and cannot auto-scale.
+7. Every promotion, suspension, and Live allocation must be explainable from
+   persisted evidence, score, gate, and allocation records.
+8. No API key, private key, paid source credential, or account secret may be
+   committed.
+
+
+Task Order
+----------
+1. [WIP] ODV2-T001 MarketData durable tape and replay foundation.
+2. [TODO] ODV2-T002 Source registry and official source packs.
+3. [TODO] ODV2-T003 OpportunityDiscovery v2 domain and point-in-time evidence.
+4. [TODO] ODV2-T004 Feature extraction, scoring, and calibration.
+5. [TODO] ODV2-T005 Backtest, shadow, paper, and promotion gates.
+6. [TODO] ODV2-T006 Auto Live micro-allocation and kill criteria.
+7. [TODO] ODV2-T007 LlmOpportunityStrategy v2 executable-policy feed.
+8. [TODO] ODV2-T008 CLI/API explainability and operator controls.
+9. [TODO] ODV2-T009 Integrated validation, operations, and release evidence.
+
+
+Current Implementation Slice
+----------------------------
+The first implementation slice is ODV2-T001:
+
+- add append-only market tape entities and EF mapping;
+- add repository contracts for tape writes and replay reads;
+- add deterministic replay/backtest primitives over persisted top-of-book ticks;
+- add tests proving no forward-looking replay reads.
+
+2026-05-13 update: this slice now has passing repository/replay/backtest tests,
+an EF migration, and WebSocket recorder wiring. It remains [WIP] until CLOB REST
+gap repair, depth-aware fill modeling, and replay export integration are added.
+Do not start source packs, scoring, or Live allocation before those remaining
+MarketData tape items are closed.
+
+
+Acceptance Evidence
+-------------------
+Each closed task must record:
+
+- code paths changed;
+- tests added or updated;
+- exact validation command output summary;
+- residual risk, if any;
+- whether any Postgres smoke test was skipped because `AUTOTRADE_TEST_POSTGRES`
+  was not set.
+
+
+Detailed Breakdown
+------------------
+- `task-board/opportunity-discovery-v2-profit-engine/00-README.txt`
+- `task-board/opportunity-discovery-v2-profit-engine/01-marketdata-durable-tape-and-replay.txt`
+- `task-board/opportunity-discovery-v2-profit-engine/02-source-registry-and-official-packs.txt`
+- `task-board/opportunity-discovery-v2-profit-engine/03-v2-domain-and-point-in-time-evidence.txt`
+- `task-board/opportunity-discovery-v2-profit-engine/04-feature-scoring-calibration.txt`
+- `task-board/opportunity-discovery-v2-profit-engine/05-backtest-shadow-paper-gates.txt`
+- `task-board/opportunity-discovery-v2-profit-engine/06-auto-live-micro-allocation.txt`
+- `task-board/opportunity-discovery-v2-profit-engine/07-strategy-v2-executable-policy.txt`
+- `task-board/opportunity-discovery-v2-profit-engine/08-cli-api-explainability.txt`
+- `task-board/opportunity-discovery-v2-profit-engine/09-integrated-validation-and-ops.txt`

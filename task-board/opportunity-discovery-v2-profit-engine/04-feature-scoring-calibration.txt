@@ -1,0 +1,49 @@
+ODV2-T004: Feature Extraction, Scoring, and Calibration
+=======================================================
+
+Status
+------
+[TODO]
+
+
+Goal
+----
+Make opportunity quality deterministic, auditable, and calibratable.
+
+
+Scoring Formula
+---------------
+`netEdge = fairProbability - executableEntryPrice - feeEstimate - slippageBuffer`
+
+
+Feature Areas
+-------------
+- evidence confidence
+- official confirmation strength
+- model calibration bucket
+- liquidity capacity
+- spread and market impact
+- time half-life
+- source conflict
+- resolution risk
+- execution freshness
+- market closure and settlement ambiguity
+
+
+Opportunity Types
+-----------------
+- information asymmetry
+- order book microstructure
+- cross-market or same-event consistency
+- delayed repricing
+- near-resolution
+- liquidity mismatch
+
+
+Acceptance
+----------
+- No positive `netEdge`, no promotion.
+- No executable capacity, no promotion.
+- LLM fair probability is a feature input, not final authority.
+- Score breakdown is persisted and explainable.
+- Calibration can compare scored probability against market-implied baseline.

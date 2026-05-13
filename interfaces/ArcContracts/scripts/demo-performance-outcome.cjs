@@ -19,6 +19,11 @@ async function main() {
   const strategyId = process.env.ARC_PERFORMANCE_STRATEGY_ID ||
     signalPublication?.strategyId ||
     "repricing_lag_arbitrage";
+  const marketId = process.env.ARC_PERFORMANCE_MARKET_ID || "demo-polymarket-market";
+  const executionId = process.env.ARC_PERFORMANCE_EXECUTION_ID || "paper-order-phase7-loss-0001";
+  const runSessionId = process.env.ARC_PERFORMANCE_RUN_SESSION_ID || null;
+  const clientOrderId = process.env.ARC_PERFORMANCE_CLIENT_ORDER_ID || null;
+  const exchangeOrderId = process.env.ARC_PERFORMANCE_EXCHANGE_ORDER_ID || executionId;
   const exportedAtUtc = new Date().toISOString();
   const network = await hre.ethers.provider.getNetwork();
   const chainId = Number(network.chainId);
@@ -52,9 +57,15 @@ async function main() {
     eventName: "OutcomeRecorded",
     outcomeId: outcomeHash,
     signalId,
-    executionId: "paper-order-phase7-loss-0001",
+    executionId,
     strategyId,
-    marketId: "demo-polymarket-market",
+    marketId,
+    correlation: {
+      arcSignalId: signalId,
+      runSessionId,
+      clientOrderId,
+      exchangeOrderId
+    },
     status: "ExecutedLoss",
     realizedPnlBps: -12,
     slippageBps: 3,

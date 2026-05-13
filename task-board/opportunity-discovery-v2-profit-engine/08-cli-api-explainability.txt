@@ -1,0 +1,46 @@
+ODV2-T008: CLI/API Explainability and Operator Controls
+=======================================================
+
+Status
+------
+[TODO]
+
+
+Goal
+----
+Expose score, replay, promotion, Live status, suspension, and explanation flows
+without requiring direct database inspection.
+
+
+CLI Commands
+------------
+- `opportunity score --id <id>`
+- `opportunity replay --id <id>`
+- `opportunity promote --id <id>`
+- `opportunity live-status`
+- `opportunity suspend --id <id> --reason <reason>`
+- `opportunity explain --id <id>`
+
+
+Explain Output
+--------------
+- evidence snapshot
+- source profile versions
+- source conflicts
+- market tape timestamps
+- price and order book snapshot
+- model and prompt version
+- score version
+- score breakdown
+- expected EV
+- executable capacity
+- gate results
+- allocation state
+- risk and compliance reasons
+
+
+Acceptance
+----------
+- CLI and API return the same contract shape.
+- Explain output is redacted for secrets.
+- Operators can suspend an opportunity without deleting evidence.

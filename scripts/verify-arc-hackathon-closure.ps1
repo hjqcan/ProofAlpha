@@ -59,6 +59,24 @@ function Read-JsonFile {
     return Get-Content -Raw -LiteralPath $Path | ConvertFrom-Json
 }
 
+function Get-OptionalProperty {
+    param(
+        [Parameter(Mandatory = $true)]$Object,
+        [Parameter(Mandatory = $true)][string]$Name
+    )
+
+    if ($null -eq $Object) {
+        return $null
+    }
+
+    $property = $Object.PSObject.Properties[$Name]
+    if ($null -eq $property) {
+        return $null
+    }
+
+    return $property.Value
+}
+
 function Add-Check {
     param(
         [Parameter(Mandatory = $true)]$Target,
@@ -110,6 +128,8 @@ $accessDenied = Read-JsonFile (Join-Path $artifactDir "access-denied.json")
 $accessAllowed = Read-JsonFile (Join-Path $artifactDir "access-allowed.json")
 $autoTradePermission = Read-JsonFile (Join-Path $artifactDir "autotrade-permission.json")
 $builderEvidence = Read-JsonFile (Join-Path $artifactDir "builder-attribution.json")
+$dualLegReplay = Read-JsonFile (Join-Path $artifactDir "dual-leg-replay.json")
+$executionCorrelation = Read-JsonFile (Join-Path $artifactDir "execution-correlation.json")
 $performanceOutcome = Read-JsonFile (Join-Path $artifactDir "performance-outcome.json")
 $agentReputation = Read-JsonFile (Join-Path $artifactDir "agent-reputation.json")
 $revenueSettlement = Read-JsonFile (Join-Path $artifactDir "revenue-settlement.json")
@@ -150,7 +170,7 @@ else {
 $commandStatus = if ($hasPassedSummary -and -not $hasFailedCommand) { "Passed" } else { "Failed" }
 Add-Check -Target $checks `
     -Id "command-gate" `
-    -Requirement "Build, contract tests, .NET tests, WebApp build, screenshots, and demo commands must pass." `
+    -Requirement "Build, contract tests, .NET tests, deterministic two-leg replay gate, WebApp build, screenshots, and demo commands must pass." `
     -Status $commandStatus `
     -Evidence "artifacts/arc-hackathon/demo-run/demo-summary.md" `
     -Details "$restoreDetail; failedOrTimedOutCommands=$hasFailedCommand."
@@ -223,12 +243,41 @@ $strategyAligned = $builderEvidence.strategyId -eq $strategyId -and
 $signalAligned = $builderEvidence.arcSignalId -eq $signalId -and
     $performanceOutcome.signalId -eq $signalId -and
     $revenueSettlement.signalId -eq $signalId
+$builderCorrelation = Get-OptionalProperty $builderEvidence "correlation"
+$performanceCorrelation = Get-OptionalProperty $performanceOutcome "correlation"
+$revenueCorrelation = Get-OptionalProperty $revenueSettlement "correlation"
+$correlationSignalId = [string](Get-OptionalProperty $executionCorrelation "signalId")
+$correlationRunSessionId = [string](Get-OptionalProperty $executionCorrelation "runSessionId")
+$correlationClientOrderId = [string](Get-OptionalProperty $executionCorrelation "clientOrderId")
+$correlationExchangeOrderId = [string](Get-OptionalProperty $executionCorrelation "exchangeOrderId")
+$builderRunSessionId = [string](Get-OptionalProperty $builderCorrelation "runSessionId")
+$builderClientOrderId = [string](Get-OptionalProperty $builderCorrelation "clientOrderId")
+$builderExchangeOrderId = [string](Get-OptionalProperty $builderCorrelation "orderId")
+$performanceExecutionId = [string](Get-OptionalProperty $performanceOutcome "executionId")
+$performanceRunSessionId = [string](Get-OptionalProperty $performanceCorrelation "runSessionId")
+$performanceClientOrderId = [string](Get-OptionalProperty $performanceCorrelation "clientOrderId")
+$revenueExecutionId = [string](Get-OptionalProperty $revenueSettlement "executionId")
+$revenueRunSessionId = [string](Get-OptionalProperty $revenueCorrelation "runSessionId")
+$revenueClientOrderId = [string](Get-OptionalProperty $revenueCorrelation "clientOrderId")
+$correlationSignalAligned = $correlationSignalId -eq $signalId
+$runCorrelationAligned = -not [string]::IsNullOrWhiteSpace($correlationRunSessionId) -and
+    -not [string]::IsNullOrWhiteSpace($correlationClientOrderId) -and
+    -not [string]::IsNullOrWhiteSpace($correlationExchangeOrderId) -and
+    $correlationRunSessionId -eq $builderRunSessionId -and
+    $correlationClientOrderId -eq $builderClientOrderId -and
+    $correlationExchangeOrderId -eq $builderExchangeOrderId -and
+    $performanceExecutionId -eq $correlationExchangeOrderId -and
+    $performanceRunSessionId -eq $correlationRunSessionId -and
+    $performanceClientOrderId -eq $correlationClientOrderId -and
+    $revenueExecutionId -eq $correlationExchangeOrderId -and
+    $revenueRunSessionId -eq $correlationRunSessionId -and
+    $revenueClientOrderId -eq $correlationClientOrderId
 Add-Check -Target $checks `
     -Id "cross-artifact-linkage" `
-    -Requirement "Signal, builder evidence, performance outcome, and revenue settlement must link the same strategy and signal." `
-    -Status ($(if ($strategyAligned -and $signalAligned) { "Passed" } else { "Failed" })) `
-    -Evidence "signal-proof.json, builder-attribution.json, performance-outcome.json, revenue-settlement.json" `
-    -Details "strategyAligned=$strategyAligned; signalAligned=$signalAligned."
+    -Requirement "Signal, builder evidence, performance outcome, revenue settlement, and execution correlation must link the same strategy, signal, run session, client order, and exchange order." `
+    -Status ($(if ($strategyAligned -and $signalAligned -and $correlationSignalAligned -and $runCorrelationAligned) { "Passed" } else { "Failed" })) `
+    -Evidence "signal-proof.json, builder-attribution.json, execution-correlation.json, performance-outcome.json, revenue-settlement.json" `
+    -Details "strategyAligned=$strategyAligned; signalAligned=$signalAligned; correlationSignalAligned=$correlationSignalAligned; runCorrelationAligned=$runCorrelationAligned."
 
 $builderExternalStatus = [string]$builderEvidence.externalVerification.status
 $builderExternalMatched = $builderExternalStatus -eq "matched" -and
@@ -250,6 +299,27 @@ Add-Check -Target $checks `
     -Status ($(if ($builderAttributionValid) { "Passed" } else { "Failed" })) `
     -Evidence "artifacts/arc-hackathon/demo-run/builder-attribution.json" `
     -Details $builderAttributionDetails
+
+$dualLegRejectedCases = @($dualLegReplay.rejectedCases)
+$dualLegReplayGateValid = [string]$dualLegReplay.documentVersion -eq "proofalpha-dual-leg-replay-gate.v1" -and
+    [string]$dualLegReplay.strategyId -eq $strategyId -and
+    [string]$dualLegReplay.fillModelVersion -eq "two-leg-depth-aware-fok-v1" -and
+    [string]$dualLegReplay.gate.status -eq "Passed" -and
+    [bool]$dualLegReplay.acceptedCase.result.accepted -and
+    [decimal]$dualLegReplay.acceptedCase.result.quantity -ge [decimal]$dualLegReplay.acceptedCase.request.minOrderQuantity -and
+    [decimal]$dualLegReplay.acceptedCase.result.netEdgeUsdc -gt 0 -and
+    [decimal]$dualLegReplay.acceptedCase.result.slippageAdjustedPairCost + [decimal]$dualLegReplay.acceptedCase.result.feePerUnit -lt [decimal]$dualLegReplay.acceptedCase.request.pairCostThreshold -and
+    $dualLegRejectedCases.Count -eq 3 -and
+    -not [bool]($dualLegRejectedCases | Where-Object { [bool]$_.result.accepted -or -not [bool]$_.passed } | Select-Object -First 1) -and
+    [bool]($dualLegRejectedCases | Where-Object { [string]$_.id -eq "reject-fee-slippage-false-edge" -and ($_.result.rejectionReasons -match "Pair cost") } | Select-Object -First 1) -and
+    [bool]($dualLegRejectedCases | Where-Object { [string]$_.id -eq "reject-shallow-opposite-leg-depth" -and ($_.result.rejectionReasons -match "below min") } | Select-Object -First 1) -and
+    [bool]($dualLegRejectedCases | Where-Object { [string]$_.id -eq "reject-stale-opposite-leg-quote" -and ($_.result.rejectionReasons -match "Quote age") } | Select-Object -First 1)
+Add-Check -Target $checks `
+    -Id "dual-leg-replay-gate" `
+    -Requirement "Two-leg arbitrage execution must be proven by deterministic replay: a positive YES/NO depth fill survives fees and slippage, while false-edge, shallow-depth, and stale-quote cases fail closed." `
+    -Status ($(if ($dualLegReplayGateValid) { "Passed" } else { "Failed" })) `
+    -Evidence "artifacts/arc-hackathon/demo-run/dual-leg-replay.json, DualLegArbitrageReplayRunnerTests.cs" `
+    -Details "gate=$($dualLegReplay.gate.status); accepted=$($dualLegReplay.acceptedCase.result.accepted); netEdgeUsdc=$($dualLegReplay.acceptedCase.result.netEdgeUsdc); rejectedCases=$($dualLegRejectedCases.Count)."
 
 Add-Check -Target $checks `
     -Id "performance-ledger" `

@@ -1,0 +1,48 @@
+ODV2-T005: Backtest, Shadow, Paper, and Promotion Gates
+=======================================================
+
+Status
+------
+[TODO]
+
+
+Goal
+----
+Create the closed validation loop before any automatic Live publication.
+
+
+Gates
+-----
+- Backtest gate
+- Shadow gate
+- Paper gate
+- Execution-quality gate
+- Risk gate
+- Compliance gate
+
+
+Default Thresholds
+------------------
+- At least 100 evaluable samples in the same opportunity bucket, or 14 days of
+  shadow/paper observation.
+- Net paper PnL greater than 0.
+- Brier/calibration better than market-implied baseline.
+- Adverse slippage consumes no more than 25% of predicted edge.
+- No critical risk event.
+- No source drift or model calibration drift beyond configured threshold.
+
+
+Backtest Rules
+--------------
+- No future evidence.
+- No future price data.
+- Fill model must align with historical order book depth when depth exists.
+- Same replay seed and same inputs must produce same outputs.
+
+
+Acceptance
+----------
+- A failing gate prevents `LiveEligible`.
+- Gate result includes evidence ids, metrics, thresholds, and explanation.
+- Paper report, slippage, PnL, risk, and live arming infrastructure are reused
+  instead of duplicated.

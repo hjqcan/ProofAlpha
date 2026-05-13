@@ -11,6 +11,7 @@ const webRoot = path.join(repoRoot, 'interfaces/WebApp')
 const distRoot = path.join(webRoot, 'dist')
 const screenshotRoot = path.join(repoRoot, 'artifacts/arc-hackathon/screenshots')
 const artifactRoot = path.join(repoRoot, 'artifacts/arc-hackathon/demo-run')
+const requestedBrowserChannel = process.env.ARC_WEBAPP_BROWSER_CHANNEL?.trim() || null
 const require = createRequire(path.join(webRoot, 'package.json'))
 const { chromium } = require('@playwright/test')
 
@@ -360,7 +361,8 @@ const provenance = {
 await mkdir(screenshotRoot, { recursive: true })
 const server = await startStaticServer()
 const baseUrl = `http://127.0.0.1:${server.address().port}`
-const browser = await launchBrowser()
+const browserLaunch = await launchBrowser()
+const browser = browserLaunch.browser
 const page = await browser.newPage({ viewport: { width: 1440, height: 980 } })
 const consoleFailures = []
 
@@ -422,6 +424,7 @@ if (consoleFailures.length > 0) {
 }
 
 console.log(JSON.stringify({
+  browser: browserLaunch.evidence,
   blockedScreenshot,
   unlockedScreenshot,
   signalProofScreenshot,
@@ -658,8 +661,26 @@ async function assertNoHorizontalOverflow(pageToCheck, label) {
 }
 
 async function launchBrowser() {
+  if (requestedBrowserChannel) {
+    return {
+      browser: await chromium.launch({ channel: requestedBrowserChannel }),
+      evidence: {
+        engine: 'chromium',
+        channel: requestedBrowserChannel,
+        source: 'ARC_WEBAPP_BROWSER_CHANNEL'
+      }
+    }
+  }
+
   try {
-    return await chromium.launch()
+    return {
+      browser: await chromium.launch(),
+      evidence: {
+        engine: 'chromium',
+        channel: 'bundled',
+        source: 'playwright-default'
+      }
+    }
   } catch (error) {
     const candidates = [
       'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
@@ -670,7 +691,15 @@ async function launchBrowser() {
     for (const executablePath of candidates) {
       try {
         await access(executablePath)
-        return await chromium.launch({ executablePath })
+        return {
+          browser: await chromium.launch({ executablePath }),
+          evidence: {
+            engine: 'chromium',
+            channel: executablePath.includes('Chrome') ? 'chrome-executable' : 'edge-executable',
+            executablePath,
+            source: 'local-executable-fallback'
+          }
+        }
       } catch {
         // Try the next locally installed browser.
       }

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Autotrade.MarketData.Application.Contract.WebSocket;
 using Autotrade.MarketData.Application.Contract.WebSocket.Events;
+using Autotrade.MarketData.Application.Contract.Tape;
 using Autotrade.MarketData.Application.Observability;
 using Autotrade.MarketData.Application.WebSocket.Clob;
 using Autotrade.MarketData.Application.WebSocket.Core;
@@ -17,6 +18,7 @@ public sealed class OrderBookSynchronizer : IOrderBookSynchronizer, IDisposable
     private readonly ILocalOrderBookStore _orderBookStore;
     private readonly IClobMarketClient _clobMarketClient;
     private readonly ILogger<OrderBookSynchronizer> _logger;
+    private readonly IMarketTapeRecorder? _tapeRecorder;
 
     /// <summary>
     /// 每个资产的同步状态。
@@ -41,11 +43,13 @@ public sealed class OrderBookSynchronizer : IOrderBookSynchronizer, IDisposable
     public OrderBookSynchronizer(
         ILocalOrderBookStore orderBookStore,
         IClobMarketClient clobMarketClient,
-        ILogger<OrderBookSynchronizer> logger)
+        ILogger<OrderBookSynchronizer> logger,
+        IMarketTapeRecorder? tapeRecorder = null)
     {
         _orderBookStore = orderBookStore ?? throw new ArgumentNullException(nameof(orderBookStore));
         _clobMarketClient = clobMarketClient ?? throw new ArgumentNullException(nameof(clobMarketClient));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _tapeRecorder = tapeRecorder;
 
         // 修复：订阅连接状态变更，断线时重置所有资产的快照状态
         _clobMarketClient.StateChanged += OnConnectionStateChanged;
@@ -85,6 +89,17 @@ public sealed class OrderBookSynchronizer : IOrderBookSynchronizer, IDisposable
             {
                 await HandlePriceChangeEventAsync(assetId, priceChangeEvent).ConfigureAwait(false);
             });
+
+            if (_tapeRecorder is not null)
+            {
+                state.LastTradePriceDisposable = _clobMarketClient.OnLastTradePrice(async tradeEvent =>
+                {
+                    if (string.Equals(tradeEvent.AssetId, assetId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        await _tapeRecorder.RecordLastTradePriceEventAsync(tradeEvent).ConfigureAwait(false);
+                    }
+                });
+            }
         }
 
         // 订阅 WebSocket
@@ -215,13 +230,13 @@ public sealed class OrderBookSynchronizer : IOrderBookSynchronizer, IDisposable
         }
     }
 
-    private Task HandleBookEventAsync(string assetId, ClobBookEvent bookEvent)
+    private async Task HandleBookEventAsync(string assetId, ClobBookEvent bookEvent)
     {
         using var activity = MarketDataActivitySource.StartOrderBookUpdate(assetId, isSnapshot: true);
 
         if (!_syncStates.TryGetValue(assetId, out var state))
         {
-            return Task.CompletedTask;
+            return;
         }
 
         try
@@ -231,7 +246,7 @@ public sealed class OrderBookSynchronizer : IOrderBookSynchronizer, IDisposable
             {
                 // 相同的快照，可能是重复推送，跳过
                 _logger.LogDebug("收到重复快照（Hash 相同），跳过: {AssetId}, Hash={Hash}", assetId, bookEvent.Hash);
-                return Task.CompletedTask;
+                return;
             }
 
             // 应用快照
@@ -271,14 +286,16 @@ public sealed class OrderBookSynchronizer : IOrderBookSynchronizer, IDisposable
 
             // 触发事件
             OnOrderBookUpdated(assetId, isSnapshot: true);
+            if (_tapeRecorder is not null)
+            {
+                await _tapeRecorder.RecordBookEventAsync(bookEvent).ConfigureAwait(false);
+            }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "处理订单簿快照异常: {AssetId}", assetId);
             MarketDataMetrics.Errors.Add(1, new KeyValuePair<string, object?>("type", "snapshot_processing"));
         }
-
-        return Task.CompletedTask;
     }
 
     private async Task HandlePriceChangeEventAsync(string assetId, ClobPriceChangeEvent priceChangeEvent)
@@ -350,6 +367,10 @@ public sealed class OrderBookSynchronizer : IOrderBookSynchronizer, IDisposable
 
             // 触发事件
             OnOrderBookUpdated(assetId, isSnapshot: false);
+            if (_tapeRecorder is not null)
+            {
+                await _tapeRecorder.RecordPriceChangeEventAsync(priceChangeEvent).ConfigureAwait(false);
+            }
         }
         catch (Exception ex)
         {
@@ -478,6 +499,7 @@ public sealed class OrderBookSynchronizer : IOrderBookSynchronizer, IDisposable
 
         public IDisposable? BookDisposable { get; set; }
         public IDisposable? PriceChangeDisposable { get; set; }
+        public IDisposable? LastTradePriceDisposable { get; set; }
 
         public AssetSyncState(string assetId)
         {
@@ -488,6 +510,7 @@ public sealed class OrderBookSynchronizer : IOrderBookSynchronizer, IDisposable
         {
             BookDisposable?.Dispose();
             PriceChangeDisposable?.Dispose();
+            LastTradePriceDisposable?.Dispose();
         }
     }
 }

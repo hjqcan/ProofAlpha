@@ -4,11 +4,13 @@
 
 using System.Text.Json;
 using System.Globalization;
+using Autotrade.MarketData.Application.Contract.Tape;
 using Autotrade.Strategy.Application.Contract.Strategies;
 using Autotrade.Strategy.Application.Audit;
 using Autotrade.Strategy.Application.Decisions;
 using Autotrade.Strategy.Application.Promotion;
 using Autotrade.Strategy.Application.RunReports;
+using Autotrade.Strategy.Application.Strategies.DualLeg;
 using Autotrade.Trading.Application.Contract.Repositories;
 using Autotrade.Cli.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,6 +22,11 @@ namespace Autotrade.Cli.Commands;
 /// </summary>
 public static class ExportCommands
 {
+    private static readonly JsonSerializerOptions ReplayDemoJsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        WriteIndented = true
+    };
+
     /// <summary>
     /// 导出策略决策日志。
     /// </summary>
@@ -326,6 +333,256 @@ public static class ExportCommands
 
         var payload = JsonSerializer.Serialize(package, new JsonSerializerOptions { WriteIndented = true });
         return await WriteOutputAsync(context, payload, output).ConfigureAwait(false);
+    }
+
+    public static async Task<int> ExportDualLegReplayDemoAsync(
+        CommandContext context,
+        string? strategyId,
+        string? marketId,
+        FileInfo? output)
+    {
+        var now = new DateTimeOffset(2026, 5, 13, 0, 0, 0, TimeSpan.Zero);
+        var resolvedStrategyId = string.IsNullOrWhiteSpace(strategyId)
+            ? "dual_leg_arbitrage"
+            : strategyId;
+        var resolvedMarketId = string.IsNullOrWhiteSpace(marketId)
+            ? "demo-polymarket-dual-leg-market"
+            : marketId;
+        const string yesTokenId = "demo-yes-token";
+        const string noTokenId = "demo-no-token";
+
+        var acceptedRequest = CreateDualLegReplayRequest(now, resolvedMarketId, yesTokenId, noTokenId);
+        var accepted = await RunDualLegFixtureAsync(
+                acceptedRequest,
+                Slice(resolvedMarketId, yesTokenId, Depth(resolvedMarketId, yesTokenId, now, "accepted-yes-1", Ask(0.42m, 12m))),
+                Slice(resolvedMarketId, noTokenId, Depth(resolvedMarketId, noTokenId, now, "accepted-no-1", Ask(0.53m, 12m))))
+            .ConfigureAwait(false);
+
+        var falseEdgeRequest = acceptedRequest with
+        {
+            MaxSlippage = 0.02m,
+            FeeRateBps = 20m
+        };
+        var falseEdge = await RunDualLegFixtureAsync(
+                falseEdgeRequest,
+                Slice(resolvedMarketId, yesTokenId, Depth(resolvedMarketId, yesTokenId, now, "false-edge-yes-1", Ask(0.49m, 20m))),
+                Slice(resolvedMarketId, noTokenId, Depth(resolvedMarketId, noTokenId, now, "false-edge-no-1", Ask(0.49m, 20m))))
+            .ConfigureAwait(false);
+
+        var shallowDepth = await RunDualLegFixtureAsync(
+                acceptedRequest,
+                Slice(resolvedMarketId, yesTokenId, Depth(resolvedMarketId, yesTokenId, now, "depth-yes-1", Ask(0.42m, 12m))),
+                Slice(resolvedMarketId, noTokenId, Depth(resolvedMarketId, noTokenId, now, "depth-no-1", Ask(0.53m, 0.25m))))
+            .ConfigureAwait(false);
+
+        var staleRequest = acceptedRequest with
+        {
+            ToUtc = now.AddSeconds(30),
+            AsOfUtc = now.AddSeconds(30),
+            MaxQuoteAge = TimeSpan.FromSeconds(5)
+        };
+        var staleQuote = await RunDualLegFixtureAsync(
+                staleRequest,
+                Slice(resolvedMarketId, yesTokenId, Depth(resolvedMarketId, yesTokenId, now.AddSeconds(30), "stale-yes-1", Ask(0.42m, 12m))),
+                Slice(resolvedMarketId, noTokenId, Depth(resolvedMarketId, noTokenId, now, "stale-no-1", Ask(0.53m, 12m))))
+            .ConfigureAwait(false);
+
+        var acceptedPassed = accepted.Accepted &&
+            accepted.Status == "accepted" &&
+            accepted.Fills.Count == 2 &&
+            accepted.Quantity >= acceptedRequest.MinOrderQuantity &&
+            accepted.NetEdgeUsdc > 0m &&
+            accepted.SlippageAdjustedPairCost + accepted.FeePerUnit < acceptedRequest.PairCostThreshold;
+        var falseEdgePassed = IsRejected(falseEdge, "Pair cost");
+        var shallowDepthPassed = IsRejected(shallowDepth, "below min");
+        var staleQuotePassed = IsRejected(staleQuote, "Quote age");
+        var gatePassed = acceptedPassed && falseEdgePassed && shallowDepthPassed && staleQuotePassed;
+
+        var payload = new
+        {
+            documentVersion = "proofalpha-dual-leg-replay-gate.v1",
+            generatedAtUtc = DateTimeOffset.UtcNow,
+            strategyId = resolvedStrategyId,
+            marketId = resolvedMarketId,
+            yesTokenId,
+            noTokenId,
+            fillModelVersion = DualLegArbitrageReplayRunner.FillModelVersion,
+            fixture = new
+            {
+                source = "deterministic-cli-fixture",
+                asOfUtc = now,
+                notes = new[]
+                {
+                    "Positive case requires both legs to fill from visible ask depth.",
+                    "Negative cases prove the gate rejects fee/slippage false edge, shallow one-leg depth, and stale opposite-leg quotes.",
+                    "This artifact validates replay gating logic; it is not a claim of live Polymarket execution."
+                }
+            },
+            gate = new
+            {
+                status = gatePassed ? "Passed" : "Failed",
+                checks = new[]
+                {
+                    new { id = "accepted-positive-edge", passed = acceptedPassed },
+                    new { id = "reject-fee-slippage-false-edge", passed = falseEdgePassed },
+                    new { id = "reject-shallow-opposite-leg-depth", passed = shallowDepthPassed },
+                    new { id = "reject-stale-opposite-leg-quote", passed = staleQuotePassed }
+                }
+            },
+            acceptedCase = new
+            {
+                id = "accepted-depth-aware-edge-after-fee-slippage",
+                requirement = "YES + NO pair cost must remain below threshold after depth, slippage, and fees.",
+                request = acceptedRequest,
+                result = accepted
+            },
+            rejectedCases = new[]
+            {
+                new
+                {
+                    id = "reject-fee-slippage-false-edge",
+                    requirement = "A raw-looking edge must be rejected when fee and slippage remove the edge.",
+                    expectedReasonContains = "Pair cost",
+                    passed = falseEdgePassed,
+                    request = falseEdgeRequest,
+                    result = falseEdge
+                },
+                new
+                {
+                    id = "reject-shallow-opposite-leg-depth",
+                    requirement = "The gate must reject one-sided depth that cannot fill the minimum two-leg quantity.",
+                    expectedReasonContains = "below min",
+                    passed = shallowDepthPassed,
+                    request = acceptedRequest,
+                    result = shallowDepth
+                },
+                new
+                {
+                    id = "reject-stale-opposite-leg-quote",
+                    requirement = "The gate must reject stale paired quotes even when the latest visible prices look profitable.",
+                    expectedReasonContains = "Quote age",
+                    passed = staleQuotePassed,
+                    request = staleRequest,
+                    result = staleQuote
+                }
+            },
+            disclosures = new[]
+            {
+                "Replay uses deterministic fixture data for hackathon evidence.",
+                "Production claims still require real market tape and real Polymarket execution credentials.",
+                "No investment advice or profitability guarantee."
+            }
+        };
+
+        var json = JsonSerializer.Serialize(payload, ReplayDemoJsonOptions);
+        return await WriteOutputAsync(context, json, output).ConfigureAwait(false);
+    }
+
+    private static DualLegArbitrageReplayRequest CreateDualLegReplayRequest(
+        DateTimeOffset now,
+        string marketId,
+        string yesTokenId,
+        string noTokenId)
+        => new(
+            marketId,
+            yesTokenId,
+            noTokenId,
+            Quantity: 10m,
+            MinOrderQuantity: 1m,
+            MaxNotionalUsdc: 10m,
+            PairCostThreshold: 0.99m,
+            MaxSlippage: 0.002m,
+            FeeRateBps: 10m,
+            FromUtc: now,
+            ToUtc: now.AddMinutes(5),
+            AsOfUtc: now.AddMinutes(5),
+            MaxQuoteAge: TimeSpan.FromSeconds(10));
+
+    private static async Task<DualLegArbitrageReplayResult> RunDualLegFixtureAsync(
+        DualLegArbitrageReplayRequest request,
+        params MarketTapeReplaySlice[] slices)
+    {
+        var runner = new DualLegArbitrageReplayRunner(new StaticMarketReplayReader(slices));
+        return await runner.RunAsync(request).ConfigureAwait(false);
+    }
+
+    private static bool IsRejected(DualLegArbitrageReplayResult result, string expectedReason)
+        => !result.Accepted &&
+           result.Status == "no_profitable_two_leg_fill" &&
+           result.RejectionReasons.Any(
+               reason => reason.Contains(expectedReason, StringComparison.OrdinalIgnoreCase));
+
+    private static MarketTapeReplaySlice Slice(
+        string marketId,
+        string tokenId,
+        params OrderBookDepthSnapshotDto[] snapshots)
+        => new(
+            new MarketTapeQuery(marketId, tokenId),
+            Array.Empty<MarketPriceTickDto>(),
+            Array.Empty<OrderBookTopTickDto>(),
+            snapshots,
+            Array.Empty<ClobTradeTickDto>(),
+            Array.Empty<MarketResolutionEventDto>(),
+            Array.Empty<string>());
+
+    private static OrderBookDepthSnapshotDto Depth(
+        string marketId,
+        string tokenId,
+        DateTimeOffset timestamp,
+        string snapshotHash,
+        params OrderBookDepthLevelDto[] asks)
+        => new(
+            Guid.Empty,
+            marketId,
+            tokenId,
+            timestamp,
+            snapshotHash,
+            Array.Empty<OrderBookDepthLevelDto>(),
+            asks,
+            "cli-dual-leg-replay-demo",
+            "{}",
+            timestamp);
+
+    private static OrderBookDepthLevelDto Ask(decimal price, decimal size)
+        => new(price, size, IsBid: false);
+
+    private sealed class StaticMarketReplayReader : IMarketReplayReader
+    {
+        private readonly Dictionary<string, MarketTapeReplaySlice> _slices;
+
+        public StaticMarketReplayReader(params MarketTapeReplaySlice[] slices)
+        {
+            _slices = slices.ToDictionary(
+                slice => slice.Query.TokenId ?? string.Empty,
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        public Task<MarketTapeReplaySlice> GetReplaySliceAsync(
+            MarketTapeQuery query,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (query.TokenId is not null && _slices.TryGetValue(query.TokenId, out var slice))
+            {
+                var filteredDepth = slice.DepthSnapshots
+                    .Where(snapshot => (!query.FromUtc.HasValue || snapshot.TimestampUtc >= query.FromUtc.Value) &&
+                        (!query.ToUtc.HasValue || snapshot.TimestampUtc <= query.ToUtc.Value) &&
+                        (!query.AsOfUtc.HasValue || snapshot.TimestampUtc <= query.AsOfUtc.Value))
+                    .ToArray();
+
+                return Task.FromResult(slice with { Query = query, DepthSnapshots = filteredDepth });
+            }
+
+            return Task.FromResult(new MarketTapeReplaySlice(
+                query,
+                Array.Empty<MarketPriceTickDto>(),
+                Array.Empty<OrderBookTopTickDto>(),
+                Array.Empty<OrderBookDepthSnapshotDto>(),
+                Array.Empty<ClobTradeTickDto>(),
+                Array.Empty<MarketResolutionEventDto>(),
+                Array.Empty<string>()));
+        }
     }
 
     private static (DateTimeOffset?, DateTimeOffset?) ParseTimeRange(string? from, string? to)

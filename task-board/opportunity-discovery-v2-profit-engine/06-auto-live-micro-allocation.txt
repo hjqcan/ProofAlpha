@@ -1,0 +1,49 @@
+ODV2-T006: Auto Live Micro-Allocation and Kill Criteria
+=======================================================
+
+Status
+------
+[TODO]
+
+
+Goal
+----
+Allow validated opportunities to publish tiny Live allocations automatically
+while keeping all existing arming, risk, and compliance controls authoritative.
+
+
+Default Limits
+--------------
+- Single order: 5 USDC.
+- Single opportunity: 10 USDC.
+- Single cycle: 20 USDC.
+- Global active Live exposure: 100 USDC.
+- Active Live opportunities: 3.
+
+
+Rules
+-----
+- Defaults must be conservative and explicit.
+- Increasing limits requires explicit config and compliance guard support.
+- OpportunityDiscovery creates allocation records; Strategy and Trading execute.
+- Kill criteria suspend opportunities and cancel open orders.
+
+
+Kill Criteria
+-------------
+- realized edge below threshold
+- adverse slippage above threshold
+- fill rate below threshold
+- drawdown above threshold
+- source drift
+- model calibration drift
+- stale order book
+- risk or compliance event
+
+
+Acceptance
+----------
+- Auto Live cannot run unless live arming, compliance, account sync, and risk
+  gates all pass.
+- Suspension writes audit trail and blocks future feed publication.
+- Unfilled open orders are canceled on suspension.

@@ -203,6 +203,28 @@ dotnet run --project .\interfaces\Autotrade.Cli\Autotrade.Cli.csproj -- opportun
 dotnet run --project .\interfaces\Autotrade.Cli\Autotrade.Cli.csproj -- self-improve list --limit 20 --config .\interfaces\Autotrade.Cli\appsettings.local.json
 ```
 
+Paper-only SelfImprove closed-loop evidence runner:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-self-improve-closed-loop.ps1
+```
+
+The runner writes opportunity evidence, generated Python strategy packages,
+baseline/improved strategy run logs, the LLM improvement response, and a gate
+summary under `artifacts/self-improve/closed-loop`. It does not enable Live
+trading and its paper replay PnL is validation evidence, not a live
+profitability guarantee.
+
+Paper-only repeating SelfImprove agent loop:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-self-improve-agent-loop.ps1 -Iterations 3 -DelaySeconds 300
+```
+
+The controller reruns the closed-loop evidence runner, writes per-iteration
+controller logs under `artifacts/self-improve/agent-loop`, and preserves the
+same paper-only boundary.
+
 ## API And Web App
 
 Start the API on the default local Control Room port:

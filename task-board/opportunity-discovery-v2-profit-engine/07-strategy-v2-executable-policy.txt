@@ -1,0 +1,44 @@
+ODV2-T007: LlmOpportunityStrategy v2 Executable Policy
+======================================================
+
+Status
+------
+[TODO]
+
+
+Goal
+----
+Make Strategy consume deterministic executable policies instead of v1 published
+LLM opportunities.
+
+
+Scope
+-----
+- Add `IExecutableOpportunityPolicyFeed`.
+- Update `LlmOpportunityStrategy` to consume v2 policies.
+- Keep the hot path offline and deterministic.
+- Add ContextJson provenance:
+  - opportunity id
+  - score id
+  - gate run id
+  - allocation id
+  - score version
+  - policy version
+
+
+Guards
+------
+- stale policy guard
+- stale order book guard
+- max spread guard
+- max notional guard
+- max active opportunity guard
+- per-cycle allocation guard
+- kill switch guard
+
+
+Acceptance
+----------
+- Strategy tests prove no LLM/source dependency is called.
+- Expired, suspended, stale, or over-budget policies do not emit signals.
+- Entry and exit signals remain deterministic for the same snapshot and policy.

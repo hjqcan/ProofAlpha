@@ -106,10 +106,17 @@ The following boards are independent from the product-hardening sequence above:
 
 - `09-arc-hackathon-proofalpha.txt`
 - `arc-hackathon-proofalpha/`
+- `10-opportunity-discovery-v2-profit-engine.txt`
+- `opportunity-discovery-v2-profit-engine/`
 
 Use the Arc hackathon board only for the Arc-backed ProofAlpha submission. It
 must preserve the same safety baseline: Paper-first, no browser credentials, no
 Live execution without arming, and no unverified profitability claims.
+
+Use the OpportunityDiscovery v2 board only for the profit-driven autonomous
+opportunity engine. It must preserve the same safety baseline while adding
+point-in-time market tape, evidence replay, deterministic scoring, promotion
+gates, and micro-allocation Live publishing.
 
 
 Current Sequencing Note

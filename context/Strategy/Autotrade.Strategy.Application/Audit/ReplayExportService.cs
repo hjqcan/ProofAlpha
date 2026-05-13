@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Autotrade.Application.Readiness;
+using Autotrade.MarketData.Application.Contract.Tape;
 using Autotrade.Strategy.Application.Decisions;
 using Autotrade.Strategy.Application.RunSessions;
 using Autotrade.Trading.Application.Contract.Repositories;
@@ -18,7 +19,8 @@ public sealed class ReplayExportService(
     IPositionRepository positionRepository,
     IRiskEventRepository riskEventRepository,
     IPaperRunSessionService runSessionService,
-    IReadinessReportService readinessReportService) : IReplayExportService
+    IReadinessReportService readinessReportService,
+    IMarketReplayReader? marketReplayReader = null) : IReplayExportService
 {
     public const string ContractVersion = "autotrade.replay-export.v1";
 
@@ -59,8 +61,9 @@ public sealed class ReplayExportService(
         var orderEventsTask = LoadOrderEventsAsync(normalizedQuery, effectiveFrom, effectiveTo, cancellationToken);
         var riskEventsTask = LoadRiskEventsAsync(normalizedQuery, effectiveFrom, effectiveTo, cancellationToken);
         var readinessTask = LoadReadinessAsync(cancellationToken);
+        var marketTapeTask = LoadMarketTapeAsync(normalizedQuery, effectiveFrom, effectiveTo, cancellationToken);
 
-        await Task.WhenAll(timelineTask, decisionsTask, orderEventsTask, riskEventsTask, readinessTask)
+        await Task.WhenAll(timelineTask, decisionsTask, orderEventsTask, riskEventsTask, readinessTask, marketTapeTask)
             .ConfigureAwait(false);
 
         var timeline = SanitizeTimeline(await timelineTask.ConfigureAwait(false));
@@ -74,11 +77,13 @@ public sealed class ReplayExportService(
             .ConfigureAwait(false);
         var riskEvents = (await riskEventsTask.ConfigureAwait(false)).ToArray();
         var (readiness, readinessNote) = await readinessTask.ConfigureAwait(false);
+        var marketTape = await marketTapeTask.ConfigureAwait(false);
 
         var notes = BuildCompletenessNotes(
             normalizedQuery,
             runSession,
             readinessNote,
+            marketTape,
             decisions,
             orderEvents,
             orders,
@@ -101,6 +106,7 @@ public sealed class ReplayExportService(
                 trades.Select(ToReplayTrade).ToArray(),
                 positions.Select(ToReplayPosition).ToArray(),
                 riskEvents.Select(ToReplayRiskEvent).ToArray()),
+            marketTape,
             BuildStrategyConfigVersions(runSession, decisions),
             readiness,
             BuildExportReferences(normalizedQuery));
@@ -387,6 +393,39 @@ public sealed class ReplayExportService(
         {
             return (null, $"Readiness state was unavailable: {exception.Message}");
         }
+    }
+
+    private async Task<ReplayMarketTapeSlice?> LoadMarketTapeAsync(
+        ReplayExportQuery query,
+        DateTimeOffset? effectiveFrom,
+        DateTimeOffset? effectiveTo,
+        CancellationToken cancellationToken)
+    {
+        if (marketReplayReader is null || string.IsNullOrWhiteSpace(query.MarketId))
+        {
+            return null;
+        }
+
+        var asOfUtc = effectiveTo ?? DateTimeOffset.UtcNow;
+        var slice = await marketReplayReader.GetReplaySliceAsync(
+                new MarketTapeQuery(
+                    query.MarketId,
+                    TokenId: null,
+                    FromUtc: effectiveFrom,
+                    ToUtc: effectiveTo,
+                    AsOfUtc: asOfUtc,
+                    Limit: query.Limit),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return new ReplayMarketTapeSlice(
+            slice.Query,
+            slice.PriceTicks,
+            slice.TopTicks,
+            slice.DepthSnapshots,
+            slice.TradeTicks,
+            slice.ResolutionEvents,
+            slice.CompletenessNotes);
     }
 
     private static AuditTimelineQuery ToTimelineQuery(ReplayExportQuery query)
@@ -725,6 +764,7 @@ public sealed class ReplayExportService(
         ReplayExportQuery query,
         PaperRunSessionRecord? runSession,
         string? readinessNote,
+        ReplayMarketTapeSlice? marketTape,
         IReadOnlyList<StrategyDecisionRecord> decisions,
         IReadOnlyList<OrderEventDto> orderEvents,
         IReadOnlyList<OrderDto> orders,
@@ -741,6 +781,22 @@ public sealed class ReplayExportService(
         if (readinessNote is not null)
         {
             notes.Add(readinessNote);
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.MarketId))
+        {
+            if (marketTape is null)
+            {
+                notes.Add("Market tape was not included because no market replay reader is configured.");
+            }
+            else if (marketTape.PriceTicks.Count == 0 &&
+                     marketTape.TopTicks.Count == 0 &&
+                     marketTape.DepthSnapshots.Count == 0 &&
+                     marketTape.TradeTicks.Count == 0 &&
+                     marketTape.ResolutionEvents.Count == 0)
+            {
+                notes.Add("No market tape records matched the replay query.");
+            }
         }
 
         if (decisions.Count == 0)

@@ -3,7 +3,7 @@ ODV2-T001: MarketData Durable Tape and Replay
 
 Status
 ------
-[WIP]
+[DONE]
 
 Progress
 --------
@@ -20,9 +20,11 @@ Progress
   synchronizer.
 - [DONE] Added tests for top tick dedup, as-of replay clamping, and deterministic
   top-of-book backtest.
-- [TODO] Add CLOB REST polling gap-repair writer.
-- [TODO] Add depth-aware fill model for promotion-grade backtests.
-- [TODO] Add replay export integration for market tape slices.
+- [DONE] Added CLOB REST polling gap-repair writer and disabled-by-default
+  Hangfire schedule.
+- [DONE] Added depth-aware single-leg fill model with named top-of-book degraded
+  fallback.
+- [DONE] Added replay export integration for market tape slices.
 
 
 Goal
@@ -143,12 +145,24 @@ Completion Evidence
   `MarketDataContext`, `EfMarketTapeRepository`, `ScopedMarketTapeRecorder`,
   `OrderBookSynchronizer`, DI registration, migration files, and
   `MarketTapeRepositoryTests`.
+- [DONE] Additional closure changes include `MarketTapeGapRepairContracts`,
+  `ClobRestMarketTapeGapRepairService`, `MarketTapeGapRepairJob`,
+  `MarketReplayBacktestRunner` depth-aware fill logic, replay export market tape
+  DTOs/service integration, default-disabled API/CLI configuration, and
+  `replay-export-schema.md`.
 - [DONE] Targeted test passed:
   `dotnet test context/MarketData/Autotrade.MarketData.Tests/Autotrade.MarketData.Tests.csproj`
-  with 26 passed.
+  with 29 passed.
+- [DONE] Targeted Strategy regression passed:
+  `dotnet test context/Strategy/Autotrade.Strategy.Tests/Autotrade.Strategy.Tests.csproj`
+  with 100 passed.
+- [DONE] Targeted API regression passed:
+  `dotnet test interfaces/Autotrade.Api.Tests/Autotrade.Api.Tests.csproj`
+  with 139 passed.
 - [DONE] Full validation passed:
   `dotnet build` with 0 warnings and 0 errors.
 - [DONE] Full test passed:
-  `dotnet test --no-build` with all listed test assemblies passing.
+  `dotnet test --no-build` with all listed test assemblies passing
+  (633 tests total across 10 test assemblies).
 - [DONE] Postgres smoke was not run because `AUTOTRADE_TEST_POSTGRES` was not
   set in this environment.

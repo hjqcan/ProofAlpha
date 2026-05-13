@@ -7,7 +7,9 @@ namespace Autotrade.MarketData.Application.Tape;
 
 public sealed class MarketReplayBacktestRunner : IMarketReplayBacktestRunner
 {
-    public const string FillModelVersion = "top-of-book-degraded-v1";
+    public const string FillModelVersion = TopOfBookFillModelVersion;
+    public const string TopOfBookFillModelVersion = "top-of-book-degraded-v1";
+    public const string DepthAwareFillModelVersion = "single-leg-depth-aware-v1";
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -32,69 +34,74 @@ public sealed class MarketReplayBacktestRunner : IMarketReplayBacktestRunner
             request.AsOfUtc);
         var replay = await _replayReader.GetReplaySliceAsync(query, cancellationToken).ConfigureAwait(false);
         var notes = replay.CompletenessNotes.ToList();
-        notes.Add("Backtest used top-of-book degraded fill model; depth-aware promotion remains required for Live gates.");
+        var (books, fillModelVersion) = BuildBookStates(replay, request.TokenId, notes);
 
-        var topTicks = replay.TopTicks
-            .OrderBy(tick => tick.TimestampUtc)
-            .ThenBy(tick => tick.Id)
-            .ToArray();
-        var entryTick = topTicks.FirstOrDefault(tick =>
-            tick.BestAskPrice.HasValue
-            && tick.BestAskSize.HasValue
-            && tick.BestAskPrice.Value <= request.EntryMaxPrice
-            && tick.BestAskSize.Value > 0m);
-
-        if (entryTick is null)
+        var entryCandidate = books.FirstOrDefault(book =>
+            book.Asks.Any(level => level.Price <= request.EntryMaxPrice && level.Size > 0m));
+        if (entryCandidate is null)
         {
             notes.Add("No entry fill was available inside the replay window.");
-            return Empty(request, notes);
+            return Empty(request, fillModelVersion, notes);
         }
 
-        var entryPrice = entryTick.BestAskPrice!.Value;
-        var maxQuantityByNotional = request.MaxNotional / entryPrice;
-        var quantity = Math.Min(request.Quantity, Math.Min(maxQuantityByNotional, entryTick.BestAskSize!.Value));
-        if (quantity <= 0m)
+        var entry = TryBuildBuyFill(
+            entryCandidate,
+            request.Quantity,
+            request.MaxNotional,
+            level => level.Price <= request.EntryMaxPrice,
+            "entry");
+        if (entry is null)
         {
-            notes.Add("Entry capacity was zero after quantity, max notional, and visible ask-size limits.");
-            return Empty(request, notes);
+            notes.Add("Entry capacity was zero after quantity, max notional, visible ask-size, and entry price limits.");
+            return Empty(request, fillModelVersion, notes);
         }
-
-        var entry = new MarketReplayFill(entryTick.TimestampUtc, entryPrice, quantity, "entry");
-        var exitTick = topTicks
-            .Where(tick => tick.TimestampUtc > entryTick.TimestampUtc)
-            .FirstOrDefault(tick =>
-                tick.BestBidPrice.HasValue
-                && tick.BestBidSize.HasValue
-                && tick.BestBidSize.Value > 0m
-                && (tick.BestBidPrice.Value >= request.TakeProfitPrice
-                    || tick.BestBidPrice.Value <= request.StopLossPrice));
 
         MarketReplayFill? exit = null;
-        if (exitTick is not null)
+        var exitCandidate = books
+            .Where(book => book.TimestampUtc > entryCandidate.TimestampUtc)
+            .FirstOrDefault(book =>
+            {
+                var bestBid = book.Bids.FirstOrDefault();
+                return bestBid is not null &&
+                    (bestBid.Price >= request.TakeProfitPrice || bestBid.Price <= request.StopLossPrice);
+            });
+
+        if (exitCandidate is not null)
         {
-            var reason = exitTick.BestBidPrice!.Value >= request.TakeProfitPrice ? "take_profit" : "stop_loss";
-            exit = new MarketReplayFill(
-                exitTick.TimestampUtc,
-                exitTick.BestBidPrice.Value,
-                Math.Min(quantity, exitTick.BestBidSize!.Value),
-                reason);
+            var bestBid = exitCandidate.Bids[0].Price;
+            if (bestBid >= request.TakeProfitPrice)
+            {
+                exit = TryBuildSellFill(
+                    exitCandidate,
+                    entry.Quantity,
+                    level => level.Price >= request.TakeProfitPrice,
+                    "take_profit");
+            }
+            else
+            {
+                exit = TryBuildSellFill(
+                    exitCandidate,
+                    entry.Quantity,
+                    level => level.Price > 0m,
+                    "stop_loss");
+            }
         }
         else
         {
-            var lastMark = topTicks
-                .Where(tick => tick.TimestampUtc > entryTick.TimestampUtc
-                    && tick.BestBidPrice.HasValue
-                    && tick.BestBidSize.HasValue
-                    && tick.BestBidSize.Value > 0m)
+            var lastMark = books
+                .Where(book => book.TimestampUtc > entryCandidate.TimestampUtc && book.Bids.Count > 0)
                 .LastOrDefault();
             if (lastMark is not null)
             {
-                exit = new MarketReplayFill(
-                    lastMark.TimestampUtc,
-                    lastMark.BestBidPrice!.Value,
-                    Math.Min(quantity, lastMark.BestBidSize!.Value),
+                exit = TryBuildSellFill(
+                    lastMark,
+                    entry.Quantity,
+                    level => level.Price > 0m,
                     "window_end_mark");
-                notes.Add("No take-profit or stop-loss exit occurred; result marks at last replay bid.");
+                if (exit is not null)
+                {
+                    notes.Add("No take-profit or stop-loss exit occurred; result marks at last replay bid.");
+                }
             }
             else
             {
@@ -105,11 +112,11 @@ public sealed class MarketReplayBacktestRunner : IMarketReplayBacktestRunner
         var exited = exit is not null;
         var exitQuantity = exit?.Quantity ?? 0m;
         var grossPnl = exited ? (exit!.Price - entry.Price) * exitQuantity : 0m;
-        var fees = EstimateFees(entry.Price, quantity, exit?.Price, exitQuantity, request.FeeRateBps);
+        var fees = EstimateFees(entry.Price, entry.Quantity, exit?.Price, exitQuantity, request.FeeRateBps);
 
         return new MarketReplayBacktestResult(
             BuildReplaySeed(request),
-            FillModelVersion,
+            fillModelVersion,
             Entered: true,
             Exited: exited,
             entry,
@@ -122,10 +129,11 @@ public sealed class MarketReplayBacktestRunner : IMarketReplayBacktestRunner
 
     private static MarketReplayBacktestResult Empty(
         MarketReplayBacktestRequest request,
+        string fillModelVersion,
         IReadOnlyList<string> notes)
         => new(
             BuildReplaySeed(request),
-            FillModelVersion,
+            fillModelVersion,
             Entered: false,
             Exited: false,
             Entry: null,
@@ -134,6 +142,131 @@ public sealed class MarketReplayBacktestRunner : IMarketReplayBacktestRunner
             EstimatedFees: 0m,
             NetPnl: 0m,
             CompletenessNotes: notes);
+
+    private static (IReadOnlyList<BookState> Books, string FillModelVersion) BuildBookStates(
+        MarketTapeReplaySlice replay,
+        string tokenId,
+        List<string> notes)
+    {
+        var depthStates = replay.DepthSnapshots
+            .Where(snapshot => string.Equals(snapshot.TokenId, tokenId, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(snapshot => snapshot.TimestampUtc)
+            .ThenBy(snapshot => snapshot.Id)
+            .Select(snapshot => new BookState(
+                snapshot.TimestampUtc,
+                snapshot.Bids
+                    .Where(level => level.IsBid && level.Price > 0m && level.Size > 0m)
+                    .OrderByDescending(level => level.Price)
+                    .ToArray(),
+                snapshot.Asks
+                    .Where(level => !level.IsBid && level.Price > 0m && level.Size > 0m)
+                    .OrderBy(level => level.Price)
+                    .ToArray()))
+            .ToArray();
+        if (depthStates.Length > 0)
+        {
+            return (depthStates, DepthAwareFillModelVersion);
+        }
+
+        var topStates = replay.TopTicks
+            .Where(tick => string.Equals(tick.TokenId, tokenId, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(tick => tick.TimestampUtc)
+            .ThenBy(tick => tick.Id)
+            .Select(tick => new BookState(
+                tick.TimestampUtc,
+                tick.BestBidPrice is > 0m && tick.BestBidSize is > 0m
+                    ? [new OrderBookDepthLevelDto(tick.BestBidPrice.Value, tick.BestBidSize.Value, IsBid: true)]
+                    : Array.Empty<OrderBookDepthLevelDto>(),
+                tick.BestAskPrice is > 0m && tick.BestAskSize is > 0m
+                    ? [new OrderBookDepthLevelDto(tick.BestAskPrice.Value, tick.BestAskSize.Value, IsBid: false)]
+                    : Array.Empty<OrderBookDepthLevelDto>()))
+            .ToArray();
+
+        if (topStates.Length > 0)
+        {
+            notes.Add("Depth snapshots were missing; backtest degraded to top-of-book fill model.");
+        }
+
+        return (topStates, TopOfBookFillModelVersion);
+    }
+
+    private static MarketReplayFill? TryBuildBuyFill(
+        BookState book,
+        decimal requestedQuantity,
+        decimal maxNotional,
+        Func<OrderBookDepthLevelDto, bool> canUseLevel,
+        string reason)
+    {
+        var remainingQuantity = requestedQuantity;
+        var remainingNotional = maxNotional;
+        var filledQuantity = 0m;
+        var filledNotional = 0m;
+
+        foreach (var level in book.Asks.Where(canUseLevel))
+        {
+            if (level.Price <= 0m)
+            {
+                continue;
+            }
+
+            var take = Math.Min(remainingQuantity, level.Size);
+            take = Math.Min(take, remainingNotional / level.Price);
+            if (take <= 0m)
+            {
+                break;
+            }
+
+            filledQuantity += take;
+            filledNotional += take * level.Price;
+            remainingQuantity -= take;
+            remainingNotional -= take * level.Price;
+            if (remainingQuantity <= 0m || remainingNotional <= 0m)
+            {
+                break;
+            }
+        }
+
+        return BuildFill(book.TimestampUtc, filledQuantity, filledNotional, reason);
+    }
+
+    private static MarketReplayFill? TryBuildSellFill(
+        BookState book,
+        decimal requestedQuantity,
+        Func<OrderBookDepthLevelDto, bool> canUseLevel,
+        string reason)
+    {
+        var remainingQuantity = requestedQuantity;
+        var filledQuantity = 0m;
+        var filledNotional = 0m;
+
+        foreach (var level in book.Bids.Where(canUseLevel))
+        {
+            var take = Math.Min(remainingQuantity, level.Size);
+            if (take <= 0m)
+            {
+                continue;
+            }
+
+            filledQuantity += take;
+            filledNotional += take * level.Price;
+            remainingQuantity -= take;
+            if (remainingQuantity <= 0m)
+            {
+                break;
+            }
+        }
+
+        return BuildFill(book.TimestampUtc, filledQuantity, filledNotional, reason);
+    }
+
+    private static MarketReplayFill? BuildFill(
+        DateTimeOffset timestampUtc,
+        decimal filledQuantity,
+        decimal filledNotional,
+        string reason)
+        => filledQuantity <= 0m
+            ? null
+            : new MarketReplayFill(timestampUtc, filledNotional / filledQuantity, filledQuantity, reason);
 
     private static void Validate(MarketReplayBacktestRequest request)
     {
@@ -201,4 +334,9 @@ public sealed class MarketReplayBacktestRunner : IMarketReplayBacktestRunner
         var json = JsonSerializer.Serialize(request, JsonOptions);
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json))).ToLowerInvariant();
     }
+
+    private sealed record BookState(
+        DateTimeOffset TimestampUtc,
+        IReadOnlyList<OrderBookDepthLevelDto> Bids,
+        IReadOnlyList<OrderBookDepthLevelDto> Asks);
 }

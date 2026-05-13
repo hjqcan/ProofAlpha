@@ -20,6 +20,7 @@ public static class MarketDataBackgroundJobsExtensions
     {
         // Hangfire Recurring Jobs
         services.AddScoped<MarketCatalogSyncJob>();
+        services.AddScoped<MarketTapeGapRepairJob>();
         services.AddSingleton<IRecurringJobConfigurator, MarketDataJobConfigurator>();
         services.AddHostedService<SpotPriceFeedWorker>();
 

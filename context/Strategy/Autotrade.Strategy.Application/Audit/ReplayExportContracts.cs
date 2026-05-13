@@ -1,4 +1,5 @@
 using Autotrade.Application.Readiness;
+using Autotrade.MarketData.Application.Contract.Tape;
 using Autotrade.Strategy.Application.Decisions;
 using Autotrade.Strategy.Application.RunSessions;
 using Autotrade.Trading.Application.Contract.Repositories;
@@ -35,9 +36,19 @@ public sealed record ReplayExportPackage(
     ReplayRunSessionRecord? RunSession,
     AuditTimeline Timeline,
     ReplayEvidenceBundle Evidence,
+    ReplayMarketTapeSlice? MarketTape,
     IReadOnlyList<ReplayStrategyConfigVersion> StrategyConfigVersions,
     ReplayReadinessReport? Readiness,
     ReplayExportReferences ExportReferences);
+
+public sealed record ReplayMarketTapeSlice(
+    MarketTapeQuery Query,
+    IReadOnlyList<MarketPriceTickDto> PriceTicks,
+    IReadOnlyList<OrderBookTopTickDto> TopTicks,
+    IReadOnlyList<OrderBookDepthSnapshotDto> DepthSnapshots,
+    IReadOnlyList<ClobTradeTickDto> TradeTicks,
+    IReadOnlyList<MarketResolutionEventDto> ResolutionEvents,
+    IReadOnlyList<string> CompletenessNotes);
 
 public sealed record ReplayRedactionSummary(
     IReadOnlyList<string> AppliedRules,

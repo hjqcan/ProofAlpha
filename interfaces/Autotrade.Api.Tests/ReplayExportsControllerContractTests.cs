@@ -84,6 +84,7 @@ public sealed class ReplayExportsControllerContractTests
                 new AuditTimelineQuery(),
                 []),
             new ReplayEvidenceBundle([], [], [], [], [], []),
+            null,
             [],
             null,
             new ReplayExportReferences(

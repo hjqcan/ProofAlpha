@@ -21,6 +21,7 @@ Supported filters are `strategyId`, `marketId`, `orderId`, `clientOrderId`, `run
 | `runSession` | Paper run session metadata when `runSessionId` is supplied and found. |
 | `timeline` | Unified audit timeline with sanitized detail JSON. |
 | `evidence` | Decisions, order events, orders, trades, positions, and risk events. |
+| `marketTape` | Durable MarketData replay slice for market-scoped exports, including price, top-of-book, depth, trade, and resolution tape records. |
 | `strategyConfigVersions` | Config versions observed from run session and decision evidence. |
 | `readiness` | First-run readiness snapshot with sanitized evidence. |
 | `exportReferences` | API, CLI, and schema references for reproducing the export. |
@@ -38,6 +39,12 @@ Supported filters are `strategyId`, `marketId`, `orderId`, `clientOrderId`, `run
 `evidence.positions` includes position id, market, outcome, quantity, average cost, realized PnL, notional, and timestamp.
 
 `evidence.riskEvents` includes risk event id, code, severity, message, strategy, market, sanitized context JSON, and timestamp.
+
+## Market Tape
+
+`marketTape` is included when the export query has `marketId` and the MarketData replay reader is configured. Its query uses the export/run-session `fromUtc` and `toUtc`, and clamps `asOfUtc` to the same effective `toUtc` so offline review does not pull future market data into a replay package.
+
+`marketTape.topTicks`, `marketTape.depthSnapshots`, `marketTape.priceTicks`, `marketTape.tradeTicks`, and `marketTape.resolutionEvents` use the MarketData tape DTOs. Completeness notes on the slice are preserved in `marketTape.completenessNotes`.
 
 ## Redaction
 

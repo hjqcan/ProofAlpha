@@ -98,11 +98,61 @@ public sealed class MarketTapeRepositoryTests
         var second = await runner.RunAsync(request);
 
         Assert.Equal(first.ReplaySeed, second.ReplaySeed);
+        Assert.Equal(MarketReplayBacktestRunner.TopOfBookFillModelVersion, first.FillModelVersion);
         Assert.True(first.Entered);
         Assert.True(first.Exited);
         Assert.Equal(0.51m, first.Entry!.Price);
         Assert.Equal(0.62m, first.Exit!.Price);
         Assert.True(first.NetPnl > 0m);
+    }
+
+    [Fact]
+    public async Task MarketReplayBacktestRunner_UsesDepthAwareFillModelWhenDepthSnapshotsExist()
+    {
+        await using var db = new SqliteInMemoryDatabase();
+        await using var context = TestDbContextFactory.CreateMarketDataContextSqlite(db.Connection);
+        await context.Database.EnsureCreatedAsync();
+        var repository = new EfMarketTapeRepository(context);
+        var runner = new MarketReplayBacktestRunner(repository);
+        var now = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+
+        await repository.AppendOrderBookDepthSnapshotsAsync(
+            new[]
+            {
+                CreateDepthSnapshot(
+                    now,
+                    "depth-entry",
+                    bids: [DepthBid(0.49m, 20m)],
+                    asks: [DepthAsk(0.50m, 4m), DepthAsk(0.51m, 6m), DepthAsk(0.53m, 100m)]),
+                CreateDepthSnapshot(
+                    now.AddSeconds(20),
+                    "depth-exit",
+                    bids: [DepthBid(0.62m, 4m), DepthBid(0.61m, 6m), DepthBid(0.59m, 100m)],
+                    asks: [DepthAsk(0.64m, 20m)])
+            });
+
+        var result = await runner.RunAsync(
+            new MarketReplayBacktestRequest(
+                "market-1",
+                "token-1",
+                EntryMaxPrice: 0.52m,
+                TakeProfitPrice: 0.60m,
+                StopLossPrice: 0.45m,
+                Quantity: 10m,
+                MaxNotional: 6m,
+                FromUtc: now,
+                ToUtc: now.AddSeconds(30),
+                AsOfUtc: now.AddSeconds(30)));
+
+        Assert.Equal(MarketReplayBacktestRunner.DepthAwareFillModelVersion, result.FillModelVersion);
+        Assert.True(result.Entered);
+        Assert.True(result.Exited);
+        Assert.Equal(10m, result.Entry!.Quantity);
+        Assert.Equal(0.506m, result.Entry.Price);
+        Assert.Equal(10m, result.Exit!.Quantity);
+        Assert.Equal(0.614m, result.Exit.Price);
+        Assert.True(result.NetPnl > 1m);
+        Assert.DoesNotContain(result.CompletenessNotes, note => note.Contains("degraded", StringComparison.OrdinalIgnoreCase));
     }
 
     private static OrderBookTopTickDto CreateTopTick(
@@ -124,4 +174,27 @@ public sealed class MarketTapeRepositoryTests
             sourceSequence,
             "{}",
             timestampUtc);
+
+    private static OrderBookDepthSnapshotDto CreateDepthSnapshot(
+        DateTimeOffset timestampUtc,
+        string snapshotHash,
+        IReadOnlyList<OrderBookDepthLevelDto> bids,
+        IReadOnlyList<OrderBookDepthLevelDto> asks)
+        => new(
+            Guid.Empty,
+            "market-1",
+            "token-1",
+            timestampUtc,
+            snapshotHash,
+            bids,
+            asks,
+            "test",
+            "{}",
+            timestampUtc);
+
+    private static OrderBookDepthLevelDto DepthBid(decimal price, decimal size)
+        => new(price, size, IsBid: true);
+
+    private static OrderBookDepthLevelDto DepthAsk(decimal price, decimal size)
+        => new(price, size, IsBid: false);
 }

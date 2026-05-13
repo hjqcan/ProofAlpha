@@ -43,6 +43,8 @@ public static class MarketDataServiceCollectionExtensions
             configuration.GetSection(RtdsSpotPriceFeedOptions.SectionName));
         services.Configure<MarketWindowSpecOptions>(
             configuration.GetSection(MarketWindowSpecOptions.SectionName));
+        services.Configure<MarketTapeGapRepairOptions>(
+            configuration.GetSection(MarketTapeGapRepairOptions.SectionName));
 
         // Gamma（市场元数据）
         services.AddPolymarketGammaClient(configuration);
@@ -77,6 +79,7 @@ public static class MarketDataServiceCollectionExtensions
         services.AddScoped<IMarketTapeReader>(sp => sp.GetRequiredService<EfMarketTapeRepository>());
         services.AddScoped<IMarketReplayReader>(sp => sp.GetRequiredService<EfMarketTapeRepository>());
         services.AddScoped<IMarketReplayBacktestRunner, MarketReplayBacktestRunner>();
+        services.AddScoped<IMarketTapeGapRepairService, ClobRestMarketTapeGapRepairService>();
         services.AddSingleton<IMarketTapeRecorder, ScopedMarketTapeRecorder>();
 
         // 订单簿订阅管理（由策略引擎驱动）

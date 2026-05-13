@@ -33,7 +33,7 @@ Non-Negotiable Rules
 
 Task Order
 ----------
-1. [WIP] ODV2-T001 MarketData durable tape and replay foundation.
+1. [DONE] ODV2-T001 MarketData durable tape and replay foundation.
 2. [TODO] ODV2-T002 Source registry and official source packs.
 3. [TODO] ODV2-T003 OpportunityDiscovery v2 domain and point-in-time evidence.
 4. [TODO] ODV2-T004 Feature extraction, scoring, and calibration.
@@ -53,11 +53,11 @@ The first implementation slice is ODV2-T001:
 - add deterministic replay/backtest primitives over persisted top-of-book ticks;
 - add tests proving no forward-looking replay reads.
 
-2026-05-13 update: this slice now has passing repository/replay/backtest tests,
-an EF migration, and WebSocket recorder wiring. It remains [WIP] until CLOB REST
-gap repair, depth-aware fill modeling, and replay export integration are added.
-Do not start source packs, scoring, or Live allocation before those remaining
-MarketData tape items are closed.
+2026-05-13 update: this slice is closed. It now has passing
+repository/replay/backtest tests, an EF migration, WebSocket recorder wiring,
+CLOB REST gap repair, depth-aware fill modeling, and replay export integration.
+The next permitted implementation slice is ODV2-T002 source registry and
+official source packs.
 
 
 Acceptance Evidence

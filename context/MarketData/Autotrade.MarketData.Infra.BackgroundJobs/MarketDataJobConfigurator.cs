@@ -12,6 +12,8 @@ public sealed class MarketDataJobConfigurator : IRecurringJobConfigurator
 {
     private const string MarketCatalogSyncJobId = "marketdata-catalog-sync";
     private const string MarketCatalogSyncSection = "BackgroundJobs:MarketCatalogSync";
+    private const string MarketTapeGapRepairJobId = "marketdata-tape-gap-repair";
+    private const string MarketTapeGapRepairSection = "BackgroundJobs:MarketTapeGapRepair";
 
     public void ConfigureJobs(IConfiguration configuration)
     {
@@ -23,6 +25,13 @@ public sealed class MarketDataJobConfigurator : IRecurringJobConfigurator
             configSection: MarketCatalogSyncSection,
             defaultCronExpression: "*/5 * * * *");
 
+        RecurringJobHelper.AddOrUpdateJob<MarketTapeGapRepairJob>(
+            configuration,
+            jobId: MarketTapeGapRepairJobId,
+            jobExpression: job => job.ExecuteAsync(CancellationToken.None),
+            configSection: MarketTapeGapRepairSection,
+            defaultCronExpression: "*/2 * * * *");
+
         var enabled = configuration.GetValue<bool>($"{MarketCatalogSyncSection}:Enabled", true);
         var runOnStartup = configuration.GetValue<bool>($"{MarketCatalogSyncSection}:RunOnStartup", true);
         if (enabled && runOnStartup)
@@ -31,4 +40,3 @@ public sealed class MarketDataJobConfigurator : IRecurringJobConfigurator
         }
     }
 }
-

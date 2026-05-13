@@ -2,6 +2,7 @@ using System.Text.Json;
 using Autotrade.Application.DTOs;
 using Autotrade.Application.Readiness;
 using Autotrade.Application.RunSessions;
+using Autotrade.MarketData.Application.Contract.Tape;
 using Autotrade.Strategy.Application.Audit;
 using Autotrade.Strategy.Application.Contract.Strategies;
 using Autotrade.Strategy.Application.Decisions;
@@ -253,6 +254,75 @@ public sealed class ReplayExportServiceTests
     }
 
     [Fact]
+    public async Task ExportAsync_IncludesMarketTapeSliceWhenMarketQueryIsScoped()
+    {
+        var startedAt = DateTimeOffset.Parse("2026-05-03T12:00:00Z");
+        var sessionId = Guid.NewGuid();
+        var stoppedAt = startedAt.AddMinutes(30);
+        var session = new PaperRunSessionRecord(
+            sessionId,
+            "Paper",
+            "cfg-v1",
+            ["llm_opportunity"],
+            "{}",
+            "test",
+            startedAt,
+            stoppedAt,
+            "done",
+            false,
+            false);
+        var replayReader = new StubMarketReplayReader(new MarketTapeReplaySlice(
+            new MarketTapeQuery("market-1"),
+            Array.Empty<MarketPriceTickDto>(),
+            [
+                new OrderBookTopTickDto(
+                    Guid.Empty,
+                    "market-1",
+                    "token-yes",
+                    startedAt.AddMinutes(1),
+                    0.49m,
+                    10m,
+                    0.51m,
+                    10m,
+                    0.02m,
+                    "test",
+                    "seq-1",
+                    "{}",
+                    startedAt.AddMinutes(1))
+            ],
+            Array.Empty<OrderBookDepthSnapshotDto>(),
+            Array.Empty<ClobTradeTickDto>(),
+            Array.Empty<MarketResolutionEventDto>(),
+            ["test tape note"]));
+        var service = CreateService(
+            new StubAuditTimelineService(CreateEmptyTimeline()),
+            session,
+            CreateReadinessReport(startedAt),
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            replayReader);
+
+        var package = await service.ExportAsync(new ReplayExportQuery(
+            MarketId: "market-1",
+            RunSessionId: sessionId,
+            Limit: 100));
+
+        Assert.NotNull(package.MarketTape);
+        Assert.Single(package.MarketTape.TopTicks);
+        Assert.Equal("token-yes", package.MarketTape.TopTicks[0].TokenId);
+        Assert.Equal("test tape note", package.MarketTape.CompletenessNotes[0]);
+        Assert.Equal(startedAt, replayReader.LastQuery?.FromUtc);
+        Assert.Equal(stoppedAt, replayReader.LastQuery?.ToUtc);
+        Assert.Equal(stoppedAt, replayReader.LastQuery?.AsOfUtc);
+        Assert.DoesNotContain(package.CompletenessNotes, note =>
+            note.Contains("Market tape was not included", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task ExportAsync_ScopedQueryWithoutMatchedEvidenceDoesNotIncludeUnrelatedPositions()
     {
         var startedAt = DateTimeOffset.Parse("2026-05-03T12:00:00Z");
@@ -307,7 +377,8 @@ public sealed class ReplayExportServiceTests
         IReadOnlyList<OrderDto> orders,
         IReadOnlyList<TradeDto> trades,
         IReadOnlyList<PositionDto> positions,
-        IReadOnlyList<RiskEventRecord> riskEvents)
+        IReadOnlyList<RiskEventRecord> riskEvents,
+        IMarketReplayReader? marketReplayReader = null)
         => new(
             auditTimelineService,
             new StubDecisionQueryService(decisions),
@@ -317,7 +388,8 @@ public sealed class ReplayExportServiceTests
             new StubPositionRepository(positions),
             new StubRiskEventRepository(riskEvents),
             new StubPaperRunSessionService(session),
-            new StubReadinessReportService(readiness));
+            new StubReadinessReportService(readiness),
+            marketReplayReader);
 
     private static ReadinessReport CreateReadinessReport(DateTimeOffset checkedAtUtc)
         => new(
@@ -738,6 +810,19 @@ public sealed class ReplayExportServiceTests
     {
         public Task<ReadinessReport> GetReportAsync(CancellationToken cancellationToken = default)
             => throw new InvalidOperationException("readiness offline");
+    }
+
+    private sealed class StubMarketReplayReader(MarketTapeReplaySlice slice) : IMarketReplayReader
+    {
+        public MarketTapeQuery? LastQuery { get; private set; }
+
+        public Task<MarketTapeReplaySlice> GetReplaySliceAsync(
+            MarketTapeQuery query,
+            CancellationToken cancellationToken = default)
+        {
+            LastQuery = query;
+            return Task.FromResult(slice with { Query = query });
+        }
     }
 
     private static bool Matches(string? expected, string? actual)
